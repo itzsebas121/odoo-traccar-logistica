@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_traccar_server_tree" model="ir.ui.view">
+        <field name="name">traccar.server.tree</field>
+        <field name="model">traccar.server</field>
+        <field name="arch" type="xml">
+            <tree string="Servidores Traccar">
+                <field name="name"/>
+                <field name="base_url"/>
+                <field name="username"/>
+                <field name="state" widget="badge" decoration-success="state == 'connected'" decoration-danger="state == 'error'" decoration-muted="state == 'draft'"/>
+                <field name="device_count"/>
+                <field name="last_sync_date"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_traccar_server_form" model="ir.ui.view">
+        <field name="name">traccar.server.form</field>
+        <field name="model">traccar.server</field>
+        <field name="arch" type="xml">
+            <form string="Servidor Traccar">
+                <header>
+                    <button name="action_test_connection" string="Probar Conexión" type="object" class="oe_highlight"/>
+                    <button name="action_sync_devices" string="Sincronizar Dispositivos" type="object" class="btn-primary"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,connected,error"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1><field name="name" placeholder="Ej. Traccar Servidor Principal"/></h1>
+                    </div>
+                    <group>
+                        <group string="Conexión de Red">
+                            <field name="base_url" placeholder="http://traccar:8082"/>
+                            <field name="auth_type"/>
+                            <field name="active"/>
+                        </group>
+                        <group string="Credenciales">
+                            <field name="username" attrs="{'invisible': [('auth_type', '!=', 'basic')], 'required': [('auth_type', '=', 'basic')]}"/>
+                            <field name="password" password="True" placeholder="Contraseña o Token API"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Dispositivos Sincronizados" name="devices">
+                            <field name="device_ids" readonly="1">
+                                <tree string="Dispositivos">
+                                    <field name="name"/>
+                                    <field name="unique_id"/>
+                                    <field name="traccar_id"/>
+                                    <field name="status" widget="badge" decoration-success="status == 'online'" decoration-warning="status == 'offline'"/>
+                                    <field name="vehicle_id"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Diagnóstico y Estado" name="diagnostics">
+                            <group>
+                                <field name="last_sync_date"/>
+                                <field name="last_error_message" attrs="{'invisible': [('last_error_message', '=', False)]}"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_traccar_server" model="ir.actions.act_window">
+        <field name="name">Servidores Traccar</field>
+        <field name="res_model">traccar.server</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Configure la conexión con el servidor Traccar para iniciar el rastreo de flota.
+            </p>
+        </field>
+    </record>
+</odoo>
+

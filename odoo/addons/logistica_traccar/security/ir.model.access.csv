@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_traccar_server_user,traccar.server.user,model_traccar_server,base.group_user,1,1,1,1
+access_traccar_device_user,traccar.device.user,model_traccar_device,base.group_user,1,1,1,1
+

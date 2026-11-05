@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="fleet_vehicle_view_form_inherit_traccar" model="ir.ui.view">
+        <field name="name">fleet.vehicle.form.inherit.traccar</field>
+        <field name="model">fleet.vehicle</field>
+        <field name="inherit_id" ref="fleet.fleet_vehicle_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_fetch_traccar_position" string="Actualizar GPS Traccar" type="object" class="btn-secondary" attrs="{'invisible': [('traccar_device_id', '=', False)]}"/>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="Rastreo GPS Traccar" name="traccar_tracking">
+                    <group>
+                        <group string="Vinculación de Dispositivo">
+                            <field name="traccar_device_id" placeholder="Seleccione dispositivo GPS..."/>
+                            <field name="traccar_unique_id"/>
+                            <field name="traccar_status" widget="badge" decoration-success="traccar_status == 'online'" decoration-warning="traccar_status == 'offline'"/>
+                        </group>
+                        <group string="Última Posición Registrada">
+                            <field name="traccar_latitude"/>
+                            <field name="traccar_longitude"/>
+                            <field name="traccar_speed"/>
+                            <field name="traccar_position_time"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>
+

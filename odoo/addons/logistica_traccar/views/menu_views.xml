@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Menú bajo Flota -->
+    <menuitem id="menu_traccar_root"
+              name="Rastreo Traccar"
+              parent="fleet.menu_root"
+              sequence="50"/>
+
+    <menuitem id="menu_traccar_devices"
+              name="Dispositivos GPS"
+              parent="menu_traccar_root"
+              action="action_traccar_device"
+              sequence="10"/>
+
+    <menuitem id="menu_traccar_servers"
+              name="Servidores Traccar"
+              parent="menu_traccar_root"
+              action="action_traccar_server"
+              sequence="20"/>
+</odoo>
+

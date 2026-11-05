@@ -1,142 +1,191 @@
 # Sistema Inteligente de Rastreo y Analítica de Rutas
 
-Proyecto integrador de **Odoo 16 Community**, **Traccar**, servicios ETL, PostgreSQL, analítica de datos e inteligencia artificial.
+Proyecto universitario integrador que combina **Odoo 16 Community**, **Traccar GPS Server**, motor de optimización de rutas, procesos ETL, PostgreSQL, almacén dimensional (DWH), analítica de datos e inteligencia artificial predictiva.
 
 ---
 
-## 📌 Etapa 1: Infraestructura Base con Docker Compose
+## 🏛️ Arquitectura de la Solución (Etapa 1 + 2)
 
-Esta etapa inicial implementa y valida el despliegue local y portable de **Odoo 16 Community** y **PostgreSQL 15**.
+```
+                       ┌────────────────────────────────────────────────────────┐
+                       │                     DOCKER NETWORK                     │
+                       │             (odoo-traccar-logistica_default)           │
+                       │                                                        │
+┌────────────────┐     │  ┌───────────────┐     API REST      ┌──────────────┐  │     ┌─────────────────┐
+│ Cliente Web /  │────┼─▶│     Odoo      │◀────────────────▶│   Traccar    │◀─┼─────│ Traccar Client  │
+│ Admin Logística│8069 │  │  (16.0 ERP)   │    (HTTP :8082)   │ (6.17 GPS)   │  │5055 │ (App Móvil GPS) │
+└────────────────┘     │  └───────┬───────┘                   └──────┬───────┘  │     └─────────────────┘
+                       │          │                                  │          │
+                       │          │ odoo@db:5432/logistica_dev       │          │
+                       │          │                                  │ traccar@db:5432/traccar
+                       │          ▼                                  ▼          │
+                       │  ┌──────────────────────────────────────────────────┐  │
+                       │  │                  PostgreSQL 15                   │  │
+                       │  │       (Bases separadas lógicamente:              │  │
+                       │  │        - logistica_dev                           │  │
+                       │  │        - traccar)                                │  │
+                       │  └──────────────────────────────────────────────────┘  │
+                       └────────────────────────────────────────────────────────┘
+```
 
-### Arquitectura de Servicios
+### Servicios en Docker Compose
 
-- **db (`postgres:15`)**: Base de datos relacional para Odoo con comprobación de estado de salud (`healthcheck`). El puerto 5432 no se expone al host público para maximizar la seguridad.
-- **odoo (`odoo:16.0`)**: Servidor ERP Odoo 16 Community, conectado a la base de datos interna mediante resolución DNS de Docker Compose. El puerto `8069` se publica exclusivamente en la interfaz local (`127.0.0.1:8069`) durante el desarrollo.
-
-### Persistencia y Volúmenes
-
-- `postgres_odoo_data`: Volumen gestionado por Docker para los datos de PostgreSQL (`/var/lib/postgresql/data`).
-- `odoo_data`: Volumen gestionado por Docker para los adjuntos y sesiones de Odoo (`/var/lib/odoo`).
-- `./odoo/addons`: Directorio montado como bind mount en `/mnt/extra-addons` para el desarrollo de módulos personalizados.
+1. **`db` (`postgres:15`)**:
+   - Motor de base de datos relacional para Odoo y Traccar.
+   - Separación lógica con usuarios y bases independientes:
+     - `odoo` -> `logistica_dev`
+     - `traccar` -> `traccar`
+   - Puerto 5432 no expuesto al host público (máxima seguridad en desarrollo y producción).
+   - Healthcheck nativo mediante `pg_isready`.
+2. **`odoo` (`odoo:16.0`)**:
+   - ERP Odoo 16 Community con módulos oficiales instalados: `contacts`, `fleet`, `sale_management`, `website`, `website_sale`.
+   - Módulo personalizado `logistica_traccar` montado desde `./odoo/addons` en `/mnt/extra-addons`.
+   - Puerto `8069` accesible en `127.0.0.1:8069`.
+3. **`traccar` (`traccar/traccar:latest` v6.17.0)**:
+   - Servidor GPS con esquema gestionado por Liquibase en PostgreSQL.
+   - Puerto web y API REST en `127.0.0.1:8082`.
+   - Puerto receptor GPS OsmAnd en `5055` (compatible con la app Traccar Client).
 
 ---
 
 ## 🚀 Requisitos Previos
 
-- **Docker Desktop** (en Windows/macOS) con backend WSL2 / contenedores Linux, o **Docker Engine + Docker Compose v2** (en Ubuntu/Debian).
-- Git con normalización de finales de línea (gestionado automáticamente vía `.gitattributes`).
+- **Windows**: Docker Desktop 4.x+ con WSL2 activado.
+- **Ubuntu**: Docker Engine 24.x+ y Docker Compose v2+.
+- **Git**: Normalización de finales de línea configurada vía `.gitattributes` (integrada en el repositorio).
 
 ---
 
-## 🛠️ Instrucciones de Instalación y Despliegue
+## 🛠️ Guía Rápida de Despliegue
 
-### 1. Clonar el repositorio
+### 1. Clonar el Repositorio
 
 ```bash
-git clone <URL_DEL_REPOSITORIO>
+git clone https://github.com/sebas/odoo-traccar-logistica.git
 cd odoo-traccar-logistica
 ```
 
-### 2. Configurar las variables de entorno
+### 2. Configurar Variables de Entorno
 
-Copie el archivo de plantilla `.env.example` para generar su `.env` local:
+Copie la plantilla de variables de entorno:
 
 **En Linux / macOS / Git Bash:**
 ```bash
 cp .env.example .env
 ```
 
-**En Windows (PowerShell):**
+**En Windows PowerShell:**
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Edite el archivo `.env` y asigne contraseñas seguras para su entorno local:
+Edite `.env` con contraseñas seguras locales:
 ```env
-ODOO_DB_PASSWORD=una_contrasena_segura_para_desarrollo
-ODOO_ADMIN_PASSWORD=contrasena_maestra_para_gestionar_bd
+ODOO_DB_PASSWORD=una_contrasena_segura_odoo
+ODOO_ADMIN_PASSWORD=contrasena_maestra_odoo
+TRACCAR_DB_USER=traccar
+TRACCAR_DB_PASSWORD=una_contrasena_segura_traccar
+TRACCAR_ADMIN_PASSWORD=clave_admin_traccar_web
 ```
 
-> **Seguridad**: El archivo `.env` está expresamente excluido de Git mediante `.gitignore`. Nunca confirme contraseñas en archivos versionados.
+> **Aviso de Seguridad**: `.env` está en `.gitignore` y nunca se sube a GitHub.
 
-### 3. Validar y levantar los contenedores
+### 3. Levantar los Servicios con Docker Compose
 
-Valide la configuración de Docker Compose:
-```bash
-docker compose config
-```
-
-Inicie los servicios en segundo plano:
 ```bash
 docker compose up -d
 ```
 
-### 4. Verificar el estado de los servicios
-
+Verifique que todos los contenedores estén activos y saludables:
 ```bash
 docker compose ps
 ```
 
-Deberá observar ambos servicios activos y el servicio de base de datos con estado `(healthy)`:
-- `odoo-traccar-logistica-db-1`: `Up (healthy)`
-- `odoo-traccar-logistica-odoo-1`: `Up`
+---
 
-Para consultar los registros en tiempo real:
+## 🌐 Accesos a las Plataformas
+
+### 📌 ¿Cómo ingresar a Odoo 16?
+
+> Al tener instalado el módulo de **eCommerce**, si navegas a `http://localhost:8069/` verás directamente la tienda pública. Para entrar al panel de administración del ERP debes usar la URL de login.
+
+| Módulo / Interfaz | URL | Credenciales de Acceso | Descripción |
+|---|---|---|---|
+| **Odoo - Login Administrativo** | [http://localhost:8069/web/login](http://localhost:8069/web/login) | **Base de Datos:** `logistica_dev`<br>**Email:** `admin`<br>**Contraseña:** `admin` | Formulario para ingresar al backend del ERP. |
+| **Odoo - Panel Backend ERP** | [http://localhost:8069/web](http://localhost:8069/web) | *(Requiere sesión iniciada)* | Acceso a Flota, Contactos, Ventas y Rastreo GPS. |
+| **Odoo - Tienda eCommerce** | [http://localhost:8069/shop](http://localhost:8069/shop) | *Público (sin login)* | Catálogo de productos para compras sin registro obligatorio. |
+| **Traccar - Consola Web y API** | [http://localhost:8082](http://localhost:8082) | **Usuario:** `admin@logistica.local`<br>**Contraseña:** la definida en `TRACCAR_ADMIN_PASSWORD` | Panel de monitoreo de dispositivos y gestión GPS. |
+| **Receptor GPS OsmAnd** | `http://localhost:5055` | *Protocolo OsmAnd* | Puerto para envío de coordenadas desde Traccar Client. |
+
+---
+
+## 🧭 Navegación en Odoo y Uso del Módulo de Rastreo
+
+Una vez autenticado en [http://localhost:8069/web/login](http://localhost:8069/web/login):
+
+1. **Acceder a Flota**: En el menú principal de aplicaciones (icono de 9 puntos arriba a la izquierda), selecciona **Flota** (Fleet).
+2. **Servidores Traccar**: En la barra superior de Flota, abre el menú **Rastreo Traccar > Servidores Traccar**:
+   - Verás el servidor configurado (`http://traccar:8082`).
+   - Puedes usar el botón **"Probar Conexión"** para verificar la comunicación en tiempo real.
+   - El botón **"Sincronizar Dispositivos"** consulta la API de Traccar e importa automáticamente los dispositivos GPS registrados.
+3. **Dispositivos GPS**: En **Rastreo Traccar > Dispositivos GPS** se listan los identificadores IMEI / Client ID con su estado (`online` / `offline`) y última telemetría.
+4. **Vehículos con GPS**: En **Flota > Vehículos**:
+   - Abre cualquier vehículo (ej. `LOG-001`).
+   - Revisa la pestaña **"Rastreo GPS Traccar"** para ver el dispositivo asociado, coordenadas (latitud/longitud) y velocidad.
+   - Presiona el botón de cabecera **"Actualizar GPS Traccar"** para refrescar la última ubicación registrada.
+
+---
+
+## 🧩 Módulo Personalizado: `logistica_traccar`
+
+Ubicado en `odoo/addons/logistica_traccar/`, permite la integración nativa entre Odoo y Traccar sin alterar tablas internas de ninguno de los sistemas:
+
+### Características Implementadas
+
+- **Gestión de Servidores Traccar (`traccar.server`)**:
+  - Configuración de URL base (`http://traccar:8082`) y credenciales (Basic Auth o Bearer Token).
+  - Botón **"Probar Conexión"**: Realiza test HTTP con diagnóstico de errores.
+  - Botón **"Sincronizar Dispositivos"**: Consulta `/api/devices` e importa los dispositivos GPS a Odoo.
+- **Dispositivos GPS Traccar (`traccar.device`)**:
+  - Almacena ID interno, Identificador Único (IMEI/Client ID), estado en línea y telemetría.
+  - Botón **"Actualizar Posición GPS"**: Consulta `/api/positions` en tiempo real.
+- **Extensión de Flota (`fleet.vehicle`)**:
+  - Pestaña **"Rastreo GPS Traccar"** en el formulario del vehículo.
+  - Vinculación directa `Vehículo Odoo` ↔ `Dispositivo GPS Traccar`.
+  - Botón **"Actualizar GPS Traccar"** para traer la última posición y velocidad del vehículo.
+
+### Verificación Automatizada de la Integración
+
+Para validar la comunicación interna Odoo ↔ Traccar en un solo comando:
+
+**En Linux / macOS:**
 ```bash
-docker compose logs -f
+cat scripts/verify_integration.py | docker compose exec -T odoo python3
+```
+
+**En Windows PowerShell:**
+```powershell
+Get-Content scripts/verify_integration.py -Raw | docker compose exec -T odoo python3
 ```
 
 ---
 
-## 🌐 Acceso a la Interfaz Web de Odoo
+## 📱 Vinculación con Traccar Client (Teléfono Móvil)
 
-Una vez que ambos contenedores estén en estado saludable, abra su navegador web en:
-
-👉 [http://localhost:8069](http://localhost:8069)
-
-En el primer inicio, Odoo mostrará el asistente de creación de base de datos (`/web/database/selector`):
-
-1. **Master Password**: Ingrese la contraseña maestra de administración (definida o sugerida).
-2. **Database Name**: Ingrese el nombre para la base de datos de desarrollo (ej. `odoo_logistica_dev`).
-3. **Email / Contraseña**: Credenciales para el usuario administrador de Odoo.
-4. **Country / Language**: Configure según su preferencia (ej. Spanish / Colombia).
+1. Instale la aplicación **Traccar Client** (Android / iOS).
+2. En la configuración de la app:
+   - **URL del Servidor**: `http://<IP_DE_TU_PC>:5055`
+   - **Identificador del Dispositivo**: El valor `uniqueId` asignado en Traccar (ej. `GPS-CAMION-01`).
+3. Active el servicio en la app móvil.
+4. En Odoo, ingrese a **Flota > Rastreo Traccar > Dispositivos GPS** y presione **Actualizar Posición GPS**.
 
 ---
 
-## 🧩 Desarrollo de Módulos Personalizados
+## 💾 Scripts de Mantenimiento y DevOps
 
-Los módulos desarrollados por el equipo se ubican en el directorio `./odoo/addons/`:
-
-- `logistica_base`
-- `logistica_traccar`
-- `logistica_despacho`
-- `logistica_conductor`
-- `logistica_ecommerce`
-
-Cada módulo debe contar con su estructura estándar (`__init__.py`, `__manifest__.py`, `models/`, `views/`). Al montarse en `/mnt/extra-addons`, Odoo los detectará tras activar el **Modo Desarrollador** y ejecutar **Actualizar lista de aplicaciones** desde la interfaz web.
-
----
-
-## 🛑 Comandos Útiles de Mantenimiento
-
-- **Detener los servicios (sin perder datos):**
-  ```bash
-  docker compose down
-  ```
-- **Reiniciar los servicios:**
-  ```bash
-  docker compose restart
-  ```
-- **Detener y eliminar contenedores y redes (conservando volúmenes de datos):**
-  ```bash
-  docker compose down
-  ```
-- **Inspeccionar registros de Odoo:**
-  ```bash
-  docker compose logs odoo --tail=50
-  ```
-- **Inspeccionar registros de PostgreSQL:**
-  ```bash
-  docker compose logs db --tail=50
-  ```
-
+| Tarea | Script Linux/Ubuntu | Script Windows PowerShell |
+|---|---|---|
+| **Respaldar bases y filestore** | `./scripts/backup.sh` | `.\scripts\backup.ps1` |
+| **Restaurar respaldo** | `./scripts/restore.sh <odoo.dump> <traccar.dump> [filestore.tar.gz]` | Ver comandos en `scripts/restore.sh` |
+| **Actualizar módulos Odoo** | `./scripts/update_modules.sh logistica_traccar logistica_dev` | `docker compose exec -T odoo /entrypoint.sh odoo -d logistica_dev -u logistica_traccar --stop-after-init` |
+| **Poblar datos de prueba (Seeds)** | `cat seeds/demo_data.py \| docker compose exec -T odoo python3` | `Get-Content seeds/demo_data.py -Raw \| docker compose exec -T odoo python3` |
