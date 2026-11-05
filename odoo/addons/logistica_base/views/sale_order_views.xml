@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_order_form_inherit_logistica" model="ir.ui.view">
+        <field name="name">sale.order.form.inherit.logistica</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_open_delivery_map" string="Ver Destino en Mapa" type="object" icon="fa-map-marker" class="btn-info" attrs="{'invisible': ['|', ('delivery_latitude', '=', 0.0), ('delivery_longitude', '=', 0.0)]}"/>
+            </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="Despacho y Entrega" name="logistica_despacho">
+                    <group>
+                        <group string="Destino Geográfico">
+                            <field name="delivery_latitude"/>
+                            <field name="delivery_longitude"/>
+                            <field name="delivery_zone"/>
+                            <field name="delivery_status" widget="badge" decoration-info="delivery_status == 'assigned'" decoration-warning="delivery_status == 'in_transit'" decoration-success="delivery_status == 'delivered'" decoration-danger="delivery_status == 'failed'"/>
+                        </group>
+                        <group string="Instrucciones para Chofer">
+                            <field name="delivery_notes" placeholder="Indicaciones específicas para la entrega de este pedido..."/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_order_tree_inherit_logistica" model="ir.ui.view">
+        <field name="name">sale.order.tree.inherit.logistica</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='state']" position="after">
+                <field name="delivery_zone" optional="show"/>
+                <field name="delivery_status" widget="badge" optional="show" decoration-info="delivery_status == 'assigned'" decoration-warning="delivery_status == 'in_transit'" decoration-success="delivery_status == 'delivered'" decoration-danger="delivery_status == 'failed'"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
+

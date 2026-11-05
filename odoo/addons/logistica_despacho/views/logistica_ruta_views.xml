@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Secuencia para códigos de ruta -->
+    <record id="seq_logistica_ruta" model="ir.sequence">
+        <field name="name">Secuencia de Rutas de Despacho</field>
+        <field name="code">logistica.ruta</field>
+        <field name="prefix">RUTA/%(year)s/</field>
+        <field name="padding">4</field>
+        <field name="company_id" eval="False"/>
+    </record>
+
+    <!-- Vista Formulario de Ruta -->
+    <record id="view_logistica_ruta_form" model="ir.ui.view">
+        <field name="name">logistica.ruta.form</field>
+        <field name="model">logistica.ruta</field>
+        <field name="arch" type="xml">
+            <form string="Ruta de Despacho">
+                <header>
+                    <button name="action_confirm" string="Confirmar Carga" type="object" class="oe_highlight" states="draft"/>
+                    <button name="action_start_route" string="Iniciar Ruta" type="object" class="btn-success" states="confirmed"/>
+                    <button name="action_finish_route" string="Finalizar Ruta" type="object" class="btn-primary" states="in_progress"/>
+                    <button name="action_open_google_maps_route" string="Ver Ruta en Mapa" type="object" icon="fa-map" class="btn-info" states="confirmed,in_progress,done"/>
+                    <button name="action_cancel" string="Cancelar" type="object" states="draft,confirmed"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,in_progress,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" class="oe_edit_only"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Programación">
+                            <field name="date" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                            <field name="warehouse_partner_id" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                            <field name="progress" widget="progressbar"/>
+                        </group>
+                        <group string="Asignación Operativa">
+                            <field name="vehicle_id" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                            <field name="driver_id" attrs="{'readonly': [('state', '!=', 'draft')]}"/>
+                            <field name="start_datetime" attrs="{'invisible': [('start_datetime', '=', False)]}"/>
+                            <field name="end_datetime" attrs="{'invisible': [('end_datetime', '=', False)]}"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Secuencia de Entregas" name="stops">
+                            <field name="stop_ids" attrs="{'readonly': [('state', 'in', ('in_progress', 'done', 'cancel'))]}">
+                                <tree string="Paradas" editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="order_id"/>
+                                    <field name="partner_id"/>
+                                    <field name="zone"/>
+                                    <field name="latitude"/>
+                                    <field name="longitude"/>
+                                    <field name="state" widget="badge" decoration-info="state == 'pending'" decoration-success="state == 'delivered'" decoration-danger="state == 'failed'"/>
+                                    <field name="failed_reason" attrs="{'readonly': [('state', '=', 'delivered')]}"/>
+                                    <field name="delivery_datetime" optional="hide"/>
+                                    <button name="action_open_navigation" string="Navegar" type="object" icon="fa-location-arrow" class="btn-link"/>
+                                    <button name="action_mark_delivered" string="Entregado" type="object" icon="fa-check" class="btn-success" attrs="{'invisible': [('state', '!=', 'pending')]}"/>
+                                    <button name="action_mark_failed" string="No Entregado" type="object" icon="fa-times" class="btn-danger" attrs="{'invisible': [('state', '!=', 'pending')]}"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Vista Árbol de Rutas -->
+    <record id="view_logistica_ruta_tree" model="ir.ui.view">
+        <field name="name">logistica.ruta.tree</field>
+        <field name="model">logistica.ruta</field>
+        <field name="arch" type="xml">
+            <tree string="Rutas de Despacho">
+                <field name="name"/>
+                <field name="date"/>
+                <field name="warehouse_partner_id"/>
+                <field name="vehicle_id"/>
+                <field name="driver_id"/>
+                <field name="total_stops"/>
+                <field name="delivered_stops"/>
+                <field name="failed_stops"/>
+                <field name="progress" widget="progressbar"/>
+                <field name="state" widget="badge" decoration-info="state == 'draft'" decoration-warning="state == 'confirmed'" decoration-primary="state == 'in_progress'" decoration-success="state == 'done'" decoration-muted="state == 'cancel'"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Acción de Ventana -->
+    <record id="action_logistica_ruta" model="ir.actions.act_window">
+        <field name="name">Rutas de Despacho</field>
+        <field name="res_model">logistica.ruta</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Crea una nueva ruta de despacho agrupando pedidos confirmados y asignando un vehículo y conductor.
+            </p>
+        </field>
+    </record>
+</odoo>
+

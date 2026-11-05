@@ -56,7 +56,7 @@ Proyecto universitario integrador que combina **Odoo 16 Community**, **Traccar G
 
 ---
 
-## 🛠️ Guía Rápida de Despliegue
+## 🛠️ Guía Rápida de Despliegue (1 Solo Comando)
 
 ### 1. Clonar el Repositorio
 
@@ -65,41 +65,25 @@ git clone https://github.com/sebas/odoo-traccar-logistica.git
 cd odoo-traccar-logistica
 ```
 
-### 2. Configurar Variables de Entorno
+### 2. Ejecutar el Asistente de Despliegue Automático
 
-Copie la plantilla de variables de entorno:
+El proyecto incluye un script de inicialización completa que configura `.env`, levanta Docker, crea las bases de datos de Odoo y Traccar, instala los módulos en español y siembra los datos base:
 
-**En Linux / macOS / Git Bash:**
+**En Linux / Ubuntu / macOS:**
 ```bash
-cp .env.example .env
+chmod +x ./scripts/setup.sh
+./scripts/setup.sh
 ```
 
-**En Windows PowerShell:**
+**En Windows (PowerShell):**
 ```powershell
-Copy-Item .env.example .env
+powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 ```
 
-Edite `.env` con contraseñas seguras locales:
-```env
-ODOO_DB_PASSWORD=una_contrasena_segura_odoo
-ODOO_ADMIN_PASSWORD=contrasena_maestra_odoo
-TRACCAR_DB_USER=traccar
-TRACCAR_DB_PASSWORD=una_contrasena_segura_traccar
-TRACCAR_ADMIN_PASSWORD=clave_admin_traccar_web
-```
-
-> **Aviso de Seguridad**: `.env` está en `.gitignore` y nunca se sube a GitHub.
-
-### 3. Levantar los Servicios con Docker Compose
-
-```bash
-docker compose up -d
-```
-
-Verifique que todos los contenedores estén activos y saludables:
-```bash
-docker compose ps
-```
+> **Nota:** Si prefieres hacerlo paso a paso manualmente:
+> 1. `cp .env.example .env` (y editar contraseñas si deseas).
+> 2. `docker compose up -d`
+> 3. Las bases y tablas se configuran automáticamente.
 
 ---
 

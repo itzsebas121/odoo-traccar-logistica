@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Menú Principal de Logística y Despacho -->
+    <menuitem id="menu_logistica_despacho_root"
+              name="Despacho &amp; Rutas"
+              web_icon="logistica_despacho,static/description/icon.png"
+              sequence="25"/>
+
+    <menuitem id="menu_logistica_rutas"
+              name="Rutas de Despacho"
+              parent="menu_logistica_despacho_root"
+              action="action_logistica_ruta"
+              sequence="10"/>
+
+    <record id="action_sale_order_pending_delivery" model="ir.actions.act_window">
+        <field name="name">Pedidos Pendientes de Despacho</field>
+        <field name="res_model">sale.order</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('delivery_status', 'in', ('pending', 'assigned'))]</field>
+    </record>
+
+    <menuitem id="menu_pedidos_despacho"
+              name="Pedidos por Despachar"
+              parent="menu_logistica_despacho_root"
+              action="action_sale_order_pending_delivery"
+              sequence="20"/>
+</odoo>
+

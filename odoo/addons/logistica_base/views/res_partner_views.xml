@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_inherit_logistica" model="ir.ui.view">
+        <field name="name">res.partner.form.inherit.logistica</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Geolocalización y Logística" name="logistica_geo">
+                    <group>
+                        <group string="Ubicación Geográfica">
+                            <field name="delivery_latitude"/>
+                            <field name="delivery_longitude"/>
+                            <field name="delivery_zone"/>
+                            <button name="action_open_in_google_maps" string="Ver en Google Maps" type="object" icon="fa-map-marker" class="btn-secondary" attrs="{'invisible': ['|', ('delivery_latitude', '=', 0.0), ('delivery_longitude', '=', 0.0)]}"/>
+                        </group>
+                        <group string="Perfil Logístico">
+                            <field name="is_driver"/>
+                            <field name="delivery_notes" placeholder="Color de portón, piso, puntos de referencia..."/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>
+
