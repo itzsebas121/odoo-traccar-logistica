@@ -23,7 +23,8 @@ def _franja(hora):
 
 
 def generar(cur, lote_id, dias=30, seed=42, now=None):
-    """Inserta recorridos simulados de los ultimos `dias` dias. Idempotente (fuente_id determinista)."""
+    """Inserta en el DWH (cursor de la base logistica_dwh) los recorridos simulados de los ultimos `dias` dias.
+    `lote_id` es el lote registrado en staging. Idempotente (fuente_id determinista)."""
     now = now or datetime.now(timezone.utc)
     hoy = now.replace(hour=0, minute=0, second=0, microsecond=0)
     rng = random.Random(seed)
@@ -50,7 +51,7 @@ def generar(cur, lote_id, dias=30, seed=42, now=None):
                 fin = t + timedelta(minutes=minutos)
                 fid = "sim:%s:%s" % (placa, t.strftime("%Y%m%dT%H%M"))
                 cur.execute(
-                    """INSERT INTO dwh.fact_recorridos
+                    """INSERT INTO fact_recorridos
                          (vehiculo_sk, conductor_sk, tiempo_inicio_sk, zona_origen_sk, zona_destino_sk, inicio_utc,
                           fin_utc, distancia_km, duracion_min, num_paradas, fuente_id, procedencia, lote_id)
                        VALUES (%s,NULL,%s,%s,%s,%s,%s,%s,%s,1,%s,'SIMULADO',%s)

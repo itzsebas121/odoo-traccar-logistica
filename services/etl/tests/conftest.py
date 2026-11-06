@@ -5,9 +5,10 @@ import uuid
 from datetime import datetime, timezone
 
 import psycopg2
+import psycopg2.extensions
 import pytest
 
-from etl import config, quality
+from etl import quality
 from etl.__main__ import bootstrap
 
 FIX = os.path.join(os.path.dirname(__file__), "fixtures")
@@ -63,33 +64,86 @@ def traccar():
 
 
 def _admin_dsn():
-    dsn = os.environ.get("DWH_ADMIN_DSN") or os.environ.get("DWH_DSN")
+    dsn = os.environ.get("DWH_ADMIN_DSN")
     if not dsn:
-        pytest.skip("DWH_ADMIN_DSN / DWH_DSN no definidos: pruebas de base de datos omitidas")
-    return config.with_dbname(dsn, "postgres")
+        pytest.skip("DWH_ADMIN_DSN no definido: pruebas de base de datos omitidas")
+    return dsn
 
 
-@pytest.fixture
-def dwh_env():
-    """Base PostgreSQL desechable (etl_test_<hex>) con el esquema aplicado; se elimina al terminar.
-    Devuelve los DSN (admin y de la base de prueba) para pruebas que necesitan reconectar o crear roles."""
-    admin = _admin_dsn()
-    name = "etl_test_" + uuid.uuid4().hex[:10]
-    dsn = config.with_dbname(admin, name)
-    bootstrap(dwh_dsn=dsn, admin_dsn=admin)
-    try:
-        yield {"admin": admin, "dsn": dsn, "name": name}
-    finally:
-        a = psycopg2.connect(admin)
+class Dbs:
+    """Par de bases desechables (staging y DWH, nombres con _t_<hex>) y sus roles desechables.
+    Nunca toca las bases ni los roles reales (etl_stg, dwh_etl, dwh_ro)."""
+
+    def __init__(self, admin):
+        tag = uuid.uuid4().hex[:8]
+        self.admin = admin
+        self.stg_db = "logistica_staging_t_" + tag
+        self.dwh_db = "logistica_dwh_t_" + tag
+        self.stg_user = "etl_stg_t_" + tag
+        self.dwh_user = "dwh_etl_t_" + tag
+        self.ro_role = "dwh_ro_t_" + tag
+        self.passwords = {}
+        self.result = None
+
+    def bootstrap(self, roles=False):
+        if roles:
+            self.passwords = {self.stg_user: uuid.uuid4().hex, self.dwh_user: uuid.uuid4().hex,
+                              self.ro_role: uuid.uuid4().hex}
+        pw = self.passwords
+        self.result = bootstrap(
+            admin_dsn=self.admin, staging_db=self.stg_db, dwh_db=self.dwh_db,
+            stg_user=self.stg_user, dwh_user=self.dwh_user, ro_role=self.ro_role,
+            stg_password=pw.get(self.stg_user), dwh_password=pw.get(self.dwh_user),
+            ro_password=pw.get(self.ro_role))
+        return self.result
+
+    def connect(self, dbname, role=None, autocommit=False):
+        """Conexion como admin (role=None) o como uno de los roles desechables."""
+        if role is None:
+            conn = psycopg2.connect(self.admin, dbname=dbname)
+        else:
+            p = psycopg2.extensions.parse_dsn(self.admin)
+            conn = psycopg2.connect(host=p["host"], port=p.get("port", "5432"), dbname=dbname, user=role,
+                                    password=self.passwords[role])
+        conn.autocommit = autocommit
+        return conn
+
+    def cleanup(self):
+        a = psycopg2.connect(self.admin)
         a.autocommit = True
         with a.cursor() as cur:
-            cur.execute('DROP DATABASE IF EXISTS "%s" WITH (FORCE)' % name)
+            for db in (self.stg_db, self.dwh_db):
+                cur.execute('DROP DATABASE IF EXISTS "%s" WITH (FORCE)' % db)
+            for role in (self.stg_user, self.dwh_user, self.ro_role):
+                cur.execute('DROP ROLE IF EXISTS "%s"' % role)
         a.close()
 
 
 @pytest.fixture
-def dwh(dwh_env):
-    conn = psycopg2.connect(dwh_env["dsn"])
+def dbs():
+    """Bases desechables sin roles (propietario: el administrador)."""
+    d = Dbs(_admin_dsn())
+    try:
+        d.bootstrap()
+        yield d
+    finally:
+        d.cleanup()
+
+
+@pytest.fixture
+def dbs_roles():
+    """Bases desechables con roles desechables propietarios (etl_stg, dwh_etl) y de lectura (dwh_ro)."""
+    d = Dbs(_admin_dsn())
+    try:
+        d.bootstrap(roles=True)
+        yield d
+    finally:
+        d.cleanup()
+
+
+@pytest.fixture
+def stg_con(dbs):
+    conn = dbs.connect(dbs.stg_db)
     try:
         yield conn
     finally:
@@ -97,18 +151,12 @@ def dwh(dwh_env):
 
 
 @pytest.fixture
-def ro_role(dwh_env):
-    """Nombre de un rol de solo lectura desechable (nunca el dwh_ro real); se elimina al terminar."""
-    role = "dwh_ro_t_" + uuid.uuid4().hex[:8]
+def dwh_con(dbs):
+    conn = dbs.connect(dbs.dwh_db)
     try:
-        yield role
+        yield conn
     finally:
-        a = psycopg2.connect(dwh_env["admin"])
-        a.autocommit = True
-        with a.cursor() as cur:
-            cur.execute('DROP DATABASE IF EXISTS "%s" WITH (FORCE)' % dwh_env["name"])
-            cur.execute('DROP ROLE IF EXISTS "%s"' % role)
-        a.close()
+        conn.close()
 
 
 def q1(conn, sql, *args):
