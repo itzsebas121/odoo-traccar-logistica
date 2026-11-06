@@ -30,10 +30,34 @@ class TraccarDevice(models.Model):
     last_speed = fields.Float(string='Última Velocidad (km/h)', readonly=True)
     last_position_time = fields.Datetime(string='Fecha/Hora Última Posición', readonly=True)
 
+    position_watermark = fields.Datetime(
+        string='Marca de Última Posición Procesada',
+        copy=False,
+        help='Fecha/hora de la última posición de Traccar incorporada a Odoo para este dispositivo.',
+    )
+    is_active = fields.Boolean(
+        string='Activo para Sincronización',
+        default=True,
+        help='Los dispositivos inactivos no se sincronizan con Traccar.',
+    )
+
     _sql_constraints = [
         ('server_traccar_id_uniq', 'unique(server_id, traccar_id)', 'El ID interno de Traccar debe ser único por servidor.'),
         ('unique_id_uniq', 'unique(unique_id)', 'El identificador único (IMEI / Client ID) debe ser único.')
     ]
+
+    def _registrar_posicion(self, fix_time, latitud, longitud, velocidad_kmh):
+        """Guarda la última posición conocida solo si es más reciente que la registrada.
+        Escritura con sudo: los usuarios internos no escriben en traccar.device (F1-R16)."""
+        self.ensure_one()
+        if self.last_position_time and fix_time <= self.last_position_time:
+            return
+        self.sudo().write({
+            'last_latitude': latitud,
+            'last_longitude': longitud,
+            'last_speed': velocidad_kmh,
+            'last_position_time': fix_time,
+        })
 
     def action_fetch_latest_position(self):
         self.ensure_one()
@@ -51,7 +75,8 @@ class TraccarDevice(models.Model):
                     # Conversión de nudos a km/h si Traccar reporta en knots (1 knot = 1.852 km/h)
                     speed_knots = latest.get('speed', 0.0)
                     speed_kmh = round(speed_knots * 1.852, 2)
-                    self.write({
+                    # F1-R17: la lectura queda en el contexto del usuario; la escritura va con sudo.
+                    self.sudo().write({
                         'last_latitude': latest.get('latitude', 0.0),
                         'last_longitude': latest.get('longitude', 0.0),
                         'last_speed': speed_kmh,

@@ -1,4 +1,10 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_traccar_server_user,traccar.server.user,model_traccar_server,base.group_user,1,1,1,1
-access_traccar_device_user,traccar.device.user,model_traccar_device,base.group_user,1,1,1,1
+access_traccar_server_user,traccar.server.user,model_traccar_server,base.group_user,1,0,0,0
+access_traccar_server_fleet_manager,traccar.server.fleet.manager,model_traccar_server,fleet.fleet_group_manager,1,1,1,1
+access_traccar_device_user,traccar.device.user,model_traccar_device,base.group_user,1,0,0,0
+access_traccar_device_fleet_manager,traccar.device.fleet.manager,model_traccar_device,fleet.fleet_group_manager,1,1,1,1
+access_logistica_traccar_posicion_user,logistica.traccar.posicion.user,model_logistica_traccar_posicion,base.group_user,1,0,0,0
+access_logistica_traccar_evento_user,logistica.traccar.evento.user,model_logistica_traccar_evento,base.group_user,1,0,0,0
+access_traccar_server_clave_user,traccar.server.clave.user,model_traccar_server_clave,base.group_user,0,0,0,0
+access_traccar_server_clave_fleet_manager,traccar.server.clave.fleet.manager,model_traccar_server_clave,fleet.fleet_group_manager,1,1,1,1
 

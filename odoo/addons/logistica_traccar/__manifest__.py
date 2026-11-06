@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Logística Traccar - Rastreo GPS',
-    'version': '16.0.1.0.0',
+    'version': '16.0.1.1.0',
     'category': 'Inventory/Logistics',
     'summary': 'Integración y sincronización de vehículos Odoo con Traccar GPS Server',
     'description': """
