@@ -42,6 +42,11 @@ class FleetVehicle(models.Model):
         readonly=True
     )
 
+    _sql_constraints = [
+        ('traccar_device_uniq', 'unique(traccar_device_id)',
+         'Un dispositivo GPS no puede estar vinculado a más de un vehículo.'),
+    ]
+
     def action_fetch_traccar_position(self):
         self.ensure_one()
         if not self.traccar_device_id:

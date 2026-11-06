@@ -33,14 +33,6 @@ class SaleOrder(models.Model):
         help='Indicaciones específicas de este pedido para el transportista.'
     )
 
-    delivery_status = fields.Selection([
-        ('pending', 'Pendiente de Ruta'),
-        ('assigned', 'Asignado a Ruta'),
-        ('in_transit', 'En Reparto'),
-        ('delivered', 'Entregado'),
-        ('failed', 'No Entregado'),
-    ], string='Estado de Entrega', default='pending', copy=False, readonly=True)
-
     @api.onchange('partner_shipping_id', 'partner_id')
     def _onchange_partner_delivery_coords(self):
         partner = self.partner_shipping_id or self.partner_id

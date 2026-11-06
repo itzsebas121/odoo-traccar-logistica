@@ -16,7 +16,7 @@
         <field name="name">Pedidos Pendientes de Despacho</field>
         <field name="res_model">sale.order</field>
         <field name="view_mode">tree,form</field>
-        <field name="domain">[('delivery_status', 'in', ('pending', 'assigned'))]</field>
+        <field name="domain">[('state', '=', 'sale')]</field>
     </record>
 
     <menuitem id="menu_pedidos_despacho"

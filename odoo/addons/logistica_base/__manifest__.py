@@ -19,9 +19,13 @@ Módulo Base de Logística
         'base',
         'contacts',
         'sale_management',
+        'fleet',
     ],
     'data': [
         'security/ir.model.access.csv',
+        'data/logistica_zona_data.xml',
+        'data/logistica_config_data.xml',
+        'views/logistica_config_views.xml',
         'views/res_partner_views.xml',
         'views/sale_order_views.xml',
     ],

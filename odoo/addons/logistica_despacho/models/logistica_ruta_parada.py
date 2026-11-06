@@ -18,8 +18,7 @@ class LogisticaRutaParada(models.Model):
     order_id = fields.Many2one(
         'sale.order',
         string='Pedido de Venta',
-        required=True,
-        domain=[('delivery_status', 'in', ('pending', 'assigned'))]
+        required=True
     )
     partner_id = fields.Many2one(
         'res.partner',
@@ -72,8 +71,6 @@ class LogisticaRutaParada(models.Model):
                 'delivery_datetime': fields.Datetime.now(),
                 'failed_reason': False,
             })
-            if stop.order_id:
-                stop.order_id.delivery_status = 'delivered'
 
     def action_mark_failed(self):
         for stop in self:
@@ -83,8 +80,6 @@ class LogisticaRutaParada(models.Model):
                 'state': 'failed',
                 'delivery_datetime': fields.Datetime.now(),
             })
-            if stop.order_id:
-                stop.order_id.delivery_status = 'failed'
 
     def action_open_navigation(self):
         self.ensure_one()

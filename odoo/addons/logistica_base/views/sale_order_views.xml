@@ -15,7 +15,6 @@
                             <field name="delivery_latitude"/>
                             <field name="delivery_longitude"/>
                             <field name="delivery_zone"/>
-                            <field name="delivery_status" widget="badge" decoration-info="delivery_status == 'assigned'" decoration-warning="delivery_status == 'in_transit'" decoration-success="delivery_status == 'delivered'" decoration-danger="delivery_status == 'failed'"/>
                         </group>
                         <group string="Instrucciones para Chofer">
                             <field name="delivery_notes" placeholder="Indicaciones específicas para la entrega de este pedido..."/>
@@ -33,7 +32,6 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='state']" position="after">
                 <field name="delivery_zone" optional="show"/>
-                <field name="delivery_status" widget="badge" optional="show" decoration-info="delivery_status == 'assigned'" decoration-warning="delivery_status == 'in_transit'" decoration-success="delivery_status == 'delivered'" decoration-danger="delivery_status == 'failed'"/>
             </xpath>
         </field>
     </record>

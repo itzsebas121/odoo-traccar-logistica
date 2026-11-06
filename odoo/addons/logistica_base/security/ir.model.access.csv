@@ -1,2 +1,7 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-
+access_logistica_bodega_user,logistica.bodega.user,model_logistica_bodega,base.group_user,1,0,0,0
+access_logistica_bodega_manager,logistica.bodega.manager,model_logistica_bodega,fleet.fleet_group_manager,1,1,1,1
+access_logistica_configuracion_user,logistica.configuracion.user,model_logistica_configuracion,base.group_user,1,0,0,0
+access_logistica_configuracion_manager,logistica.configuracion.manager,model_logistica_configuracion,fleet.fleet_group_manager,1,1,0,0
+access_logistica_zona_user,logistica.zona.user,model_logistica_zona,base.group_user,1,0,0,0
+access_logistica_zona_manager,logistica.zona.manager,model_logistica_zona,fleet.fleet_group_manager,1,1,1,1
