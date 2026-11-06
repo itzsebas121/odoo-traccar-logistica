@@ -1,0 +1,37 @@
+{
+  "_comentario": "Datos de Traccar de la Fase 1, con las claves de su API REST (name, uniqueId, attributes, area). Cada dispositivo lista en 'geocercas' las geocercas a las que se le concede permiso (par dispositivo-geocerca). Coordenadas ficticias (ilustrativas). attributes.speedLimit va en NUDOS y su valor es PROVISIONAL: la unidad y el valor se verifican en la Tarea 8 (ruling F1-R4).",
+  "geocercas": [
+    {"name": "Bodega central", "area": "CIRCLE (4.6097 -74.0817, 300)"}
+  ],
+  "usuarios": [
+    {
+      "name": "Integración Odoo",
+      "readonly": true,
+      "administrator": false,
+      "_nota": "Usuario de integracion (F1-D7). Correo y contrasena vienen de INTEGRATION_TRACCAR_EMAIL e INTEGRATION_TRACCAR_PASSWORD (.env), no de este archivo. Recibe permiso sobre todos los dispositivos."
+    }
+  ],
+  "dispositivos": [
+    {
+      "uniqueId": "GPS-ABC-1234",
+      "name": "ABC-1234",
+      "attributes": {"speedLimit": 30},
+      "geocercas": ["Bodega central"],
+      "_nota": "speedLimit en nudos, PENDIENTE de verificar en la Tarea 8"
+    },
+    {
+      "uniqueId": "GPS-DEF-5678",
+      "name": "DEF-5678",
+      "attributes": {"speedLimit": 30},
+      "geocercas": ["Bodega central"],
+      "_nota": "speedLimit en nudos, PENDIENTE de verificar en la Tarea 8"
+    },
+    {
+      "uniqueId": "GPS-GHI-9012",
+      "name": "GHI-9012",
+      "attributes": {"speedLimit": 30},
+      "geocercas": ["Bodega central"],
+      "_nota": "speedLimit en nudos, PENDIENTE de verificar en la Tarea 8"
+    }
+  ]
+}

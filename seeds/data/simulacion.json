@@ -1,0 +1,10 @@
+{
+  "_comentario": "Cinco pedidos web de la seccion 11, cada uno con ubicacion de entrega confirmada. Coordenadas ficticias en Bogota. La Tarea 8 anade las rutas del simulador.",
+  "pedidos": [
+    {"ref": "PED-001", "cliente": "Cliente web 1", "latitud": 4.6533, "longitud": -74.0836},
+    {"ref": "PED-002", "cliente": "Cliente web 2", "latitud": 4.6780, "longitud": -74.0580},
+    {"ref": "PED-003", "cliente": "Cliente web 3", "latitud": 4.6100, "longitud": -74.1250},
+    {"ref": "PED-004", "cliente": "Cliente web 4", "latitud": 4.5910, "longitud": -74.0950},
+    {"ref": "PED-005", "cliente": "Cliente web 5", "latitud": 4.7050, "longitud": -74.0450}
+  ]
+}
