@@ -4,6 +4,91 @@ Proyecto universitario integrador que combina **Odoo 16 Community**, **Traccar G
 
 ---
 
+## 🚧 Estado del proyecto y pendientes (actualizado 2026-11-06)
+
+Esta sección es el punto de partida para seguir implementando. Lo que aquí se lista es el estado real verificado con pruebas y revisiones; lo que no está listo se marca como pendiente.
+
+### Qué está hecho
+
+| Parte | Estado | Verificado con |
+|---|---|---|
+| Servicio de rutas (`services/routing`): matriz, ruta y optimización con capacidad | Hecho y revisado | 38 pruebas |
+| Servicio de predicción (`services/ml`): entrenamiento temporal, métricas, `/predict` | Hecho y revisado | 9 pruebas |
+| ETL y DWH (`services/etl`): staging, calidad, modelo dimensional, una base por componente | Hecho y revisado | 43 pruebas |
+| Dashboard BI (`services/bi`): consultas OLAP sobre el DWH, filtro de fecha única corregido | Hecho y revisado | 5 pruebas (1 se omite fuera de la imagen) |
+| Módulo `logistica_base`: bodega, configuración, zonas, capacidad, dispositivo GPS único | Hecho y revisado | 5 pruebas |
+| Módulo `logistica_entregas`: entrega por pedido, máquina de estados, eventos, token de seguimiento | Hecho y revisado (4 rondas de correcciones) | 17 pruebas |
+| Módulo `logistica_checkout`: checkout con mapa, pago de prueba, seguimiento público | Hecho y revisado | 9 pruebas |
+| Fase 1 · Tarea 1: `dwh_ro` sin conexión a la base de staging | Hecho y revisado | 43 pruebas del ETL |
+| Fase 1 · Tarea 2: arranque con un comando (`scripts/setup.ps1`, `scripts/setup.sh`), healthchecks, chequeo de placeholders | Hecho y revisado (Windows probado en vivo; Linux solo sintaxis) | Corridas en vivo |
+| Fase 1 · Tarea 3: seeds en JSON (`seeds/data/`) y seeder idempotente (`seeds/seed.py`) | Hecho y revisado | 6 pruebas de esquema; idempotencia probada en vivo |
+| Fase 1 · Tarea 4: usuario de integración en Traccar (solo lectura), sincronización de la secuencia de usuarios | Hecho y revisado | Verificado en vivo |
+| Fase 1 · Tarea 5: modelos de posiciones y eventos en Odoo, con restricciones únicas | Hecho y revisado | 17 pruebas |
+| Fase 1 · Tarea 6: conector de sincronización (posiciones, eventos, watermark, reintentos, aislamiento por dispositivo) | Hecho y revisado (4 rondas de correcciones y revisión de seguridad) | 53 pruebas |
+
+### Qué falta
+
+**Fase 1, tareas que no se han empezado:**
+
+- **Tarea 7 — cron y botón manual.** Crear el `ir.cron` que llama a `traccar.server.cron_sincronizar` con el intervalo de `logistica.traccar_poll_minutes`. Conservar el usuario por defecto del cron (uid 1): la compuerta de `cron_sincronizar` solo deja pasar al sistema o a un gestor de flota. El botón «Sincronizar ahora» debe llamar a `action_sincronizar_ahora`, que es el único punto de entrada del usuario.
+- **Tarea 8 — simulador OsmAnd y verificación de eventos.** Enviar posiciones al puerto 5055 de Traccar y comprobar que aparecen eventos `deviceOverspeed` y `geofenceEnter`. Verificar la unidad del atributo `speedLimit` (el valor sembrado, 30, es provisional) y la forma de la consulta de eventos con `type` repetido.
+- **Tarea 9 — pruebas E2E y estáticas.** La prueba E2E debe llamar a `action_sincronizar_ahora` (no a `sincronizar_todo`, que ahora es privado). El escaneo estático de datos quemados fallará mientras `scripts/verify_integration.py` siga en el repositorio.
+- **Tarea 10 — entorno limpio.** Levantar un proyecto de compose aparte con puertos alternos (override fuera del repositorio) y sembrar desde cero, sin tocar el entorno de desarrollo. Borrar solo los volúmenes de ese proyecto.
+- **Tarea 11 — documentación.** Completar este README con los comandos reales, las variables, la lista de pruebas y el checklist de Fase 1; corregir `docs/decisiones_fase1.md` (dice que la sincronización no está en el arranque, y que el POST de dispositivos devolvió 401/403 cuando fue 400).
+- **Tarea 12 — cierre.** Evidencia final de todas las suites y revisión de credenciales fuera de `seeds/data/` y `.env`.
+
+**Pendientes de seguridad (prioridad alta, ya en `main` o en esta misma subida):**
+
+1. **«Probar Conexión» no tiene control de gestor** (`traccar.server.action_test_connection`). Cualquier usuario interno puede dispararlo y hacer que Odoo envíe la credencial de Traccar a la `base_url` configurada por un gestor. Corrección: llamar a `_exigir_gestor_flota()` al inicio del método.
+2. **Mensajes de error con cabeceras.** `_request` guarda `str(exc)` en `last_error_message`, que los usuarios internos pueden leer. Redactar la cabecera de autorización antes de guardar.
+3. **Migración de la contraseña.** Si hay conflicto o tras la copia, puede quedar texto plano en la columna vieja o en tuplas muertas. Considerar `DROP COLUMN` solo después de una copia exitosa.
+4. **`scripts/verify_integration.py` contiene la contraseña de admin de Traccar en código.** Su borrado fue denegado por el clasificador de permisos y **requiere tu aprobación**.
+5. **Credenciales expuestas en un transcript de sesión.** Se imprimieron las líneas de `TRACCAR_ADMIN_PASSWORD` e `INTEGRATION_TRACCAR_PASSWORD` en un subagente. **Decisión tuya:** rotar la contraseña del usuario de integración (el seeder actualiza el usuario cuando la contraseña se rechaza). La de admin es tu login: no se rota sin tu decisión.
+6. **Historial de git.** La contraseña fija de `seeds/demo_data.py` (ya borrado en esta subida) sigue en el historial de los commits anteriores. Rotar esa contraseña de desarrollo.
+
+**Pendientes de decisión tuya:**
+
+- Aprobar el borrado de `scripts/verify_integration.py`.
+- Confirmar que se quitó la restauración desde `database/snapshot/` en `setup.ps1` y `setup.sh` (ruling F1-R10: `seeds/data/` es la única fuente de datos de ejemplo). El snapshot sigue en el repositorio.
+- Validar las coordenadas, el emparejamiento conductor–vehículo y las marcas de `seeds/data/`: son ilustrativas, no reales.
+
+**Menores diferidos (no bloquean; revisar antes de cerrar la entrega):**
+
+- Seeder: sin timeout en XML-RPC; el informe se pierde si hay error; `active_test=False` trata archivados como presentes; `traccar.server` se identifica por `base_url`; errores de JSON y de respuestas vacías producen trazas en lugar de mensajes.
+- Conector: reintento también en respuestas 4xx (debe ser solo en errores de conexión y 5xx); un dispositivo sin posición válida vuelve a pedir todo su historial en cada corrida; falta prueba de «posiciones correctas, eventos fallan»; `traccar.device.vehicle_id` es un campo inerte que hay que quitar de las vistas.
+- ETL: limpieza de roles de prueba sin guardas; helper de prueba repetido.
+- BI: selección de fecha única (corregido); SIMULADO solo marcado con un aviso.
+
+### Cómo levantar el entorno
+
+```powershell
+# Núcleo: Odoo, Traccar y PostgreSQL (healthchecks incluidos)
+powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
+
+# Analítica bajo demanda (routing, ml, bi)
+docker compose --profile analitica up -d
+
+# ETL bajo demanda (requiere ODOO_PASSWORD, ETL_STG_PASSWORD y DWH_ETL_PASSWORD en .env)
+docker compose --profile etl run --rm etl bootstrap
+docker compose --profile etl run --rm etl run --mode full
+```
+
+Variables nuevas en `.env` (no se suben al repositorio; ver `.env.example`): `ETL_STG_PASSWORD`, `DWH_ETL_PASSWORD`, `DWH_DB_PASSWORD` (rol `dwh_ro`), `ODOO_PASSWORD`, `INTEGRATION_TRACCAR_EMAIL` e `INTEGRATION_TRACCAR_PASSWORD`, `TRACCAR_ADMIN_EMAIL`, `TRACCAR_INTERNAL_URL`.
+
+### Decisiones tomadas sin consultar
+
+Las decisiones están en `docs/decisiones_fase1.md` y en el plan `docs/superpowers/plans/2026-11-06-fase1-odoo-traccar.md`. Las más importantes:
+
+- Las bases son una por componente, sin esquemas: `logistica_dev` (Odoo), `traccar`, `logistica_staging` (ETL) y `logistica_dwh` (DWH). Todas en el mismo contenedor `db`.
+- La sincronización es por sondeo (cron), no por WebSocket ni webhook. Odoo no escribe en Traccar durante la sincronización.
+- La vinculación vehículo–dispositivo vive solo en `fleet.vehicle.traccar_device_id`.
+- Las escrituras de sincronización van con `sudo()`; los usuarios normales solo leen posiciones y eventos.
+- El secreto de Traccar vive en un modelo que los usuarios normales no pueden leer; el campo visible es no almacenado.
+- Distancias por carretera: OSRM si hay URL; si no, estimación haversine × 1,3, etiquetada como tal.
+- Pago de prueba: la confirmación automática solo aplica al proveedor de pago de prueba.
+
+---
+
 ## 🏛️ Arquitectura de la Solución (Etapa 1 + 2)
 
 ```
@@ -172,4 +257,4 @@ Get-Content scripts/verify_integration.py -Raw | docker compose exec -T odoo pyt
 | **Respaldar bases y filestore** | `./scripts/backup.sh` | `.\scripts\backup.ps1` |
 | **Restaurar respaldo** | `./scripts/restore.sh <odoo.dump> <traccar.dump> [filestore.tar.gz]` | Ver comandos en `scripts/restore.sh` |
 | **Actualizar módulos Odoo** | `./scripts/update_modules.sh logistica_traccar logistica_dev` | `docker compose exec -T odoo /entrypoint.sh odoo -d logistica_dev -u logistica_traccar --stop-after-init` |
-| **Poblar datos de prueba (Seeds)** | `cat seeds/demo_data.py \| docker compose exec -T odoo python3` | `Get-Content seeds/demo_data.py -Raw \| docker compose exec -T odoo python3` |
+| **Poblar datos de prueba (Seeds)** | `python3 seeds/seed.py` (en el host; `scripts/setup.sh` carga `.env` antes) | `python seeds/seed.py` (en el host; `scripts/setup.ps1` carga `.env` antes) |
