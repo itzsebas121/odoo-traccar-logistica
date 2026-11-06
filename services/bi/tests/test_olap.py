@@ -54,3 +54,12 @@ def test_indicadores(conn):
     assert set(ind["entregas_cliente"]["k_cliente"].dropna()) == {"Cliente Uno", "Cliente Dos"}
     # 2 entregadas: una a las 08:00 (plan 08:15, a tiempo) y otra a 14:30 (plan 14:15, tarde) -> 50 %
     assert total(ind["cumplimiento"], "k_vehiculo", "pct_a_tiempo") == 50.0
+
+
+def test_rango_fecha_unica():
+    """Una sola fecha elegida en st.date_input llega como tupla de 1 elemento: debe filtrar ese dia, no todo."""
+    d = date(2026, 11, 4)
+    assert olap.rango_fechas((d,)) == (d, d)
+    assert olap.rango_fechas(d) == (d, d)
+    assert olap.rango_fechas((d, date(2026, 11, 5))) == (d, date(2026, 11, 5))
+    assert olap.rango_fechas(()) == (None, None)

@@ -42,12 +42,12 @@ def dwh_env():
             for f in ("dwh_schema.sql", "dwh_views.sql"):
                 with open(os.path.join(HERE, f), encoding="utf-8") as fh:
                     cur.execute(fh.read())
-            cur.execute("INSERT INTO dwh.dim_vehiculo (vehiculo_id_odoo, placa, procedencia) VALUES "
+            cur.execute("INSERT INTO dim_vehiculo (vehiculo_id_odoo, placa, procedencia) VALUES "
                         "(1,'ABC-1234','REAL'),(2,'DEF-5678','SIMULADO')")
-            cur.execute("INSERT INTO dwh.dim_conductor (conductor_id_odoo, nombre) VALUES (1,'Carlos')")
-            cur.execute("SELECT codigo, sk FROM dwh.dim_zona")
+            cur.execute("INSERT INTO dim_conductor (conductor_id_odoo, nombre) VALUES (1,'Carlos')")
+            cur.execute("SELECT codigo, sk FROM dim_zona")
             z = dict(cur.fetchall())
-            cur.execute("INSERT INTO dwh.dim_cliente (cliente_id_odoo, nombre, zona_sk) VALUES "
+            cur.execute("INSERT INTO dim_cliente (cliente_id_odoo, nombre, zona_sk) VALUES "
                         "(1,'Cliente Uno',%s),(2,'Cliente Dos',%s)", (z["centro"], z["ficoa"]))
             # (vehiculo, dia, hora, origen, destino, km, min, paradas, procedencia)
             rec = [(1, 3, 8, "centro", "ficoa", 10, 30, 1, "REAL"),
@@ -56,9 +56,9 @@ def dwh_env():
                    (2, 4, 15, "izamba", "centro", 40, 90, 0, "SIMULADO")]
             for i, (v, d, h, o, de, km, mn, p, pr) in enumerate(rec):
                 t = _ts(d, h)
-                cur.execute("INSERT INTO dwh.dim_tiempo VALUES (%s,%s,2026,11,%s,%s,%s) ON CONFLICT DO NOTHING",
+                cur.execute("INSERT INTO dim_tiempo VALUES (%s,%s,2026,11,%s,%s,%s) ON CONFLICT DO NOTHING",
                             (_tsk(t), t.date(), d, t.weekday(), h))
-                cur.execute("""INSERT INTO dwh.fact_recorridos (vehiculo_sk, conductor_sk, tiempo_inicio_sk,
+                cur.execute("""INSERT INTO fact_recorridos (vehiculo_sk, conductor_sk, tiempo_inicio_sk,
                     zona_origen_sk, zona_destino_sk, inicio_utc, fin_utc, distancia_km, duracion_min, num_paradas,
                     fuente_id, procedencia) VALUES (%s,1,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                             (v, _tsk(t), z[o], z[de], t, t, km, mn, p, "t%d" % i, pr))
@@ -68,7 +68,7 @@ def dwh_env():
             for i, (c, v, d, h, res, minuto, pr) in enumerate(ent):
                 t = _ts(d, h)
                 comp = None if minuto is None else _ts(d, h, minuto)
-                cur.execute("""INSERT INTO dwh.fact_entregas (cliente_sk, vehiculo_sk, tiempo_sk, zona_sk,
+                cur.execute("""INSERT INTO fact_entregas (cliente_sk, vehiculo_sk, tiempo_sk, zona_sk,
                     entrega_id_odoo, resultado, planificado_utc, completado_utc, procedencia)
                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                             (c, v, _tsk(t), z["centro"], i + 1, res, _ts(d, h, 15), comp, pr))

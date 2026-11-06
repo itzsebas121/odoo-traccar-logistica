@@ -1,4 +1,4 @@
-"""Panel BI (Streamlit) sobre el DWH. No consulta Odoo ni Traccar: solo el esquema dwh (§10.3)."""
+"""Panel BI (Streamlit) sobre el DWH. No consulta Odoo ni Traccar: solo la base del DWH (§10.3)."""
 from datetime import date, timedelta
 
 import streamlit as st
@@ -22,7 +22,7 @@ with st.sidebar:
 if not procedencia:
     st.warning("Seleccione al menos una procedencia (REAL / SIMULADO).")
     st.stop()
-desde, hasta = (rango if isinstance(rango, (tuple, list)) and len(rango) == 2 else (None, None))
+desde, hasta = olap.rango_fechas(rango)
 
 if olap.hay_simulados(procedencia):
     st.warning("Datos SIMULADOS: los resultados incluyen informacion generada para demostracion, no GPS real.")

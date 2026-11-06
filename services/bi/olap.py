@@ -1,4 +1,4 @@
-"""Consultas OLAP del BI. Lee SOLO el esquema dwh de PostgreSQL (rol de solo lectura); no usa Odoo."""
+"""Consultas OLAP del BI. Lee SOLO la base del DWH (rol de solo lectura); no usa Odoo."""
 import os
 import re
 
@@ -41,6 +41,19 @@ def cargar_consultas(ruta=SQL_FILE):
 
 
 QUERIES = cargar_consultas()
+
+
+def rango_fechas(rango):
+    """Normaliza el valor de st.date_input: una fecha, tupla de 1 (un solo dia) o de 2 -> (desde, hasta)."""
+    if rango is None:
+        return None, None
+    if not isinstance(rango, (tuple, list)):
+        return rango, rango
+    if len(rango) == 1:
+        return rango[0], rango[0]
+    if len(rango) == 2:
+        return rango[0], rango[1]
+    return None, None
 
 
 def hay_simulados(procedencia):

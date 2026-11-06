@@ -27,3 +27,14 @@ def test_no_odoo():
                         if linea.strip().lower().split("=")[0] in PROHIBIDOS:
                             hallados.append((ruta, linea.strip()))
     assert not hallados, hallados
+
+
+def test_copias_esquema_iguales_a_etl():
+    """Las copias de tests/ deben coincidir con services/etl/sql (si la carpeta existe; no esta en la imagen)."""
+    import pytest
+    etl = os.path.join(os.path.dirname(BI), "etl", "sql")
+    if not os.path.isdir(etl):
+        pytest.skip("services/etl/sql no esta presente")
+    for nombre in ("dwh_schema.sql", "dwh_views.sql"):
+        with open(os.path.join(etl, nombre), "rb") as a, open(os.path.join(BI, "tests", nombre), "rb") as b:
+            assert a.read() == b.read(), "%s difiere del ETL: vuelva a copiarlo" % nombre
