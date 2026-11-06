@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="logistica_configuracion_default" model="logistica.configuracion">
+        <field name="arrival_radius_m">50</field>
+        <field name="gps_stale_after_seconds">300</field>
+        <field name="dispatch_cutoff">14.0</field>
+        <field name="route_recalculation_policy">solo_pendientes</field>
+    </record>
+    <record id="logistica_bodega_central" model="logistica.bodega">
+        <field name="name">Bodega Central</field>
+        <field name="address">Ambato, Tungurahua (ubicación aproximada, editable)</field>
+        <field name="latitude">-1.2400</field>
+        <field name="longitude">-78.6100</field>
+    </record>
+    <function model="ir.config_parameter" name="set_param" eval="('logistica.routing_url', 'http://routing:8000')"/>
+    <function model="ir.config_parameter" name="set_param" eval="('logistica.ml_url', 'http://ml:8000')"/>
+    <function model="ir.config_parameter" name="set_param" eval="('logistica.traccar_poll_minutes', '1')"/>
+</odoo>

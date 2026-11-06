@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_logistica_bodega_form" model="ir.ui.view">
+        <field name="name">logistica.bodega.form</field>
+        <field name="model">logistica.bodega</field>
+        <field name="arch" type="xml">
+            <form string="Bodega">
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="address"/>
+                        <field name="latitude"/>
+                        <field name="longitude"/>
+                        <field name="active"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_logistica_bodega_tree" model="ir.ui.view">
+        <field name="name">logistica.bodega.tree</field>
+        <field name="model">logistica.bodega</field>
+        <field name="arch" type="xml">
+            <tree string="Bodegas"><field name="name"/><field name="address"/><field name="latitude"/><field name="longitude"/><field name="active"/></tree>
+        </field>
+    </record>
+    <record id="action_logistica_bodega" model="ir.actions.act_window">
+        <field name="name">Bodega</field>
+        <field name="res_model">logistica.bodega</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="view_logistica_zona_tree" model="ir.ui.view">
+        <field name="name">logistica.zona.tree</field>
+        <field name="model">logistica.zona</field>
+        <field name="arch" type="xml">
+            <tree string="Zonas" editable="bottom"><field name="code"/><field name="name"/><field name="latitude"/><field name="longitude"/><field name="active"/></tree>
+        </field>
+    </record>
+    <record id="action_logistica_zona" model="ir.actions.act_window">
+        <field name="name">Zonas</field>
+        <field name="res_model">logistica.zona</field>
+        <field name="view_mode">tree</field>
+    </record>
+
+    <record id="view_logistica_configuracion_form" model="ir.ui.view">
+        <field name="name">logistica.configuracion.form</field>
+        <field name="model">logistica.configuracion</field>
+        <field name="arch" type="xml">
+            <form string="Configuración de Logística">
+                <sheet>
+                    <group>
+                        <field name="arrival_radius_m"/>
+                        <field name="gps_stale_after_seconds"/>
+                        <field name="dispatch_cutoff" widget="float_time"/>
+                        <field name="route_recalculation_policy"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_logistica_configuracion" model="ir.actions.server">
+        <field name="name">Configuración de Logística</field>
+        <field name="model_id" ref="model_logistica_configuracion"/>
+        <field name="state">code</field>
+        <field name="code">action = {'type': 'ir.actions.act_window', 'res_model': 'logistica.configuracion', 'view_mode': 'form', 'res_id': model.get_config().id, 'target': 'current'}</field>
+    </record>
+
+    <menuitem id="menu_logistica_root" name="Logística" sequence="24" groups="base.group_user"/>
+    <menuitem id="menu_logistica_config" name="Configuración" parent="menu_logistica_root" sequence="90" groups="fleet.fleet_group_manager"/>
+    <menuitem id="menu_logistica_configuracion" name="Parámetros" parent="menu_logistica_config" action="action_logistica_configuracion" sequence="10"/>
+    <menuitem id="menu_logistica_bodega" name="Bodega" parent="menu_logistica_config" action="action_logistica_bodega" sequence="20"/>
+    <menuitem id="menu_logistica_zona" name="Zonas" parent="menu_logistica_config" action="action_logistica_zona" sequence="30"/>
+</odoo>

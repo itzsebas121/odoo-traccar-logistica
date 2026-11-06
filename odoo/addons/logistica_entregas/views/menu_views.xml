@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_logistica_entregas"
+              name="Entregas"
+              parent="logistica_base.menu_logistica_root"
+              action="action_logistica_entrega"
+              sequence="10"/>
+</odoo>

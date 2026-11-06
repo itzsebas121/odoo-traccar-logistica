@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_logistica_entrega_tree" model="ir.ui.view">
+        <field name="name">logistica.entrega.tree</field>
+        <field name="model">logistica.entrega</field>
+        <field name="arch" type="xml">
+            <tree string="Entregas" create="false" decoration-success="state == 'entregado'"
+                  decoration-danger="state in ('no_entregado', 'pendiente_reprogramacion')">
+                <field name="name"/>
+                <field name="sale_order_id"/>
+                <field name="partner_id"/>
+                <field name="destination_address"/>
+                <field name="state"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_logistica_entrega_form" model="ir.ui.view">
+        <field name="name">logistica.entrega.form</field>
+        <field name="model">logistica.entrega</field>
+        <field name="arch" type="xml">
+            <form string="Entrega" create="false">
+                <header>
+                    <button name="action_marcar_preparado" type="object" string="Marcar preparado"
+                            class="btn-primary" states="en_preparacion"/>
+                    <button name="action_reprogramar" type="object" string="Reprogramar"
+                            states="no_entregado,pendiente_reprogramacion"/>
+                    <button name="action_devolver_bodega" type="object" string="Devolver a bodega"
+                            states="no_entregado,pendiente_reprogramacion"/>
+                    <button name="action_revocar_token" type="object" string="Revocar enlace de seguimiento"
+                            groups="fleet.fleet_group_manager"
+                            attrs="{'invisible': [('tracking_token_revoked', '=', True)]}"
+                            confirm="El cliente dejará de poder consultar el pedido con su enlace. ¿Continuar?"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="en_preparacion,preparado,asignado,en_recorrido,entregado"/>
+                </header>
+                <sheet>
+                    <h1><field name="name"/></h1>
+                    <group>
+                        <group string="Destino">
+                            <field name="sale_order_id" readonly="1"/>
+                            <field name="partner_id"/>
+                            <field name="recipient_name"/>
+                            <field name="phone"/>
+                            <field name="destination_address"/>
+                            <field name="latitude"/>
+                            <field name="longitude"/>
+                            <field name="delivery_reference"/>
+                        </group>
+                        <group string="Seguimiento">
+                            <field name="tracking_token" groups="fleet.fleet_group_manager"/>
+                            <field name="tracking_token_expires" groups="fleet.fleet_group_manager" readonly="1"/>
+                            <field name="tracking_token_revoked" groups="fleet.fleet_group_manager" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Eventos">
+                            <field name="event_ids">
+                                <tree>
+                                    <field name="event_time"/>
+                                    <field name="event_type"/>
+                                    <field name="user_id"/>
+                                    <field name="failure_reason"/>
+                                    <field name="gps_available"/>
+                                    <field name="gps_latitude" optional="hide"/>
+                                    <field name="gps_longitude" optional="hide"/>
+                                    <field name="gps_age_seconds" optional="hide"/>
+                                    <field name="notes"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_logistica_entrega_search" model="ir.ui.view">
+        <field name="name">logistica.entrega.search</field>
+        <field name="model">logistica.entrega</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="sale_order_id"/>
+                <field name="partner_id"/>
+                <filter name="f_preparacion" string="En preparación" domain="[('state', '=', 'en_preparacion')]"/>
+                <filter name="f_preparado" string="Preparadas" domain="[('state', '=', 'preparado')]"/>
+                <filter name="f_recorrido" string="En recorrido" domain="[('state', '=', 'en_recorrido')]"/>
+                <filter name="f_fallidas" string="Fallidas"
+                        domain="[('state', 'in', ('no_entregado', 'pendiente_reprogramacion'))]"/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="g_estado" string="Estado" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_logistica_entrega" model="ir.actions.act_window">
+        <field name="name">Entregas</field>
+        <field name="res_model">logistica.entrega</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+</odoo>

@@ -1,0 +1,5 @@
+[
+  {"id": 1, "route_id": [1, "RUTA/0001"], "sequence": 1, "entrega_id": [1, "ENT/0001"], "state": "entregado", "completed_at": "2026-11-05 13:40:00", "actual_arrival_at": "2026-11-05 13:38:00", "failed_reason": false, "write_date": "2026-11-05 13:41:00"},
+  {"id": 2, "route_id": [2, "RUTA/0002"], "sequence": 1, "entrega_id": [2, "ENT/0002"], "state": "no_entregado", "completed_at": "2026-11-05 13:50:00", "actual_arrival_at": "2026-11-05 13:48:00", "failed_reason": "absent", "write_date": "2026-11-05 13:51:00"},
+  {"id": 3, "route_id": [1, "RUTA/0001"], "sequence": 2, "entrega_id": [3, "ENT/0003"], "state": "pendiente", "completed_at": false, "actual_arrival_at": false, "failed_reason": false, "write_date": "2026-11-05 13:15:00"}
+]

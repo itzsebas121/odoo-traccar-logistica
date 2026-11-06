@@ -95,9 +95,7 @@ class LogisticaRuta(models.Model):
             if not route.stop_ids:
                 raise UserError(_('Debe agregar al menos una parada de entrega antes de confirmar la ruta.'))
             route.state = 'confirmed'
-            for stop in route.stop_ids:
-                if stop.order_id:
-                    stop.order_id.delivery_status = 'assigned'
+            # delivery_status eliminado (Task 5); Task 8 reescribe el módulo
 
     def action_start_route(self):
         for route in self:
@@ -107,9 +105,7 @@ class LogisticaRuta(models.Model):
                 'state': 'in_progress',
                 'start_datetime': fields.Datetime.now(),
             })
-            for stop in route.stop_ids:
-                if stop.order_id:
-                    stop.order_id.delivery_status = 'in_transit'
+            # delivery_status eliminado (Task 5); Task 8 reescribe el módulo
 
     def action_finish_route(self):
         for route in self:
@@ -128,9 +124,7 @@ class LogisticaRuta(models.Model):
             if route.state == 'done':
                 raise UserError(_('No se puede cancelar una ruta finalizada.'))
             route.state = 'cancel'
-            for stop in route.stop_ids:
-                if stop.order_id:
-                    stop.order_id.delivery_status = 'pending'
+            # delivery_status eliminado (Task 5); Task 8 reescribe el módulo
 
     def action_open_google_maps_route(self):
         self.ensure_one()

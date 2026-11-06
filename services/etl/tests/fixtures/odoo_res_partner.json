@@ -1,0 +1,4 @@
+[
+  {"id": 100, "name": "Carlos", "is_driver": true, "write_date": "2026-11-05 07:00:00"},
+  {"id": 101, "name": "Luis", "is_driver": true, "write_date": "2026-11-05 07:00:00"}
+]

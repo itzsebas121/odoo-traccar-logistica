@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_logistica_entrega_user,logistica.entrega.user,model_logistica_entrega,base.group_user,1,0,0,0
+access_logistica_entrega_manager,logistica.entrega.manager,model_logistica_entrega,fleet.fleet_group_manager,1,1,0,0
+access_logistica_entrega_evento_user,logistica.entrega.evento.user,model_logistica_entrega_evento,base.group_user,1,0,0,0
+access_logistica_entrega_evento_manager,logistica.entrega.evento.manager,model_logistica_entrega_evento,fleet.fleet_group_manager,1,0,0,0

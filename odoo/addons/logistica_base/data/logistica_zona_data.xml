@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- Centroides APROXIMADOS de sectores de Ambato (editables). -->
+    <record id="zona_centro" model="logistica.zona"><field name="code">centro</field><field name="name">Centro</field><field name="latitude">-1.2417</field><field name="longitude">-78.6197</field></record>
+    <record id="zona_ficoa" model="logistica.zona"><field name="code">ficoa</field><field name="name">Ficoa</field><field name="latitude">-1.2150</field><field name="longitude">-78.6250</field></record>
+    <record id="zona_huachi" model="logistica.zona"><field name="code">huachi</field><field name="name">Huachi</field><field name="latitude">-1.2700</field><field name="longitude">-78.6280</field></record>
+    <record id="zona_izamba" model="logistica.zona"><field name="code">izamba</field><field name="name">Izamba</field><field name="latitude">-1.2000</field><field name="longitude">-78.5800</field></record>
+    <record id="zona_atocha" model="logistica.zona"><field name="code">atocha</field><field name="name">Atocha</field><field name="latitude">-1.2300</field><field name="longitude">-78.6400</field></record>
+    <record id="zona_ingahurco" model="logistica.zona"><field name="code">ingahurco</field><field name="name">Ingahurco</field><field name="latitude">-1.2330</field><field name="longitude">-78.6100</field></record>
+    <record id="zona_otra" model="logistica.zona"><field name="code">otra</field><field name="name">Otra / Periférica</field><field name="latitude">-1.2800</field><field name="longitude">-78.5900</field></record>
+</odoo>

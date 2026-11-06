@@ -1,0 +1,4 @@
+[
+  {"id": 10, "name": "ABC-1234", "uniqueId": "abc1234", "status": "online"},
+  {"id": 11, "name": "DEF-5678", "uniqueId": "def5678", "status": "offline"}
+]

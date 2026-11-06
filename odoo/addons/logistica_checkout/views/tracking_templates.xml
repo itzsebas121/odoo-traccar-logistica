@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Página pública de seguimiento (D8): solo número de pedido, estado
+         simplificado y fecha. Recibe únicamente cadenas, nunca registros. -->
+    <template id="seguimiento_pedido" name="Logística: seguimiento del pedido">
+        <t t-call="website.layout">
+            <t t-set="additional_title">Seguimiento del pedido</t>
+            <div id="wrap">
+                <div class="container py-5" style="max-width: 640px;">
+                    <h1 class="h3 mb-4">Seguimiento del pedido</h1>
+                    <div class="card">
+                        <div class="card-body">
+                            <dl class="row mb-0">
+                                <dt class="col-sm-4">Pedido</dt>
+                                <dd class="col-sm-8" t-esc="seguimiento['pedido']"/>
+                                <dt class="col-sm-4">Estado</dt>
+                                <dd class="col-sm-8"><span class="badge text-bg-primary fs-6" t-esc="seguimiento['estado']"/></dd>
+                                <dt class="col-sm-4">Fecha del pedido</dt>
+                                <dd class="col-sm-8" t-esc="seguimiento['fecha']"/>
+                            </dl>
+                        </div>
+                    </div>
+                    <p class="text-muted small mt-3">Este enlace es privado. No lo comparta.</p>
+                </div>
+            </div>
+        </t>
+    </template>
+</odoo>

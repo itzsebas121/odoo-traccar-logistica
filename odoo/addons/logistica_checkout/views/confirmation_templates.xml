@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="confirmation_seguimiento" inherit_id="website_sale.confirmation" name="Logística: enlace de seguimiento">
+        <xpath expr="//div[@id='oe_structure_website_sale_confirmation_1']" position="before">
+            <div t-if="logistica_errores" class="alert alert-danger mt-3" role="alert" id="logistica_no_confirmado">
+                <strong>Su pedido no se confirmó automáticamente.</strong>
+                <ul class="mb-0">
+                    <li t-foreach="logistica_errores" t-as="err" t-esc="err"/>
+                </ul>
+                <span>Corrija los datos y vuelva a intentarlo, o contáctenos.</span>
+            </div>
+            <div t-if="logistica_tracking_url" class="alert alert-info mt-3" role="status" id="logistica_seguimiento">
+                <strong>Seguimiento de su pedido:</strong>
+                guarde este enlace privado para consultar el estado de la entrega.
+                <div class="mt-1"><a t-att-href="logistica_tracking_url" t-esc="logistica_tracking_url"/></div>
+            </div>
+        </xpath>
+    </template>
+</odoo>

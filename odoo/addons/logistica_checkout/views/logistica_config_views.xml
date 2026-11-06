@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_logistica_configuracion_form_checkout" model="ir.ui.view">
+        <field name="name">logistica.configuracion.form.checkout</field>
+        <field name="model">logistica.configuracion</field>
+        <field name="inherit_id" ref="logistica_base.view_logistica_configuracion_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <group string="Checkout web">
+                    <group string="Rectángulo de cobertura">
+                        <field name="coverage_lat_min"/>
+                        <field name="coverage_lat_max"/>
+                        <field name="coverage_lon_min"/>
+                        <field name="coverage_lon_max"/>
+                    </group>
+                    <group string="Pago de prueba">
+                        <field name="checkout_auto_confirm"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>
