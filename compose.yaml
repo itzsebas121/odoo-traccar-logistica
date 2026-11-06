@@ -56,6 +56,88 @@ services:
       - traccar_data:/opt/traccar/data
       - traccar_logs:/opt/traccar/logs
 
+  # --- Servicios de analítica y rutas (ver docs/superpowers/plans) ---
+
+  routing:
+    build: ./services/routing
+    profiles: ["analitica"]
+    restart: unless-stopped
+    environment:
+      ROUTING_OSRM_URL: ${ROUTING_OSRM_URL:-}
+      ROUTING_TIME_LIMIT_S: ${ROUTING_TIME_LIMIT_S:-5}
+    ports:
+      - "127.0.0.1:8001:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status == 200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  ml:
+    build: ./services/ml
+    profiles: ["analitica"]
+    restart: unless-stopped
+    environment:
+      MODEL_DIR: /app/models
+      DATA_DIR: /app/data
+      DWH_DSN: ${DWH_DSN:-}
+    volumes:
+      - ./services/ml/models:/app/models
+      - ./services/ml/data:/app/data
+    ports:
+      - "127.0.0.1:8002:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  etl:
+    build: ./services/etl
+    profiles: ["etl"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ODOO_URL: http://odoo:8069
+      ODOO_DB: logistica_dev
+      ODOO_USER: admin
+      # OBLIGATORIA, sin valor por defecto: se toma de .env (o del entorno). Se deja sin interpolar con ":?" porque
+      # Compose evalua las variables de TODOS los servicios, aunque su perfil este inactivo, y un ":?" aqui haria
+      # fallar cualquier `docker compose` del proyecto mientras .env no la defina. Si falta, el ETL termina con
+      # un error de configuracion claro (etl.config.require).
+      ODOO_PASSWORD:
+      TRACCAR_URL: http://traccar:8082
+      TRACCAR_USER: ${TRACCAR_ADMIN_EMAIL:-admin@logistica.local}
+      TRACCAR_PASSWORD: ${TRACCAR_ADMIN_PASSWORD:?Configura TRACCAR_ADMIN_PASSWORD}
+      DWH_ADMIN_DSN: postgresql://odoo:${ODOO_DB_PASSWORD:?Configura ODOO_DB_PASSWORD}@db:5432/postgres
+      DWH_DSN: postgresql://odoo:${ODOO_DB_PASSWORD:?Configura ODOO_DB_PASSWORD}@db:5432/logistica_dwh
+      # Vacia = no se crea el rol de solo lectura dwh_ro
+      DWH_DB_PASSWORD: ${DWH_DB_PASSWORD:-}
+
+  bi:
+    build: ./services/bi
+    profiles: ["analitica"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DWH_HOST: db
+      DWH_PORT: "5432"
+      DWH_NAME: logistica_dwh
+      DWH_USER: dwh_ro
+      # OBLIGATORIA, sin valor por defecto: se toma de .env (o del entorno). No se usa ":?" por la misma razon que
+      # en etl. Si falta, la aplicacion muestra un error claro en espanol (olap.ConfigError).
+      DWH_DB_PASSWORD:
+    ports:
+      - "127.0.0.1:8501:8501"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health',timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_odoo_data:
   odoo_data:

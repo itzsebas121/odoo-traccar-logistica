@@ -9,3 +9,5 @@ backups/*
 **/*.pyc
 .vscode/
 .idea/
+.superpowers/
+.pytest_cache/
