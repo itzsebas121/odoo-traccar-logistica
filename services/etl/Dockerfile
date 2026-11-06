@@ -1,0 +1,10 @@
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt requirements-dev.txt ./
+RUN pip install --no-cache-dir -r requirements-dev.txt
+COPY pytest.ini ./
+COPY etl ./etl
+COPY sql ./sql
+COPY tests ./tests
+ENV PYTHONUNBUFFERED=1
+ENTRYPOINT ["python", "-m", "etl"]

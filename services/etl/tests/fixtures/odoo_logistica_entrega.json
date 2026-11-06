@@ -1,0 +1,5 @@
+[
+  {"id": 1, "name": "ENT/0001", "sale_order_id": [11, "S0001"], "partner_id": [200, "Cliente A"], "latitude": -1.2417, "longitude": -78.6197, "state": "entregado", "route_id": [1, "RUTA/0001"], "create_date": "2026-11-05 12:30:00", "write_date": "2026-11-05 13:41:00"},
+  {"id": 2, "name": "ENT/0002", "sale_order_id": [12, "S0002"], "partner_id": [201, "Cliente B"], "latitude": -1.2230, "longitude": -78.6330, "state": "no_entregado", "route_id": [2, "RUTA/0002"], "create_date": "2026-11-05 12:35:00", "write_date": "2026-11-05 13:51:00"},
+  {"id": 3, "name": "ENT/0003", "sale_order_id": [13, "S0003"], "partner_id": [202, "Cliente C"], "latitude": -1.2750, "longitude": -78.6300, "state": "en_recorrido", "route_id": [1, "RUTA/0001"], "create_date": "2026-11-05 12:40:00", "write_date": "2026-11-05 13:15:00"}
+]

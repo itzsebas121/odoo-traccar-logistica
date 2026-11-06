@@ -1,0 +1,4 @@
+[
+  {"id": 1, "license_plate": "ABC-1234", "name": "ABC-1234", "traccar_device_id": 10, "driver_id": [100, "Carlos"], "write_date": "2026-11-05 07:00:00"},
+  {"id": 2, "license_plate": "DEF-5678", "name": "DEF-5678", "traccar_device_id": 11, "driver_id": [101, "Luis"], "write_date": "2026-11-05 07:00:00"}
+]

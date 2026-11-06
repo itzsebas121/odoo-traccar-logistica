@@ -1,0 +1,4 @@
+[
+  {"id": 1, "entrega_id": [1, "ENT/0001"], "event_type": "entregado", "event_time": "2026-11-05 13:40:00", "route_id": [1, "RUTA/0001"], "failure_reason": false, "write_date": "2026-11-05 13:40:00"},
+  {"id": 2, "entrega_id": [2, "ENT/0002"], "event_type": "no_entregado", "event_time": "2026-11-05 13:50:00", "route_id": [2, "RUTA/0002"], "failure_reason": "absent", "write_date": "2026-11-05 13:50:00"}
+]
