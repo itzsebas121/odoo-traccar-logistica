@@ -93,7 +93,7 @@ def cargar_fuente(source: str, data_dir) -> pd.DataFrame:
         if not dsn:
             raise SystemExit("DWH_DSN no esta definido")
         with psycopg2.connect(dsn) as con:
-            return pd.read_sql_query(f"SELECT {', '.join(COLUMNAS)} FROM dwh.v_viajes_entrenamiento", con)
+            return pd.read_sql_query(f"SELECT {', '.join(COLUMNAS)} FROM v_viajes_entrenamiento", con)
     raise SystemExit(f"Fuente desconocida: {source} (use csv:<ruta>, simulate o dwh)")
 
 
