@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Selector de destino en mapa dentro del formulario de dirección (§3.1).
+         El pin se guarda en el pedido (delivery_latitude / delivery_longitude). -->
+    <template id="address_mapa_destino" inherit_id="website_sale.address" name="Logística: destino en mapa">
+        <xpath expr="//select[@name='state_id']/parent::div" position="after">
+            <t t-if="not only_services">
+                <t t-set="ld" t-value="logistica_destino or {}"/>
+                <div class="w-100"/>
+                <div t-attf-class="mb-3 col-lg-12 #{error.get('delivery_latitude') and 'o_has_error' or ''}"
+                     id="div_logistica_destino">
+                    <label class="col-form-label" for="delivery_latitude">Punto de entrega en el mapa</label>
+                    <p class="text-muted small mb-2">Haga clic en el mapa o arrastre el pin hasta el lugar exacto donde recibirá el pedido.</p>
+                    <div id="logistica_map_picker" t-attf-class="border rounded #{error.get('delivery_latitude') and 'border-danger' or ''}"
+                         style="height: 320px;"
+                         t-att-data-centro-lat="ld.get('centro') and ld['centro'][0]"
+                         t-att-data-centro-lon="ld.get('centro') and ld['centro'][1]"
+                         t-att-data-cobertura="ld.get('cobertura')"/>
+                    <small id="logistica_map_estado" class="form-text text-muted"/>
+                    <input type="hidden" name="delivery_latitude" id="delivery_latitude" t-att-value="ld.get('lat')"/>
+                    <input type="hidden" name="delivery_longitude" id="delivery_longitude" t-att-value="ld.get('lon')"/>
+                </div>
+                <div class="mb-3 col-lg-12" id="div_logistica_referencia">
+                    <label class="col-form-label label-optional" for="delivery_notes">Referencia para el transportista</label>
+                    <textarea name="delivery_notes" id="delivery_notes" class="form-control" rows="2"
+                              placeholder="Casa, edificio, piso, color de la puerta..."
+                              t-esc="ld.get('notas')"/>
+                </div>
+                <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+                      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+                <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+                        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""/>
+                <script type="text/javascript" src="/logistica_checkout/static/src/js/map_picker.js"/>
+            </t>
+        </xpath>
+    </template>
+</odoo>
