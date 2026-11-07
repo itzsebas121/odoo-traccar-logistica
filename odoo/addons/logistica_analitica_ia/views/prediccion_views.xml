@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Asistente -->
+    <record id="view_logistica_prediccion_wizard_form" model="ir.ui.view">
+        <field name="name">logistica.prediccion.wizard.form</field>
+        <field name="model">logistica.prediccion.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Predecir destino">
+                <p class="text-muted">
+                    El modelo estima a qué zona irá el vehículo. Es una ayuda para decidir:
+                    no asigna pedidos ni cambia rutas.
+                </p>
+                <group>
+                    <field name="vehicle_id"/>
+                    <field name="fecha"/>
+                    <field name="hora" widget="float_time"/>
+                    <field name="origin_zone" required="1"/>
+                </group>
+                <footer>
+                    <button name="action_predecir" string="Predecir destino" type="object" class="btn-primary"/>
+                    <button string="Cancelar" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_logistica_prediccion_wizard" model="ir.actions.act_window">
+        <field name="name">Predecir destino</field>
+        <field name="res_model">logistica.prediccion.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Consulta (auditoría) -->
+    <record id="view_logistica_prediccion_consulta_form" model="ir.ui.view">
+        <field name="name">logistica.prediccion.consulta.form</field>
+        <field name="model">logistica.prediccion.consulta</field>
+        <field name="arch" type="xml">
+            <form string="Consulta de destino probable" create="false" edit="false" delete="false">
+                <header>
+                    <button name="action_ver_mapa" string="Ver mapa de la ruta" type="object" class="btn-primary"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="Consulta">
+                            <field name="vehicle_id"/>
+                            <field name="reference_datetime"/>
+                            <field name="origin_zone"/>
+                            <field name="user_id"/>
+                            <field name="created_at"/>
+                        </group>
+                        <group string="Modelo y ruta">
+                            <field name="model_version"/>
+                            <field name="route_distance_km"/>
+                            <field name="route_duration_min"/>
+                            <field name="route_source"/>
+                        </group>
+                    </group>
+                    <field name="resultado_html"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_logistica_prediccion_consulta_tree" model="ir.ui.view">
+        <field name="name">logistica.prediccion.consulta.tree</field>
+        <field name="model">logistica.prediccion.consulta</field>
+        <field name="arch" type="xml">
+            <tree string="Consultas del modelo" create="false" edit="false" delete="false">
+                <field name="created_at"/>
+                <field name="vehicle_id"/>
+                <field name="reference_datetime"/>
+                <field name="origin_zone"/>
+                <field name="predicted_zone"/>
+                <field name="route_distance_km"/>
+                <field name="route_source"/>
+                <field name="user_id"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_logistica_prediccion_consulta" model="ir.actions.act_window">
+        <field name="name">Consultas del modelo</field>
+        <field name="res_model">logistica.prediccion.consulta</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <!-- Métricas -->
+    <record id="view_logistica_prediccion_metricas_form" model="ir.ui.view">
+        <field name="name">logistica.prediccion.metricas.form</field>
+        <field name="model">logistica.prediccion.metricas</field>
+        <field name="arch" type="xml">
+            <form string="Métricas del modelo predictivo">
+                <group>
+                    <group string="Modelo">
+                        <field name="model_version"/>
+                        <field name="n_train"/>
+                        <field name="n_test"/>
+                        <field name="split_date"/>
+                    </group>
+                    <group string="Resultados en el conjunto de prueba">
+                        <field name="accuracy"/>
+                        <field name="precision_macro"/>
+                        <field name="recall_macro"/>
+                        <field name="f1_macro"/>
+                    </group>
+                    <group string="Predictor base (referencia)">
+                        <field name="baseline_accuracy"/>
+                        <field name="baseline_f1"/>
+                    </group>
+                </group>
+                <field name="confusion_html"/>
+                <footer>
+                    <button string="Cerrar" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_logistica_prediccion_metricas" model="ir.actions.act_window">
+        <field name="name">Métricas del modelo</field>
+        <field name="res_model">logistica.prediccion.metricas</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

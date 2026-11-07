@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="mapa_pagina" name="Mapa de la ruta sugerida">
+        <t t-call="web.layout">
+            <t t-set="title">Ruta sugerida</t>
+            <t t-set="head">
+                <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+                      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+                <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+                        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+                <script type="text/javascript" src="/logistica_analitica_ia/static/src/js/mapa.js"></script>
+                <style>
+                    html, body { height: 100%; margin: 0; font-family: sans-serif; }
+                    #prediccion-barra { padding: 8px 12px; background: #714b67; color: #fff; }
+                    #prediccion-mapa { height: calc(100% - 60px); }
+                </style>
+            </t>
+            <div id="prediccion-barra">
+                <strong>Ruta sugerida:</strong>
+                <span t-esc="origen"/> → <span t-esc="destino"/>
+                <span t-if="consulta.route_source">
+                    · <span t-esc="'%.2f' % consulta.route_distance_km"/> km ·
+                    fuente: <span t-esc="consulta.route_source"/>
+                </span>
+                <span t-if="consulta.route_source == 'estimado_haversine'"> (estimación, no es ruta por carretera)</span>
+            </div>
+            <div id="prediccion-mapa" t-att-data-geometria="geometria"></div>
+        </t>
+    </template>
+</odoo>

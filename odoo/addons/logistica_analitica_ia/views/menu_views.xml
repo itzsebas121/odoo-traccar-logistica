@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_logistica_ia"
+              name="Analítica IA"
+              parent="logistica_base.menu_logistica_root"
+              groups="fleet.fleet_group_user"
+              sequence="60"/>
+
+    <menuitem id="menu_logistica_prediccion"
+              name="Predecir destino"
+              parent="menu_logistica_ia"
+              action="action_logistica_prediccion_wizard"
+              sequence="10"/>
+
+    <menuitem id="menu_logistica_prediccion_consultas"
+              name="Consultas realizadas"
+              parent="menu_logistica_ia"
+              action="action_logistica_prediccion_consulta"
+              sequence="20"/>
+
+    <menuitem id="menu_logistica_prediccion_metricas"
+              name="Métricas del modelo"
+              parent="menu_logistica_ia"
+              action="action_logistica_prediccion_metricas"
+              sequence="30"/>
+</odoo>
