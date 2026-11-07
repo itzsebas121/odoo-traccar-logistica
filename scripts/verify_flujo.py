@@ -24,7 +24,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xmlrpc.client
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[1]
@@ -46,7 +46,7 @@ def exigir(condicion, mensaje):
 
 
 def ahora_utc():
-    return datetime.utcnow()
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def fecha_odoo(fecha):
@@ -118,7 +118,13 @@ def buscar_csrf(html):
     raise Fallo('La página no trae token CSRF.')
 
 
-def docker(*args, comprobar=True):
+def docker(*args, comprobar=True, mostrar=False):
+    """docker compose. Con ``mostrar`` la salida va a la consola (útil en pasos largos, como construir imágenes)."""
+    if mostrar:
+        proceso = subprocess.run(['docker', 'compose'] + list(args), cwd=str(RAIZ))
+        if comprobar and proceso.returncode != 0:
+            raise Fallo('docker compose %s falló (código %s).' % (' '.join(args), proceso.returncode))
+        return ''
     proceso = subprocess.run(['docker', 'compose'] + list(args), cwd=str(RAIZ), capture_output=True, text=True)
     if comprobar and proceso.returncode != 0:
         raise Fallo('docker compose %s falló: %s' % (' '.join(args), (proceso.stderr or proceso.stdout)[-500:]))
@@ -213,8 +219,8 @@ def preparar(ctx):
     configuracion = odoo.x('logistica.configuracion', 'search', [[]], {'limit': 1})
     odoo.x('logistica.configuracion', 'write', [configuracion, {'checkout_auto_confirm': True}])
 
-    print('  Arrancando routing, ml y bi (perfil analitica)...')
-    docker('--profile', 'analitica', 'up', '-d', '--wait', 'routing', 'ml', 'bi')
+    print('  Arrancando routing, ml y bi (perfil analitica). La primera vez construye imágenes: puede tardar 10 minutos o más...')
+    docker('--profile', 'analitica', 'up', '-d', '--build', '--wait', 'routing', 'ml', 'bi', mostrar=True)
 
     canceladas = odoo.buscar('logistica.ruta', [('state', 'in', ['borrador', 'planificada', 'carga_confirmada'])], ['id'])
     if canceladas:
@@ -545,8 +551,8 @@ def criterio_11(ctx):
 
 def criterio_12(ctx):
     """El ETL extrae ambas APIs, valida y carga el modelo dimensional."""
-    docker('--profile', 'etl', 'run', '--rm', 'etl', 'bootstrap')
-    docker('--profile', 'etl', 'run', '--rm', 'etl', 'run', '--mode', 'full')
+    docker('--profile', 'etl', 'run', '--rm', 'etl', 'bootstrap', mostrar=True)
+    docker('--profile', 'etl', 'run', '--rm', 'etl', 'run', '--mode', 'full', mostrar=True)
     for tabla, minimo in (('dim_vehiculo', 3), ('fact_entregas', 1), ('fact_posicion_gps', 1)):
         salida = docker('exec', '-T', 'db', 'psql', '-U', 'odoo', '-d', 'logistica_dwh', '-tAc',
                         'SELECT count(*) FROM %s' % tabla)
@@ -577,7 +583,8 @@ def criterio_14(ctx):
         return estado == 200 and datos and datos.get('model_loaded')
 
     if not cargado():
-        docker('--profile', 'analitica', 'run', '--rm', 'ml', 'python', '-m', 'mlsvc.train', '--source', 'simulate')
+        docker('--profile', 'analitica', 'run', '--rm', 'ml', 'python', '-m', 'mlsvc.train', '--source', 'simulate',
+               mostrar=True)
         for _i in range(15):
             if cargado():
                 break
