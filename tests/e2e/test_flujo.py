@@ -60,12 +60,20 @@ class FlujoE2ETest(unittest.TestCase):
     def test_evento_overspeed_y_geocerca_en_odoo(self):
         self._script('seeds/seed.py')
         self._script('seeds/simular.py')
-        self._sincronizar()
-        db, uid, clave, modelos = self._odoo()
-        eventos = modelos.execute_kw(
-            db, uid, clave, 'logistica.traccar.evento', 'search_read',
-            [[]], {'fields': ['event_type'], 'limit': 0})
-        tipos = {e['event_type'] for e in eventos}
+        # Traccar guarda la posicion antes de generar sus eventos: se reintenta la sincronizacion hasta un tope.
+        esperados = {'deviceOverspeed', 'geofenceEnter'}
+        tipos = set()
+        limite = time.time() + 90
+        while time.time() < limite:
+            self._sincronizar()
+            db, uid, clave, modelos = self._odoo()
+            eventos = modelos.execute_kw(
+                db, uid, clave, 'logistica.traccar.evento', 'search_read',
+                [[]], {'fields': ['event_type'], 'limit': 0})
+            tipos = {e['event_type'] for e in eventos}
+            if esperados <= tipos:
+                break
+            time.sleep(5)
         self.assertIn('deviceOverspeed', tipos)
         self.assertIn('geofenceEnter', tipos)
 
