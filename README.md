@@ -111,7 +111,7 @@ Las decisiones están en `docs/decisiones_fase1.md` y en el plan `docs/superpowe
 | `traccar.server` | servidor y usuario de integración (solo lectura) | `base_url` + `username`; la clave vive en `traccar.server.clave`, que los usuarios normales no leen |
 | `logistica.traccar.posicion` | posición | `traccar_position_id`, único |
 | `logistica.traccar.evento` | evento (`deviceOverspeed`, `geofenceEnter`, `geofenceExit`, `deviceOnline`, `deviceOffline`) | `traccar_event_id`, único; guarda `geofence_traccar_id` |
-| `res.partner` «Bodega central» | geocerca «Bodega central» | solo por nombre: Odoo no tiene modelo de geocerca |
+| `res.partner` de la bodega (`seeds/data/odoo.json`) | geocerca (`seeds/data/traccar.json`) | solo por nombre: Odoo no tiene modelo de geocerca |
 
 **Checklist de Fase 1** (cada casilla tiene su evidencia):
 
