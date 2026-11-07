@@ -18,6 +18,9 @@ class EsquemaSeedsTest(unittest.TestCase):
                          [c['name'] for c in self.odoo['conductores']])
         self.assertEqual(3, len(self.traccar['dispositivos']))
         self.assertEqual(5, len(self.simulacion['pedidos']))
+        self.assertEqual(5, len(self.odoo['productos']))
+        self.assertEqual(3, len(self.odoo['usuarios_conductor']))
+        self.assertEqual(3, len(self.simulacion['rutas']))
 
     def test_dispositivo_sin_uniqueId_falla_nombrando_el_campo(self):
         traccar = copy.deepcopy(self.traccar)
@@ -60,6 +63,35 @@ class EsquemaSeedsTest(unittest.TestCase):
         traccar['usuarios'][0]['readonly'] = False
         with self.assertRaisesRegex(schema.ErrorEsquema, "'readonly'"):
             schema.validar_traccar(traccar)
+
+
+    def test_producto_sin_precio_falla_nombrando_el_campo(self):
+        odoo = copy.deepcopy(self.odoo)
+        del odoo['productos'][0]['list_price']
+        with self.assertRaisesRegex(schema.ErrorEsquema, "'list_price'"):
+            schema.validar_odoo(odoo)
+
+    def test_usuario_conductor_de_un_conductor_inexistente_falla(self):
+        odoo = copy.deepcopy(self.odoo)
+        odoo['usuarios_conductor'][0]['conductor'] = 'Nadie'
+        with self.assertRaisesRegex(schema.ErrorEsquema, 'Nadie'):
+            schema.validar_todo(odoo, self.traccar, self.simulacion)
+
+    def test_login_repetido_falla(self):
+        odoo = copy.deepcopy(self.odoo)
+        odoo['usuarios_conductor'][1]['login'] = odoo['usuarios_conductor'][0]['login']
+        with self.assertRaisesRegex(schema.ErrorEsquema, 'login'):
+            schema.validar_odoo(odoo)
+
+    def test_bodega_fuera_de_la_geocerca_falla(self):
+        odoo = copy.deepcopy(self.odoo)
+        odoo['bodega_logistica']['latitude'] = odoo['bodega_logistica']['latitude'] + 1.0
+        with self.assertRaisesRegex(schema.ErrorEsquema, 'geocerca'):
+            schema.validar_todo(odoo, self.traccar, self.simulacion)
+
+    def test_cada_vehiculo_tiene_una_ruta_de_simulacion(self):
+        con_ruta = {r['uniqueId'] for r in self.simulacion['rutas']}
+        self.assertEqual(con_ruta, {v['uniqueId'] for v in self.odoo['vehiculos']})
 
 
 if __name__ == '__main__':

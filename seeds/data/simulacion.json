@@ -1,18 +1,87 @@
 {
-  "_comentario": "Cinco pedidos web de la seccion 11 y una ruta OsmAnd. Coordenadas ficticias en Bogota. La ruta de GPS-ABC-1234 sale fuera del circulo 'Bodega central' (radio 300 m) y el segundo punto cae en el centro, a 40 nudos: por encima del speedLimit provisional de 30. Verificado en vivo: speedLimit va en nudos.",
+  "_comentario": "Cinco pedidos web de la seccion 11 y una ruta OsmAnd. Coordenadas ficticias en Bogota. La ruta de GPS-ABC-1234 sale fuera del circulo 'Bodega central' (radio 300 m) y el segundo punto cae en el centro, a 40 nudos: por encima del speedLimit provisional de 30. Verificado en vivo: speedLimit va en nudos. Las rutas de los otros dos dispositivos quedan fuera del circulo 'Bodega central' y por debajo del speedLimit: dejan posiciones para los tres vehiculos sin generar eventos.",
   "pedidos": [
-    {"ref": "PED-001", "cliente": "Cliente web 1", "latitud": 4.6533, "longitud": -74.0836},
-    {"ref": "PED-002", "cliente": "Cliente web 2", "latitud": 4.6780, "longitud": -74.0580},
-    {"ref": "PED-003", "cliente": "Cliente web 3", "latitud": 4.6100, "longitud": -74.1250},
-    {"ref": "PED-004", "cliente": "Cliente web 4", "latitud": 4.5910, "longitud": -74.0950},
-    {"ref": "PED-005", "cliente": "Cliente web 5", "latitud": 4.7050, "longitud": -74.0450}
+    {
+      "ref": "PED-001",
+      "cliente": "Cliente web 1",
+      "latitud": 4.6533,
+      "longitud": -74.0836
+    },
+    {
+      "ref": "PED-002",
+      "cliente": "Cliente web 2",
+      "latitud": 4.678,
+      "longitud": -74.058
+    },
+    {
+      "ref": "PED-003",
+      "cliente": "Cliente web 3",
+      "latitud": 4.61,
+      "longitud": -74.125
+    },
+    {
+      "ref": "PED-004",
+      "cliente": "Cliente web 4",
+      "latitud": 4.591,
+      "longitud": -74.095
+    },
+    {
+      "ref": "PED-005",
+      "cliente": "Cliente web 5",
+      "latitud": 4.705,
+      "longitud": -74.045
+    }
   ],
   "rutas": [
     {
       "uniqueId": "GPS-ABC-1234",
       "puntos": [
-        {"lat": 4.6197, "lon": -74.0817, "speed": 10, "timestamp": 1762473600},
-        {"lat": 4.6097, "lon": -74.0817, "speed": 40, "timestamp": 1762473660}
+        {
+          "lat": 4.6197,
+          "lon": -74.0817,
+          "speed": 10,
+          "timestamp": 1762473600
+        },
+        {
+          "lat": 4.6097,
+          "lon": -74.0817,
+          "speed": 40,
+          "timestamp": 1762473660
+        }
+      ]
+    },
+    {
+      "uniqueId": "GPS-DEF-5678",
+      "puntos": [
+        {
+          "lat": 4.615,
+          "lon": -74.085,
+          "speed": 12,
+          "timestamp": 1762473600
+        },
+        {
+          "lat": 4.616,
+          "lon": -74.086,
+          "speed": 15,
+          "timestamp": 1762473660
+        }
+      ]
+    },
+    {
+      "uniqueId": "GPS-GHI-9012",
+      "puntos": [
+        {
+          "lat": 4.6,
+          "lon": -74.075,
+          "speed": 8,
+          "timestamp": 1762473600
+        },
+        {
+          "lat": 4.599,
+          "lon": -74.0745,
+          "speed": 10,
+          "timestamp": 1762473660
+        }
       ]
     }
   ]

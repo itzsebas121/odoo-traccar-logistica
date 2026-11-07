@@ -6,6 +6,7 @@ o con la API REST de Traccar (name, uniqueId, attributes, area) cuando reflejan 
 Las claves que empiezan por "_" son documentacion: no se validan y el seeder no las usa.
 """
 import json
+import math
 import os
 import re
 
@@ -91,6 +92,28 @@ def validar_odoo(datos):
         _texto(vehiculo, 'uniqueId', donde_v)
     _sin_repetidos([v['license_plate'] for v in vehiculos], donde, 'vehiculos.license_plate')
     _sin_repetidos([v['uniqueId'] for v in vehiculos], donde, 'vehiculos.uniqueId')
+
+    bodega_logistica = _objeto(_campo(raiz, 'bodega_logistica', donde), f'{donde}: bodega_logistica')
+    _texto(bodega_logistica, 'name', f'{donde}: bodega_logistica')
+    _numero(bodega_logistica, 'latitude', f'{donde}: bodega_logistica', minimo=-90, maximo=90)
+    _numero(bodega_logistica, 'longitude', f'{donde}: bodega_logistica', minimo=-180, maximo=180)
+
+    productos = _lista(_campo(raiz, 'productos', donde), f'{donde}: productos')
+    for i, producto in enumerate(productos):
+        donde_p = f'{donde}: productos[{i}]'
+        _objeto(producto, donde_p)
+        _texto(producto, 'name', donde_p)
+        _numero(producto, 'list_price', donde_p, minimo=0, exclusivo_minimo=True)
+    _sin_repetidos([p['name'] for p in productos], donde, 'productos.name')
+
+    usuarios = _lista(_campo(raiz, 'usuarios_conductor', donde), f'{donde}: usuarios_conductor')
+    for i, usuario in enumerate(usuarios):
+        donde_u = f'{donde}: usuarios_conductor[{i}]'
+        _objeto(usuario, donde_u)
+        _texto(usuario, 'login', donde_u)
+        _texto(usuario, 'conductor', donde_u)
+    _sin_repetidos([u['login'] for u in usuarios], donde, 'usuarios_conductor.login')
+    _sin_repetidos([u['conductor'] for u in usuarios], donde, 'usuarios_conductor.conductor')
 
 
 def validar_traccar(datos):
@@ -185,6 +208,31 @@ def validar_referencias(odoo, traccar):
             if nombre not in geocercas:
                 raise ErrorEsquema(
                     f"{ARCHIVO_TRACCAR}: dispositivos[{i}]: la geocerca '{nombre}' no existe en 'geocercas'")
+    for i, usuario in enumerate(odoo['usuarios_conductor']):
+        if usuario['conductor'] not in conductores:
+            raise ErrorEsquema(
+                f"{ARCHIVO_ODOO}: usuarios_conductor[{i}]: el conductor '{usuario['conductor']}' "
+                f"no esta en 'conductores'")
+    _bodega_dentro_de_su_geocerca(odoo['bodega_logistica'], traccar['geocercas'])
+
+
+def _distancia_m(lat1, lon1, lat2, lon2):
+    f1, f2 = math.radians(lat1), math.radians(lat2)
+    a = (math.sin((f2 - f1) / 2) ** 2
+         + math.cos(f1) * math.cos(f2) * math.sin(math.radians(lon2 - lon1) / 2) ** 2)
+    return 2 * 6371000.0 * math.asin(math.sqrt(a))
+
+
+def _bodega_dentro_de_su_geocerca(bodega, geocercas):
+    """Si hay una geocerca con el nombre de la bodega, la bodega debe caer dentro de ella."""
+    for geocerca in geocercas:
+        if geocerca['name'] != bodega['name']:
+            continue
+        lat, lon, radio = (float(x) for x in _AREA_CIRCULO.match(geocerca['area']).groups())
+        if _distancia_m(bodega['latitude'], bodega['longitude'], lat, lon) > radio:
+            raise ErrorEsquema(
+                f"{ARCHIVO_ODOO}: bodega_logistica queda fuera de la geocerca '{geocerca['name']}' "
+                f"de {ARCHIVO_TRACCAR}")
 
 
 def validar_rutas(simulacion, traccar):

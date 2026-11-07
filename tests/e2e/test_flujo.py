@@ -15,6 +15,8 @@ import unittest
 import xmlrpc.client
 from pathlib import Path
 
+from seeds import schema
+
 RAIZ = Path(__file__).resolve().parents[2]
 VARIABLES = (
     'ODOO_URL', 'ODOO_DB', 'ODOO_USER', 'ODOO_PASSWORD',
@@ -76,6 +78,54 @@ class FlujoE2ETest(unittest.TestCase):
             time.sleep(5)
         self.assertIn('deviceOverspeed', tipos)
         self.assertIn('geofenceEnter', tipos)
+
+    def test_datos_demo_en_odoo_sin_duplicados(self):
+        self._script('seeds/seed.py')
+        self._script('seeds/seed.py')
+        odoo, traccar, simulacion = schema.cargar()
+        db, uid, clave, modelos = self._odoo()
+
+        def contar(modelo, dominio):
+            return modelos.execute_kw(db, uid, clave, modelo, 'search_count', [dominio])
+
+        self.assertEqual(contar('logistica.bodega', [('active', '=', True)]), 1)
+        for vehiculo in odoo['vehiculos']:
+            self.assertEqual(contar('fleet.vehicle', [
+                ('license_plate', '=', vehiculo['license_plate']), ('driver_id', '!=', False),
+                ('traccar_device_id.unique_id', '=', vehiculo['uniqueId'])]), 1, vehiculo['license_plate'])
+        for producto in odoo['productos']:
+            self.assertEqual(contar('product.template', [
+                ('name', '=', producto['name']), ('website_published', '=', True)]), 1, producto['name'])
+        for pedido in simulacion['pedidos']:
+            self.assertEqual(contar('sale.order', [
+                ('client_order_ref', '=', pedido['ref']), ('state', '=', 'sale')]), 1, pedido['ref'])
+            self.assertEqual(contar('logistica.entrega', [
+                ('sale_order_id.client_order_ref', '=', pedido['ref'])]), 1, pedido['ref'])
+        for usuario in odoo['usuarios_conductor']:
+            self.assertEqual(contar('res.users', [
+                ('login', '=', usuario['login']),
+                ('groups_id', 'in', [modelos.execute_kw(
+                    db, uid, clave, 'ir.model.data', 'check_object_reference',
+                    ['logistica_conductor', 'group_conductor'])[1]])]), 1, usuario['login'])
+            self.assertEqual(contar('res.partner', [
+                ('name', '=', usuario['conductor']), ('is_driver', '=', True)]), 1, usuario['conductor'])
+
+    def test_posiciones_de_los_tres_vehiculos(self):
+        odoo, _traccar, _simulacion = schema.cargar()
+        self._script('seeds/seed.py')
+        self._script('seeds/simular.py')
+        db, uid, clave, modelos = self._odoo()
+        placas = [v['license_plate'] for v in odoo['vehiculos']]
+        limite = time.time() + 90
+        faltan = list(placas)
+        while faltan and time.time() < limite:
+            self._sincronizar()
+            faltan = [placa for placa in placas if not modelos.execute_kw(
+                db, uid, clave, 'logistica.traccar.posicion', 'search_count',
+                [[('vehicle_id.license_plate', '=', placa)]])]
+            if faltan:
+                time.sleep(4)
+        self.assertFalse(faltan, 'sin posiciones en Odoo para: %s' % ', '.join(faltan))
 
     def test_reinicio_traccar_sin_perdidas(self):
         self._exigir_reinicio()

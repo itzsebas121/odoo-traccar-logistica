@@ -1,5 +1,5 @@
 {
-  "_comentario": "Datos maestros de Odoo de la Fase 1 (datos ficticios de docs/flujo_funcional_odoo_traccar.md, seccion 11). Las claves con nombre de campo de Odoo (name, is_company, function, license_plate) se pasan tal cual al modelo; las claves que empiezan por _ son documentacion. Marca y modelo son los del antiguo seeds/demo_data.py, porque la especificacion no los fija. La asignacion conductor-vehiculo es ilustrativa (1 a 1): la especificacion solo nombra conductores y vehiculos.",
+  "_comentario": "Datos maestros de Odoo de la Fase 1 (datos ficticios de docs/flujo_funcional_odoo_traccar.md, seccion 11). Las claves con nombre de campo de Odoo (name, is_company, function, license_plate) se pasan tal cual al modelo; las claves que empiezan por _ son documentacion. Marca y modelo son los del antiguo seeds/demo_data.py, porque la especificacion no los fija. La asignacion conductor-vehiculo es ilustrativa (1 a 1): la especificacion solo nombra conductores y vehiculos. Fase 2 de la demo: 'bodega_logistica' alinea la bodega activa de Odoo con la geocerca de Traccar; 'productos' son los cinco articulos publicados en la tienda; 'usuarios_conductor' crea un usuario por conductor (la contrasena sale de DEMO_CONDUCTOR_PASSWORD en .env, nunca de este archivo).",
   "traccar_server": {
     "name": "Servidor Traccar local"
   },
@@ -10,13 +10,94 @@
   "marca": "Hino",
   "modelo": "Dutro 300",
   "conductores": [
-    {"name": "Carlos", "is_company": false, "function": "Conductor"},
-    {"name": "Luis", "is_company": false, "function": "Conductor"},
-    {"name": "Pedro", "is_company": false, "function": "Conductor"}
+    {
+      "name": "Carlos",
+      "is_company": false,
+      "function": "Conductor"
+    },
+    {
+      "name": "Luis",
+      "is_company": false,
+      "function": "Conductor"
+    },
+    {
+      "name": "Pedro",
+      "is_company": false,
+      "function": "Conductor"
+    }
   ],
   "vehiculos": [
-    {"license_plate": "ABC-1234", "conductor": "Carlos", "uniqueId": "GPS-ABC-1234"},
-    {"license_plate": "DEF-5678", "conductor": "Luis", "uniqueId": "GPS-DEF-5678"},
-    {"license_plate": "GHI-9012", "conductor": "Pedro", "uniqueId": "GPS-GHI-9012"}
+    {
+      "license_plate": "ABC-1234",
+      "conductor": "Carlos",
+      "uniqueId": "GPS-ABC-1234"
+    },
+    {
+      "license_plate": "DEF-5678",
+      "conductor": "Luis",
+      "uniqueId": "GPS-DEF-5678"
+    },
+    {
+      "license_plate": "GHI-9012",
+      "conductor": "Pedro",
+      "uniqueId": "GPS-GHI-9012"
+    }
+  ],
+  "bodega_logistica": {
+    "name": "Bodega central",
+    "address": "Bodega de la demostracion (ilustrativa)",
+    "latitude": 4.6097,
+    "longitude": -74.0817
+  },
+  "productos": [
+    {
+      "name": "Producto demo 1",
+      "list_price": 10.0,
+      "type": "consu",
+      "sale_ok": true,
+      "website_published": true
+    },
+    {
+      "name": "Producto demo 2",
+      "list_price": 12.5,
+      "type": "consu",
+      "sale_ok": true,
+      "website_published": true
+    },
+    {
+      "name": "Producto demo 3",
+      "list_price": 15.0,
+      "type": "consu",
+      "sale_ok": true,
+      "website_published": true
+    },
+    {
+      "name": "Producto demo 4",
+      "list_price": 17.5,
+      "type": "consu",
+      "sale_ok": true,
+      "website_published": true
+    },
+    {
+      "name": "Producto demo 5",
+      "list_price": 20.0,
+      "type": "consu",
+      "sale_ok": true,
+      "website_published": true
+    }
+  ],
+  "usuarios_conductor": [
+    {
+      "login": "carlos",
+      "conductor": "Carlos"
+    },
+    {
+      "login": "luis",
+      "conductor": "Luis"
+    },
+    {
+      "login": "pedro",
+      "conductor": "Pedro"
+    }
   ]
 }
