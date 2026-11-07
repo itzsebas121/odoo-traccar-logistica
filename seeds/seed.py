@@ -58,8 +58,10 @@ class ClienteTraccar:
 
     def __init__(self, url, correo, clave):
         self._base = url.rstrip('/')
-        credenciales = base64.b64encode(f'{correo}:{clave}'.encode('utf-8')).decode('ascii')
-        self._cabeceras = {'Authorization': 'Basic ' + credenciales, 'Accept': 'application/json'}
+        self._cabeceras = {'Accept': 'application/json'}
+        if correo is not None:
+            credenciales = base64.b64encode(f'{correo}:{clave}'.encode('utf-8')).decode('ascii')
+            self._cabeceras['Authorization'] = 'Basic ' + credenciales
 
     def llamar(self, metodo, ruta, cuerpo=None):
         cabeceras = dict(self._cabeceras)
@@ -301,11 +303,24 @@ def _sembrar_odoo(odoo, entorno, datos, informe):
                   f'fleet.vehicle {placa} vinculado a {uid}', crear=False)
 
 
+def _registrar_administrador_inicial(entorno, informe):
+    """Un Traccar recien instalado no tiene usuarios (/api/server: newServer=true). El primer usuario
+    registrado queda como administrador; se registra el de TRACCAR_ADMIN_EMAIL para que el resto del sembrado entre."""
+    anonimo = ClienteTraccar(entorno['TRACCAR_URL'], None, None)
+    if not (anonimo.llamar('GET', '/api/server') or {}).get('newServer'):
+        return
+    correo = entorno['TRACCAR_ADMIN_EMAIL']
+    anonimo.llamar('POST', '/api/users', {
+        'name': 'Administrador', 'email': correo, 'password': entorno['TRACCAR_ADMIN_PASSWORD']})
+    informe.creados.append(f'traccar.user {correo} (administrador inicial)')
+
+
 def main():
     informe = Informe()
     try:
         datos_odoo, datos_traccar, datos_simulacion = schema.cargar()
         entorno = _leer_entorno()
+        _registrar_administrador_inicial(entorno, informe)
         traccar = ClienteTraccar(entorno['TRACCAR_URL'], entorno['TRACCAR_ADMIN_EMAIL'],
                                  entorno['TRACCAR_ADMIN_PASSWORD'])
         ids_dispositivo = _sembrar_traccar(traccar, datos_traccar, informe)

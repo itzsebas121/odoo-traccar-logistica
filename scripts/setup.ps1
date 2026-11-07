@@ -96,8 +96,9 @@ Write-Host "      Secuencia tc_users_id_seq sincronizada (base traccar)."
 
 Write-Host "[5/5] Datos de prueba (seeds/seed.py) en el host"
 if (Test-Path seeds\seed.py) {
-    # Carga las claves de .env en el proceso; los valores no se imprimen.
-    foreach ($clave in $vars.Keys) { Set-Item -Path "env:$clave" -Value $vars[$clave] }
+    # Carga las claves de .env en el proceso; los valores no se imprimen. Una variable ya definida en el
+    # entorno manda sobre .env (permite apuntar el sembrado a un proyecto de compose con otros puertos).
+    foreach ($clave in $vars.Keys) { if (-not (Test-Path "env:$clave")) { Set-Item -Path "env:$clave" -Value $vars[$clave] } }
     if (Get-Command python -ErrorAction SilentlyContinue) {
         & python seeds\seed.py
     } else {
