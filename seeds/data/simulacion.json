@@ -1,5 +1,5 @@
 {
-  "_comentario": "Cinco pedidos web de la seccion 11 y una ruta OsmAnd. Coordenadas ficticias en Bogota. La ruta de GPS-ABC-1234 sale fuera del circulo 'Bodega central' (radio 300 m) y el segundo punto cae en el centro, a 40 nudos: por encima del speedLimit provisional de 30. La unidad de speedLimit sigue sin verificar en vivo.",
+  "_comentario": "Cinco pedidos web de la seccion 11 y una ruta OsmAnd. Coordenadas ficticias en Bogota. La ruta de GPS-ABC-1234 sale fuera del circulo 'Bodega central' (radio 300 m) y el segundo punto cae en el centro, a 40 nudos: por encima del speedLimit provisional de 30. Verificado en vivo: speedLimit va en nudos.",
   "pedidos": [
     {"ref": "PED-001", "cliente": "Cliente web 1", "latitud": 4.6533, "longitud": -74.0836},
     {"ref": "PED-002", "cliente": "Cliente web 2", "latitud": 4.6780, "longitud": -74.0580},
