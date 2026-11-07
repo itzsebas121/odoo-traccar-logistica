@@ -6,4 +6,4 @@ from . import fleet_vehicle
 from . import logistica_traccar_util
 from . import logistica_traccar_posicion
 from . import logistica_traccar_evento
-
+from . import logistica_ruta_parada_gps

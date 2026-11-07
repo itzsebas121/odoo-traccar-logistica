@@ -40,6 +40,13 @@ def _fecha_utc(texto):
     return fecha
 
 
+def _a_utc(fecha):
+    """Datetime a UTC sin zona; una fecha sin zona ya se entiende UTC (formato de Odoo)."""
+    if fecha.tzinfo is not None:
+        return fecha.astimezone(timezone.utc).replace(tzinfo=None)
+    return fecha
+
+
 def _parametros(dispositivo, desde, hasta):
     return {'deviceId': dispositivo.traccar_id, 'from': _iso_utc(desde), 'to': _iso_utc(hasta)}
 
@@ -452,6 +459,31 @@ class TraccarServer(models.Model):
                      self.id, resumen['dispositivos'], resumen['posiciones'], resumen['eventos'],
                      resumen['errores'])
         return resumen
+
+    # ------------------------------------------------------------------
+    # Informes de Traccar (ruta, viajes y paradas): solo lectura
+    # ------------------------------------------------------------------
+    def _exigir_usuario_flota(self):
+        if not (self.env.su or self.env.user.has_group('fleet.fleet_group_user')):
+            raise AccessError(_('Solo el personal de flota consulta los informes de Traccar.'))
+
+    def _informe(self, tipo, dispositivo, desde, hasta):
+        """GET /api/reports/<tipo> con deviceId, from y to en ISO 8601 UTC. Lista vacía si no hay datos."""
+        self.ensure_one()
+        self._exigir_usuario_flota()
+        traccar_id = dispositivo if isinstance(dispositivo, int) else dispositivo.traccar_id
+        parametros = {'deviceId': traccar_id, 'from': _iso_utc(_a_utc(desde)), 'to': _iso_utc(_a_utc(hasta))}
+        return self._request('/api/reports/' + tipo, parametros) or []
+
+    def get_route_report(self, dispositivo, desde, hasta):
+        """Posiciones del dispositivo en la ventana (informe de ruta)."""
+        return self._informe('route', dispositivo, desde, hasta)
+
+    def get_trips(self, dispositivo, desde, hasta):
+        return self._informe('trips', dispositivo, desde, hasta)
+
+    def get_stops(self, dispositivo, desde, hasta):
+        return self._informe('stops', dispositivo, desde, hasta)
 
     def action_sincronizar_ahora(self):
         """Botón manual «Sincronizar ahora»: el mismo flujo que el cron, solo para gestores de flota."""

@@ -30,6 +30,9 @@ class TraccarDevice(models.Model):
     last_speed = fields.Float(string='Última Velocidad (km/h)', readonly=True)
     last_position_time = fields.Datetime(string='Fecha/Hora Última Posición', readonly=True)
 
+    is_stale = fields.Boolean(
+        string='GPS desactualizado', compute='_compute_is_stale',
+        help='Verdadero si la última posición es más antigua que el umbral configurado en logística.')
     position_watermark = fields.Datetime(
         string='Marca de Última Posición Procesada',
         copy=False,
@@ -48,7 +51,9 @@ class TraccarDevice(models.Model):
 
     def _registrar_posicion(self, fix_time, latitud, longitud, velocidad_kmh):
         """Guarda la última posición conocida solo si es más reciente que la registrada.
-        Escritura con sudo: los usuarios internos no escriben en traccar.device (F1-R16)."""
+        Escritura con sudo: los usuarios internos no escriben en traccar.device (F1-R16).
+        Con una posición nueva revisa si el vehículo llegó a alguna parada (solo registra
+        «posible llegada»; nunca marca la entrega como entregada)."""
         self.ensure_one()
         if self.last_position_time and fix_time <= self.last_position_time:
             return
@@ -58,6 +63,53 @@ class TraccarDevice(models.Model):
             'last_speed': velocidad_kmh,
             'last_position_time': fix_time,
         })
+        self._verificar_llegadas(latitud, longitud, fix_time)
+
+    def _verificar_llegadas(self, latitud, longitud, fix_time):
+        """Llegada por proximidad. Un fallo aquí nunca debe romper la sincronización del GPS."""
+        self.ensure_one()
+        try:
+            with self.env.cr.savepoint():
+                vehiculo = self.env['fleet.vehicle'].sudo().search(
+                    [('traccar_device_id', '=', self.id)], limit=1)
+                if not vehiculo:
+                    return
+                Parada = self.env['logistica.ruta.parada'].sudo()
+                Parada._paradas_en_recorrido(vehiculo)._check_proximidad(latitud, longitud, fix_time)
+        except Exception as exc:  # aislamiento: la posición ya quedó guardada
+            _logger.warning('traccar_llegada_error dispositivo=%s error=%s', self.traccar_id, exc)
+
+    @api.model
+    def _umbral_desactualizado_s(self):
+        return self.env['logistica.configuracion'].sudo().get_config().gps_stale_after_seconds or 300
+
+    @api.depends('last_position_time')
+    def _compute_is_stale(self):
+        umbral = self._umbral_desactualizado_s()
+        ahora = fields.Datetime.now()
+        for rec in self:
+            rec.is_stale = bool(
+                rec.last_position_time
+                and (ahora - rec.last_position_time).total_seconds() > umbral)
+
+    def _estado_gps(self):
+        """Estado para el monitoreo. Nunca simula movimiento: si la señal es vieja devuelve la
+        última ubicación conocida con su antigüedad."""
+        self.ensure_one()
+        base = {'dispositivo': self.name, 'tiene_posicion': False, 'desactualizado': False,
+                'antiguedad_s': None, 'ultima_ubicacion_conocida': None}
+        if not self.last_position_time:
+            return base
+        antiguedad = max(int((fields.Datetime.now() - self.last_position_time).total_seconds()), 0)
+        base.update(
+            tiene_posicion=True,
+            desactualizado=antiguedad > self._umbral_desactualizado_s(),
+            antiguedad_s=antiguedad,
+            ultima_ubicacion_conocida={
+                'latitud': self.last_latitude, 'longitud': self.last_longitude,
+                'velocidad_kmh': self.last_speed,
+                'hora_gps': fields.Datetime.to_string(self.last_position_time)})
+        return base
 
     def action_fetch_latest_position(self):
         self.ensure_one()

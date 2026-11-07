@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="monitoreo_pagina" name="Monitoreo GPS">
+        <t t-call="web.layout">
+            <t t-set="title">Monitoreo GPS</t>
+            <t t-set="head">
+                <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+                      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+                <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+                        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+                <script type="text/javascript" src="/logistica_traccar/static/src/js/monitoreo.js"></script>
+                <style>
+                    html, body { height: 100%; margin: 0; font-family: sans-serif; }
+                    #monitoreo-barra { padding: 8px 12px; background: #714b67; color: #fff; display: flex; gap: 12px; align-items: center; }
+                    #monitoreo-barra a { color: #fff; }
+                    #monitoreo-mapa { height: calc(100% - 41px); }
+                    #monitoreo-aviso { margin-left: auto; font-size: 0.9em; }
+                </style>
+            </t>
+            <div id="monitoreo-barra">
+                <strong>Monitoreo GPS</strong>
+                <a href="/web">Volver a Odoo</a>
+                <span id="monitoreo-aviso"></span>
+            </div>
+            <div id="monitoreo-mapa"></div>
+        </t>
+    </template>
+
+    <record id="action_logistica_monitoreo" model="ir.actions.act_url">
+        <field name="name">Monitoreo GPS</field>
+        <field name="url">/logistica/monitoreo</field>
+        <field name="target">self</field>
+    </record>
+
+    <menuitem id="menu_logistica_monitoreo"
+              name="Monitoreo GPS"
+              parent="logistica_base.menu_logistica_root"
+              action="action_logistica_monitoreo"
+              groups="fleet.fleet_group_user"
+              sequence="40"/>
+</odoo>

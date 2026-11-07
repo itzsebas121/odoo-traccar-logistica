@@ -4,3 +4,4 @@ from . import test_modelos
 from . import test_conector
 from . import test_credencial
 from . import test_cron
+from . import test_traccar
