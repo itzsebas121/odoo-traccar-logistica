@@ -254,7 +254,7 @@
 - [x] **Step 1: Crear el override** `$SCRATCHPAD/puertos-limpio.yaml` que cambia `odoo` a `127.0.0.1:18069:8069`, `traccar` a `127.0.0.1:18082:8082` y `5055` a `15055:5055`.
 - [x] **Step 2: Levantar un proyecto aparte** `docker compose -p fase1limpia -f compose.yaml -f <override> up -d --wait`. El stack de desarrollo no se toca.
 - [x] **Step 3: Sembrar y probar** con las URLs del proyecto limpio (`ODOO_URL=http://127.0.0.1:18069`, `TRACCAR_URL=http://127.0.0.1:18082`, `TRACCAR_OSMAND_URL=http://127.0.0.1:15055`). Ejecutar `scripts/setup` (instala módulos desde cero) y luego `python -m unittest discover -s tests -v`.
-- [ ] **Step 4: Limpiar** `docker compose -p fase1limpia -f compose.yaml -f <override> down -v` (solo borra volúmenes de ese proyecto).
+- [x] **Step 4: Limpiar** `docker compose -p fase1limpia -f compose.yaml -f <override> down -v` (solo borra volúmenes de ese proyecto).
 
 ---
 
@@ -269,8 +269,10 @@
 - Consumes: resultados reales de Tasks 1–10. Cada casilla del checklist se marca solo con evidencia del paso de verificación correspondiente.
 - Produce: sección «Preparación para Fase 2 (ETL/ML/BI)» que lista, sin implementar, las tablas `logistica.traccar.posicion` y `logistica.traccar.evento` y el servicio `traccar.server.sincronizar_*` como puntos de enganche.
 
-- [ ] **Step 1: Escribir README y decisiones** con los comandos reales ejecutados.
-- [ ] **Step 2: Verificar** que cada comando del README se ejecutó tal cual en Task 10.
+**Hecho el 2026-11-07:** README (comandos, variables, mapeo, checklist y preparación para la Fase 2), `docs/decisiones_fase1.md` (textos desactualizados corregidos) y enlace desde `docs/estado_implementacion.md`. Excepción: el comando de la suite de Odoo de `logistica_traccar` no se ha ejecutado, y por eso su casilla del checklist queda sin marcar.
+
+- [x] **Step 1: Escribir README y decisiones** con los comandos reales ejecutados.
+- [x] **Step 2: Verificar** que cada comando del README se ejecutó tal cual en Task 10. Ejecutados: `setup.ps1`, `seed.py`, `simular.py`, pruebas sin Docker y E2E (con y sin reinicios). No ejecutado: la suite de Odoo (queda para la Tarea 12).
 
 ---
 

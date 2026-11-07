@@ -29,13 +29,13 @@ Esta sección es el punto de partida para seguir implementando. Lo que aquí se 
 | Fase 1 · Tarea 8: `seeds/simular.py` envía la ruta OsmAnd de `simulacion.json` | Hecho y verificado en vivo (2026-11-07): genera `deviceOverspeed` y `geofenceEnter`; `speedLimit` va en nudos | `python -m unittest seeds.tests.test_simular seeds.tests.test_schema` → 13 OK; eventos consultados en la API de Traccar |
 | Fase 1 · Tarea 9: escaneo estático y pruebas E2E | El escaneo pasa, con `scripts/verify_integration.py` como única excepción conocida. El E2E corrió contra el stack vivo (2026-11-07): 3 pruebas OK y 3 defectos corregidos (simulador como script, timestamps del simulador, permiso de geocerca del usuario de integración). Con `E2E_REINICIO=1` pasan también los 2 reinicios de contenedor | `python -m unittest tests.e2e.test_flujo -v` → 5 OK; `tests.estatico` + `seeds.tests` → 17 OK |
 | Fase 1 · Tarea 10: verificación desde un entorno limpio | Hecho (2026-11-07): proyecto de compose aparte con puertos 18069/18082/15055 y volúmenes propios; `setup.ps1` termina con código 0 y `tests/` pasa 8 de 8 con reinicios. Encontró 3 defectos (administrador inicial de Traccar, variables de entorno en `setup.ps1`, carrera en el E2E de eventos), ya corregidos. `setup.sh` no recibió el ajuste de variables | Corrida completa desde cero; detalle en `docs/decisiones_fase1.md` |
+| Fase 1 · Tarea 11: documentación | Hecho (2026-11-07): comandos, variables, mapeo Odoo ↔ Traccar, checklist con evidencia y preparación para la Fase 2; textos desactualizados de `docs/decisiones_fase1.md` corregidos | Revisión contra lo ejecutado en las Tareas 8 a 10 |
 
 ### Qué falta
 
 **Fase 1, tareas que no se han empezado:**
 
 - **Tarea 9 — solo queda una decisión tuya.** El E2E completo (5 pruebas, con reinicios) ya pasa contra el stack vivo. `scripts/verify_integration.py` queda como excepción del escaneo hasta que se apruebe borrarlo.
-- **Tarea 11 — documentación.** Completar este README con los comandos reales, las variables, la lista de pruebas y el checklist de Fase 1; corregir `docs/decisiones_fase1.md` (dice que la sincronización no está en el arranque, y que el POST de dispositivos devolvió 401/403 cuando fue 400).
 - **Tarea 12 — cierre.** Evidencia final de todas las suites y revisión de credenciales fuera de `seeds/data/` y `.env`.
 
 **Pendientes de seguridad (prioridad alta, ya en `main` o en esta misma subida):**
@@ -87,6 +87,48 @@ Las decisiones están en `docs/decisiones_fase1.md` y en el plan `docs/superpowe
 - El secreto de Traccar vive en un modelo que los usuarios normales no pueden leer; el campo visible es no almacenado.
 - Distancias por carretera: OSRM si hay URL; si no, estimación haversine × 1,3, etiquetada como tal.
 - Pago de prueba: la confirmación automática solo aplica al proveedor de pago de prueba.
+
+### Fase 1: comandos, mapeo y checklist (2026-11-07)
+
+**Comandos** (desde la raíz del repositorio; en PowerShell, `.env` se carga con el bloque de `tests/README.md`):
+
+| Qué | Comando |
+|---|---|
+| Levantar todo desde cero | `powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1` |
+| Sembrar datos de prueba (idempotente) | `python seeds/seed.py` |
+| Simular posiciones GPS (OsmAnd) | `python seeds/simular.py` |
+| Pruebas sin Docker | `python -m unittest tests.estatico.test_sin_datos_quemados seeds.tests.test_simular seeds.tests.test_schema -v` |
+| E2E contra el stack vivo | `python -m unittest tests.e2e.test_flujo -v` (con `E2E_REINICIO=1` también reinicia Traccar y Odoo) |
+| Odoo de `logistica_traccar` | ver `tests/README.md` |
+
+**Variables de Fase 1 en `.env`** (los valores no se versionan): `ODOO_URL`, `ODOO_DB`, `ODOO_USER`, `ODOO_PASSWORD`, `TRACCAR_URL`, `TRACCAR_INTERNAL_URL` (cómo llega Odoo a Traccar dentro de Docker), `TRACCAR_ADMIN_EMAIL`, `TRACCAR_ADMIN_PASSWORD`, `INTEGRATION_TRACCAR_EMAIL`, `INTEGRATION_TRACCAR_PASSWORD`, `TRACCAR_OSMAND_URL` (obligatoria al simular) y `SIM_INTERVALO_S` (vacía = 0). Una variable ya definida en el entorno manda sobre `.env`.
+
+**Mapeo Odoo ↔ Traccar:**
+
+| Odoo | Traccar | Vínculo |
+|---|---|---|
+| `fleet.vehicle` | dispositivo | `fleet.vehicle.traccar_device_id` → `traccar.device` (`traccar_id`, `unique_id`) |
+| `traccar.server` | servidor y usuario de integración (solo lectura) | `base_url` + `username`; la clave vive en `traccar.server.clave`, que los usuarios normales no leen |
+| `logistica.traccar.posicion` | posición | `traccar_position_id`, único |
+| `logistica.traccar.evento` | evento (`deviceOverspeed`, `geofenceEnter`, `geofenceExit`, `deviceOnline`, `deviceOffline`) | `traccar_event_id`, único; guarda `geofence_traccar_id` |
+| `res.partner` «Bodega central» | geocerca «Bodega central» | solo por nombre: Odoo no tiene modelo de geocerca |
+
+**Checklist de Fase 1** (cada casilla tiene su evidencia):
+
+- [x] Un comando levanta un entorno sano desde cero: `setup.ps1` con código 0 en un proyecto limpio (Tarea 10).
+- [x] El sembrado es idempotente: la segunda corrida no crea nada (`test_seed_idempotente`).
+- [x] Las posiciones llegan a Odoo con su vehículo y sin duplicados (`test_posicion_en_odoo_vehiculo_correcto`).
+- [x] Los eventos de exceso de velocidad y de entrada a geocerca llegan a Odoo (`test_evento_overspeed_y_geocerca_en_odoo`).
+- [x] Reiniciar Traccar u Odoo no pierde datos (`test_reinicio_*`, con `E2E_REINICIO=1`).
+- [x] El usuario de integración es de solo lectura y no administrador.
+- [x] Sin datos de negocio ni credenciales en el código, salvo `scripts/verify_integration.py` (excepción conocida).
+- [ ] Suite de Odoo de `logistica_traccar` (`--test-enable`): no se ha corrido en esta máquina.
+- [ ] `scripts/setup.sh` en Linux: solo sintaxis revisada.
+- [ ] Pendientes de seguridad de la lista de arriba (control de gestor en «Probar Conexión», cabeceras en errores, rotación de credenciales).
+
+### Preparación para la Fase 2 (ETL / ML / BI), sin implementar
+
+Puntos de enganche que deja la Fase 1: las tablas `logistica.traccar.posicion` y `logistica.traccar.evento` de Odoo, y la sincronización de `traccar.server` (puntos de entrada públicos: `cron_sincronizar` y `action_sincronizar_ahora`; el trabajo vive en métodos privados `_sincronizar_*`). Hoy el ETL de `services/etl` extrae de Traccar por su API, no de estas tablas.
 
 ---
 
@@ -166,10 +208,7 @@ chmod +x ./scripts/setup.sh
 powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 ```
 
-> **Nota:** Si prefieres hacerlo paso a paso manualmente:
-> 1. `cp .env.example .env` (y editar contraseñas si deseas).
-> 2. `docker compose up -d`
-> 3. Las bases y tablas se configuran automáticamente.
+> **Nota:** `docker compose up -d` por sí solo **no** crea la base `logistica_dev` ni instala los módulos de Odoo: hasta que eso se haga, Odoo responde HTTP 500. Usa el script, que lo hace todo en orden. Si prefieres los pasos a mano, son los del script `scripts/setup.ps1`: `.env` con contraseñas reales → `docker compose up -d --wait` → `createdb logistica_dev` → instalar los módulos con `odoo -i` → reiniciar Odoo → `python seeds/seed.py`.
 
 ---
 
@@ -184,7 +223,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 | **Odoo - Login Administrativo** | [http://localhost:8069/web/login](http://localhost:8069/web/login) | **Base de Datos:** `logistica_dev`<br>**Email:** `admin`<br>**Contraseña:** `admin` | Formulario para ingresar al backend del ERP. |
 | **Odoo - Panel Backend ERP** | [http://localhost:8069/web](http://localhost:8069/web) | *(Requiere sesión iniciada)* | Acceso a Flota, Contactos, Ventas y Rastreo GPS. |
 | **Odoo - Tienda eCommerce** | [http://localhost:8069/shop](http://localhost:8069/shop) | *Público (sin login)* | Catálogo de productos para compras sin registro obligatorio. |
-| **Traccar - Consola Web y API** | [http://localhost:8082](http://localhost:8082) | **Usuario:** `admin@logistica.local`<br>**Contraseña:** la definida en `TRACCAR_ADMIN_PASSWORD` | Panel de monitoreo de dispositivos y gestión GPS. |
+| **Traccar - Consola Web y API** | [http://localhost:8082](http://localhost:8082) | **Usuario:** el correo de `TRACCAR_ADMIN_EMAIL`<br>**Contraseña:** la de `TRACCAR_ADMIN_PASSWORD`. En una instalación nueva, `seeds/seed.py` registra ese usuario como administrador inicial | Panel de monitoreo de dispositivos y gestión GPS. |
 | **Receptor GPS OsmAnd** | `http://localhost:5055` | *Protocolo OsmAnd* | Puerto para envío de coordenadas desde Traccar Client. |
 
 ---

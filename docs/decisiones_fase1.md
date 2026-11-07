@@ -23,9 +23,7 @@ Lista de 11 modulos. Se amplio la lista del script anterior con `logistica_entre
 
 ## Tarea 2: paso de seeds
 
-`seeds/seed.py` todavia no existe (Tarea 3). Mientras no exista, el paso 5 imprime un aviso y no ejecuta nada:
-- Windows: `AVISO: seeds\seed.py no existe todavia (pendiente: Tarea 3 del plan). Se omite el sembrado.`
-- Linux: `AVISO: seeds/seed.py no existe todavia (pendiente: Tarea 3 del plan). Se omite el sembrado.`
+Cuando se escribió la Tarea 2, `seeds/seed.py` todavía no existía y el paso 5 solo imprimía un aviso (`AVISO: seeds\seed.py no existe todavia ...`). Desde la Tarea 3 el archivo existe y el paso 5 de `setup.ps1` y `setup.sh` lo ejecuta en el host con las variables de `.env`; el aviso queda solo como salvaguarda.
 
 ## Tarea 4: causa del duplicate key en POST /api/users (verificado 2026-11-06)
 
@@ -72,7 +70,7 @@ Ninguna variante reproduce el error: no es un fallo de la API. Con la secuencia 
 SELECT setval('tc_users_id_seq', GREATEST((SELECT max(id) FROM tc_users), (SELECT last_value FROM tc_users_id_seq)), true);
 ```
 
-Aplicado en la base de desarrollo tras las pruebas: antes (9, true), despues (9, true); no cambio nada porque la secuencia ya estaba por encima del id maximo. Usar esta sentencia si POST /api/users vuelve a dar duplicate key en `tc_users_pkey` tras restaurar la base de Traccar. No se anadio al setup (`scripts/setup.*`), porque esos ficheros estan fuera de la lista de la Tarea 4; queda como decision pendiente.
+Aplicado en la base de desarrollo tras las pruebas: antes (9, true), despues (9, true); no cambio nada porque la secuencia ya estaba por encima del id maximo. Usar esta sentencia si POST /api/users vuelve a dar duplicate key en `tc_users_pkey` tras restaurar la base de Traccar. Cuando se escribió esto no se había añadido al setup. **Resuelto:** `scripts/setup.ps1` y `scripts/setup.sh` ejecutan esa sentencia en el paso 4, antes del sembrado.
 
 ## Tarea 4: usuario de integracion en Traccar
 
@@ -136,7 +134,7 @@ Seeder: la primera ejecucion creo el usuario y sus 3 permisos y actualizo `tracc
 - Tokens: `uniqueId`, `ref`, `marca`, `modelo`, `cliente` y el `name` de una geocerca (el objeto que tiene `area`). No se buscan placas ni nombres de persona: `ABC-1234` y `Carlos` ya estan en las fixtures de ETL y BI, de la fase anterior. Buscarlos dejaria el escaneo en rojo por codigo que no es de esta fase.
 - Un literal `password` de 8 caracteres o mas cuenta solo fuera de `tests/`. Dentro de las pruebas hay contraseñas ficticias a proposito (por ejemplo, un caracter raro en el DSN del ETL).
 - `scripts/verify_integration.py` es la unica excepcion. El test `test_la_excepcion_conocida_sigue_teniendo_datos_quemados` falla el dia que ese archivo deje de tener datos quemados, para obligar a quitar la excepcion. No se borro el archivo: sigue pendiente de aprobacion.
-- El E2E (`tests/e2e/test_flujo.py`) no se ejecuto contra el stack: faltan las variables. Si faltan, las pruebas se omiten. La sincronizacion usa `action_sincronizar_ahora`. Reiniciar `traccar` u `odoo` exige `E2E_REINICIO=1`.
+- El E2E (`tests/e2e/test_flujo.py`) se escribió sin ejecutarse contra el stack; la corrida en vivo está más abajo («Tarea 9: corrida en vivo»). Si faltan las variables de entorno, las pruebas se omiten. La sincronizacion usa `action_sincronizar_ahora`. Reiniciar `traccar` u `odoo` exige `E2E_REINICIO=1`.
 - Como la ruta del simulador repite los mismos timestamps, el reinicio comprueba que el conteo de posiciones no baja. No exige un lote nuevo con otros timestamps: el JSON no tiene un segundo lote. (Reemplazado el 2026-11-07: ver más abajo, el simulador ya desplaza los timestamps.)
 
 ### Tarea 10: entorno limpio (2026-11-07)
