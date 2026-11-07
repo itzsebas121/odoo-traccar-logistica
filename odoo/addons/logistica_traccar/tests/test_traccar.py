@@ -176,10 +176,14 @@ class TestMonitoreoHttp(_BaseMonitoreo, HttpCase):
     def setUp(self):
         super().setUp()
         self._preparar()
-        grupos = [self.env.ref(x).id for x in ('base.group_user', 'fleet.fleet_group_user')]
+        grupos = [self.env.ref(x).id for x in ('base.group_user', 'fleet.fleet_group_manager')]
         self.env['res.users'].with_context(no_reset_password=True).create({
             'name': 'Monitor', 'login': 'monitor-flota', 'password': 'monitor-flota-clave',
             'groups_id': [(6, 0, grupos)]})
+        grupos_usuario = [self.env.ref(x).id for x in ('base.group_user', 'fleet.fleet_group_user')]
+        self.env['res.users'].with_context(no_reset_password=True).create({
+            'name': 'Usuario de flota', 'login': 'usuario-flota-http', 'password': 'usuario-flota-clave',
+            'groups_id': [(6, 0, grupos_usuario)]})
         self.env['res.users'].with_context(no_reset_password=True).create({
             'name': 'Sin flota', 'login': 'sin-flota-http', 'password': 'sin-flota-clave',
             'groups_id': [(6, 0, [self.env.ref('base.group_user').id])]})
@@ -222,6 +226,11 @@ class TestMonitoreoHttp(_BaseMonitoreo, HttpCase):
         self.authenticate('sin-flota-http', 'sin-flota-clave')
         self.assertEqual(self.url_open('/logistica/monitoreo/data').status_code, 403)
         self.assertEqual(self.url_open('/logistica/monitoreo').status_code, 403)
+
+    def test_monitoreo_exige_gestor_de_flota(self):
+        """El usuario de flota ve solo sus vehículos en Odoo; el mapa de toda la flota es del gestor."""
+        self.authenticate('usuario-flota-http', 'usuario-flota-clave')
+        self.assertEqual(self.url_open('/logistica/monitoreo/data').status_code, 403)
 
     def test_pagina_de_monitoreo_carga(self):
         self.authenticate('monitor-flota', 'monitor-flota-clave')

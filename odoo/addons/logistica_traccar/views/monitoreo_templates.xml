@@ -37,6 +37,6 @@
               name="Monitoreo GPS"
               parent="logistica_base.menu_logistica_root"
               action="action_logistica_monitoreo"
-              groups="fleet.fleet_group_user"
+              groups="fleet.fleet_group_manager"
               sequence="40"/>
 </odoo>

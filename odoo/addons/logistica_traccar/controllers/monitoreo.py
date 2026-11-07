@@ -20,7 +20,9 @@ class MonitoreoController(http.Controller):
     credenciales, la URL del servidor ni cabeceras de autenticación (§12)."""
 
     def _exigir_flota(self):
-        if not request.env.user.has_group('fleet.fleet_group_user'):
+        # Odoo limita al grupo «Flota / Usuario» a los vehículos que conduce; el mapa muestra toda la
+        # flota, así que lo ve solo quien gestiona la flota.
+        if not request.env.user.has_group('fleet.fleet_group_manager'):
             raise Forbidden()
 
     @http.route('/logistica/monitoreo', type='http', auth='user')

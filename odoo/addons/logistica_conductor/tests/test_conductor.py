@@ -207,7 +207,8 @@ class TestConductor(HttpCase):
         ruta = self._ruta(self.user_a, 'CND-0009', n=1, estado='en_recorrido')
         self._entrar(self.user_a)
         respuesta = self.url_open(
-            '/logistica/conductor/parada/%s/entregado' % ruta.stop_ids.id, data={}, allow_redirects=False)
+            '/logistica/conductor/parada/%s/entregado' % ruta.stop_ids.id, data={'sin': 'token'},
+            allow_redirects=False)
         self.assertEqual(respuesta.status_code, 400)
         self._refrescar()
         self.assertEqual(ruta.stop_ids.state, 'pendiente')
