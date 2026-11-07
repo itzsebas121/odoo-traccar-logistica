@@ -150,6 +150,23 @@ def validar_simulacion(datos):
         _numero(pedido, 'longitud', donde_p, minimo=-180, maximo=180)
     _sin_repetidos([p['ref'] for p in pedidos], donde, 'pedidos.ref')
 
+    rutas = _lista(_campo(raiz, 'rutas', donde), f'{donde}: rutas')
+    for i, ruta in enumerate(rutas):
+        donde_r = f'{donde}: rutas[{i}]'
+        _objeto(ruta, donde_r)
+        _texto(ruta, 'uniqueId', donde_r)
+        puntos = _lista(_campo(ruta, 'puntos', donde_r), f'{donde_r}: puntos')
+        for j, punto in enumerate(puntos):
+            donde_pt = f'{donde_r}: puntos[{j}]'
+            _objeto(punto, donde_pt)
+            _numero(punto, 'lat', donde_pt, minimo=-90, maximo=90)
+            _numero(punto, 'lon', donde_pt, minimo=-180, maximo=180)
+            _numero(punto, 'speed', donde_pt, minimo=0)
+            marca = _campo(punto, 'timestamp', donde_pt)
+            if isinstance(marca, bool) or not isinstance(marca, int) or marca < 0:
+                raise ErrorEsquema(f"{donde_pt}: 'timestamp' debe ser un entero de segundos unix, mayor o igual que 0")
+    _sin_repetidos([r['uniqueId'] for r in rutas], donde, 'rutas.uniqueId')
+
 
 def validar_referencias(odoo, traccar):
     """Comprueba que cada conductor y cada uniqueId de vehiculo, y cada geocerca de dispositivo, existan."""
@@ -170,11 +187,23 @@ def validar_referencias(odoo, traccar):
                     f"{ARCHIVO_TRACCAR}: dispositivos[{i}]: la geocerca '{nombre}' no existe en 'geocercas'")
 
 
+def validar_rutas(simulacion, traccar):
+    """Cada ruta del simulador apunta a un uniqueId que existe en traccar.json."""
+    ids = {d['uniqueId'] for d in traccar['dispositivos']}
+    for i, ruta in enumerate(simulacion['rutas']):
+        uid = ruta['uniqueId']
+        if uid not in ids:
+            raise ErrorEsquema(
+                f"{ARCHIVO_SIMULACION}: rutas[{i}]: el uniqueId '{uid}' no existe en "
+                f"{ARCHIVO_TRACCAR} (dispositivos)")
+
+
 def validar_todo(odoo, traccar, simulacion):
     validar_odoo(odoo)
     validar_traccar(traccar)
     validar_simulacion(simulacion)
     validar_referencias(odoo, traccar)
+    validar_rutas(simulacion, traccar)
 
 
 def cargar(directorio=DIRECTORIO_DATOS):

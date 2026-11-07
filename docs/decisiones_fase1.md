@@ -120,3 +120,11 @@ Seeder: la primera ejecucion creo el usuario y sus 3 permisos y actualizo `tracc
 - `noupdate="1"`: un `-u logistica_traccar` no pisa el intervalo si alguien lo cambia en Ajustes.
 - El boton «Sincronizar ahora» de la ficha del servidor llama a `action_sincronizar_ahora` y solo lo ve `fleet.fleet_group_manager`. No llama a `sincronizar_todo` (privado desde la tarea 6).
 - `logistica.traccar_poll_minutes` no se redefinió. Ya vale `1` en `odoo/addons/logistica_base/data/logistica_config_data.xml`. El cron no consulta ese parametro en cada vuelta: `interval_number` es la agenda de Odoo. Cambiar el parametro no mueve el cron. Queda asi a proposito, para no tener dos sitios escribiendo la misma clave ni un cron que se reescriba solo.
+
+## Tarea 8: simulador OsmAnd (2026-11-07, sin verificacion en vivo)
+
+- `seeds/simular.py` lee `seeds/data/simulacion.json` y hace `GET {TRACCAR_OSMAND_URL}/?id=&lat=&lon=&speed=&timestamp=`. `speed` va en nudos, como ya convierte el conector de Odoo. `timestamp` va en segundos unix, no en milisegundos.
+- `TRACCAR_OSMAND_URL` no tiene valor por defecto. `SIM_INTERVALO_S` vacia significa 0.
+- La ruta de `GPS-ABC-1234` tiene dos puntos: el primero a ~1,1 km al norte del circulo `Bodega central` (radio 300 m), a 10 nudos; el segundo en el centro del circulo, a 40 nudos. El `speedLimit` sembrado sigue en 30 y **no se ha confirmado** si Traccar lo interpreta en nudos o en km/h. Tampoco se comprobo en vivo que aparezcan `deviceOverspeed` y `geofenceEnter`.
+- Pruebas: `python -m unittest seeds.tests.test_simular seeds.tests.test_schema -v` → 13 OK. No abren red.
+- `schema.cargar()` ahora exige `rutas`. `seeds/seed.py` lo llama, asi que un JSON de simulacion sin rutas deja de sembrar. Es intencional: el mismo archivo alimenta al seeder y al simulador.

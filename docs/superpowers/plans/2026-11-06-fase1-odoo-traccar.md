@@ -209,10 +209,10 @@
 **Interfaces:**
 - Produces: CLI `python seeds/simular.py` con variables `TRACCAR_OSMAND_URL` (por defecto no; obligatoria desde `.env`, ej. `http://127.0.0.1:5055`) y `SIM_INTERVALO_S` (opcional, 0 por defecto). Retorna el número de posiciones enviadas y falla si el servidor responde distinto de 200.
 
-- [ ] **Step 1: Verificar en vivo** el umbral de velocidad: crear un dispositivo de prueba con `attributes.speedLimit`, enviar una posición por encima del límite, consultar `/api/reports/events?deviceId=...&type=deviceOverspeed` (con Accept JSON). Anotar en `docs/decisiones_fase1.md` si `speedLimit` está en nudos o km/h. Borrar el dispositivo de prueba al final.
-- [ ] **Step 2: Escribir pruebas que fallan** (`test_simular.py`): la URL contiene `id`, `lat`, `lon`, `speed` y `timestamp` en segundos; un JSON sin `uniqueId` falla.
-- [ ] **Step 3: Implementar** `simular.py` y `simulacion.json`.
-- [ ] **Step 4: Ejecutar** `python -m unittest seeds.tests.test_simular -v` → OK.
+- [ ] **Step 1: Verificar en vivo** el umbral de velocidad: crear un dispositivo de prueba con `attributes.speedLimit`, enviar una posición por encima del límite, consultar `/api/reports/events?deviceId=...&type=deviceOverspeed` (con Accept JSON). Anotar en `docs/decisiones_fase1.md` si `speedLimit` está en nudos o km/h. Borrar el dispositivo de prueba al final. Sigue pendiente: en esta máquina no había stack sembrado.
+- [x] **Step 2: Escribir pruebas que fallan** (`test_simular.py`): la URL contiene `id`, `lat`, `lon`, `speed` y `timestamp` en segundos; un JSON sin `uniqueId` falla. No se corrió el rojo: las pruebas se escribieron en el mismo cambio que el simulador.
+- [x] **Step 3: Implementar** `simular.py` y `simulacion.json`.
+- [x] **Step 4: Ejecutar** `python -m unittest seeds.tests.test_simular seeds.tests.test_schema -v` → 13 OK (2026-11-07).
 - [ ] **Step 5: Ejecutar** el simulador contra Traccar en vivo y comprobar que `/api/positions` y `/api/reports/events` muestran `deviceOverspeed` y `geofenceEnter` para el dispositivo de prueba de la simulación.
 
 ---

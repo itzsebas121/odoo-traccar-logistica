@@ -26,12 +26,13 @@ Esta sección es el punto de partida para seguir implementando. Lo que aquí se 
 | Fase 1 · Tarea 5: modelos de posiciones y eventos en Odoo, con restricciones únicas | Hecho y revisado | 17 pruebas |
 | Fase 1 · Tarea 6: conector de sincronización (posiciones, eventos, watermark, reintentos, aislamiento por dispositivo) | Hecho y revisado (4 rondas de correcciones y revisión de seguridad) | 53 pruebas |
 | Fase 1 · Tarea 7: `ir.cron` cada minuto llama a `cron_sincronizar`; botón «Sincronizar ahora» llama a `action_sincronizar_ahora` | Implementada. La suite de Odoo no se ejecutó: Docker Desktop estaba apagado y no hay `.env` en esta máquina | `odoo/addons/logistica_traccar/tests/test_cron.py` (3 pruebas, sin correr) |
+| Fase 1 · Tarea 8 (código): `seeds/simular.py` envía la ruta OsmAnd de `simulacion.json` | Hecho en local, sin red. Falta la comprobación en vivo de `deviceOverspeed`, `geofenceEnter` y la unidad de `speedLimit` | `python -m unittest seeds.tests.test_simular seeds.tests.test_schema` → 13 OK |
 
 ### Qué falta
 
 **Fase 1, tareas que no se han empezado:**
 
-- **Tarea 8 — simulador OsmAnd y verificación de eventos.** Enviar posiciones al puerto 5055 de Traccar y comprobar que aparecen eventos `deviceOverspeed` y `geofenceEnter`. Verificar la unidad del atributo `speedLimit` (el valor sembrado, 30, es provisional) y la forma de la consulta de eventos con `type` repetido.
+- **Tarea 8 — lo que falta es la verificación en vivo.** El simulador ya está (`python seeds/simular.py`, con `TRACCAR_OSMAND_URL`). Falta levantar Traccar, enviar la ruta y comprobar `deviceOverspeed` y `geofenceEnter`. El `speedLimit` sembrado (30) sigue siendo provisional: no se confirmó si Traccar lo lee en nudos o en km/h. Tampoco se confirmó la consulta de eventos con `type` repetido.
 - **Tarea 9 — pruebas E2E y estáticas.** La prueba E2E debe llamar a `action_sincronizar_ahora` (no a `sincronizar_todo`, que ahora es privado). El escaneo estático de datos quemados fallará mientras `scripts/verify_integration.py` siga en el repositorio.
 - **Tarea 10 — entorno limpio.** Levantar un proyecto de compose aparte con puertos alternos (override fuera del repositorio) y sembrar desde cero, sin tocar el entorno de desarrollo. Borrar solo los volúmenes de ese proyecto.
 - **Tarea 11 — documentación.** Completar este README con los comandos reales, las variables, la lista de pruebas y el checklist de Fase 1; corregir `docs/decisiones_fase1.md` (dice que la sincronización no está en el arranque, y que el POST de dispositivos devolvió 401/403 cuando fue 400).
@@ -259,3 +260,4 @@ Get-Content scripts/verify_integration.py -Raw | docker compose exec -T odoo pyt
 | **Restaurar respaldo** | `./scripts/restore.sh <odoo.dump> <traccar.dump> [filestore.tar.gz]` | Ver comandos en `scripts/restore.sh` |
 | **Actualizar módulos Odoo** | `./scripts/update_modules.sh logistica_traccar logistica_dev` | `docker compose exec -T odoo /entrypoint.sh odoo -d logistica_dev -u logistica_traccar --stop-after-init` |
 | **Poblar datos de prueba (Seeds)** | `python3 seeds/seed.py` (en el host; `scripts/setup.sh` carga `.env` antes) | `python seeds/seed.py` (en el host; `scripts/setup.ps1` carga `.env` antes) |
+| **Simular posiciones OsmAnd** | `python3 seeds/simular.py` (exige `TRACCAR_OSMAND_URL` en el entorno) | `python seeds/simular.py` (exige `TRACCAR_OSMAND_URL` en el entorno) |

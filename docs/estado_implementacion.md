@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-11-05
 
-**Actualización 2026-11-07 (Fase 1, no reescribe esta tabla):** la tarea 7 de `docs/superpowers/plans/2026-11-06-fase1-odoo-traccar.md` ya está en el código: cron de un minuto hacia `cron_sincronizar` y botón «Sincronizar ahora». La tarea 9 de *este* documento (monitoreo GPS: llegada por proximidad, mapa, informes) sigue pendiente. El detalle vive en el README, sección de estado.
+**Actualización 2026-11-07 (Fase 1, no reescribe esta tabla):** la tarea 7 de `docs/superpowers/plans/2026-11-06-fase1-odoo-traccar.md` ya está en el código: cron de un minuto hacia `cron_sincronizar` y botón «Sincronizar ahora». La tarea 8 tiene el simulador OsmAnd (`seeds/simular.py`) y sus pruebas locales; la comprobación en vivo de eventos no se hizo. La tarea 9 de *este* documento (monitoreo GPS: llegada por proximidad, mapa, informes) sigue pendiente. El detalle vive en el README, sección de estado.
 **Especificación:** [flujo_funcional_odoo_traccar.md](flujo_funcional_odoo_traccar.md)
 **Plan de implementación:** [superpowers/plans/2026-11-05-rastreo-analitica-rutas.md](superpowers/plans/2026-11-05-rastreo-analitica-rutas.md)
 
