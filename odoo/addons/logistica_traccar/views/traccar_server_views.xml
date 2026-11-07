@@ -23,6 +23,8 @@
                 <header>
                     <button name="action_test_connection" string="Probar Conexión" type="object" class="oe_highlight"/>
                     <button name="action_sync_devices" string="Sincronizar Dispositivos" type="object" class="btn-primary"/>
+                    <button name="action_sincronizar_ahora" string="Sincronizar ahora" type="object"
+                            groups="fleet.fleet_group_manager"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,connected,error"/>
                 </header>
                 <sheet>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!-- El intervalo es 1 minuto, el mismo valor que logistica.traccar_poll_minutes
+         (ya definido en logistica_base). ir.cron no lee ese parámetro al dispararse:
+         interval_number es el dato que Odoo usa para programar. doall en falso porque
+         el watermark cubre el hueco si el cron se salta una vuelta; repetir las
+         llamadas perdidas solo reconsultaría la misma ventana.
+         user_id no se fija: al instalar el módulo el entorno es el superusuario (uid 1),
+         y cron_sincronizar solo deja pasar al sistema o a un gestor de flota. -->
+    <record id="ir_cron_traccar_sincronizar" model="ir.cron">
+        <field name="name">Logística: sincronizar Traccar</field>
+        <field name="model_id" ref="model_traccar_server"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_sincronizar()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">minutes</field>
+        <field name="numbercall">-1</field>
+        <field name="doall" eval="False"/>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>

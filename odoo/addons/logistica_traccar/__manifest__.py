@@ -23,6 +23,7 @@ Permite:
     ],
     'data': [
         'security/ir.model.access.csv',
+        'data/traccar_cron.xml',
         'views/traccar_server_views.xml',
         'views/traccar_device_views.xml',
         'views/fleet_vehicle_views.xml',

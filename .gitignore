@@ -11,3 +11,6 @@ backups/*
 .idea/
 .superpowers/
 .pytest_cache/
+
+# Índice local de CodeGraph. Cada quien lo genera con `codegraph init`.
+.codegraph/

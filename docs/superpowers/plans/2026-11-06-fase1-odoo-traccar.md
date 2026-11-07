@@ -187,10 +187,15 @@
 **Interfaces:**
 - Consumes: Task 6.
 
-- [ ] **Step 1: Pruebas que fallan:** existe un `ir.cron` activo cuyo `code` contiene `cron_sincronizar`; el botón está en la vista; el parámetro vale `1` por defecto.
-- [ ] **Step 2: Ejecutar** y verificar FAIL.
-- [ ] **Step 3: Implementar** los XML.
-- [ ] **Step 4: Ejecutar** `-u logistica_traccar --test-tags /logistica_traccar` → `0 failed, 0 error(s)`.
+- [x] **Step 1: Pruebas que fallan:** existe un `ir.cron` activo cuyo `code` contiene `cron_sincronizar`; el botón está en la vista; el parámetro vale `1` por defecto. Quedaron en `tests/test_cron.py`.
+- [ ] **Step 2: Ejecutar** y verificar FAIL. No se corrió el rojo: las pruebas se escribieron en el mismo cambio que el XML.
+- [x] **Step 3: Implementar** los XML.
+- [ ] **Step 4: Ejecutar** `-u logistica_traccar --test-tags /logistica_traccar` → `0 failed, 0 error(s)`. Pendiente de la corrida en el contenedor.
+
+**Hecho el 2026-11-07, con dos desviaciones respecto al texto de arriba:**
+
+- El botón llama a `action_sincronizar_ahora`, no a `sincronizar_todo`. Ese método quedó privado en la tarea 6; el README de estado ya lo pedía así.
+- No se creó `data/traccar_config.xml`. El parámetro `logistica.traccar_poll_minutes = 1` ya está en `logistica_base/data/logistica_config_data.xml`. Un segundo registro sería otro dueño de la misma clave. El `interval_number` del cron es 1, el mismo valor. Odoo no relee el parámetro al disparar el cron.
 
 ---
 

@@ -4,7 +4,7 @@ Proyecto universitario integrador que combina **Odoo 16 Community**, **Traccar G
 
 ---
 
-## 🚧 Estado del proyecto y pendientes (actualizado 2026-11-06)
+## 🚧 Estado del proyecto y pendientes (actualizado 2026-11-07)
 
 Esta sección es el punto de partida para seguir implementando. Lo que aquí se lista es el estado real verificado con pruebas y revisiones; lo que no está listo se marca como pendiente.
 
@@ -25,12 +25,12 @@ Esta sección es el punto de partida para seguir implementando. Lo que aquí se 
 | Fase 1 · Tarea 4: usuario de integración en Traccar (solo lectura), sincronización de la secuencia de usuarios | Hecho y revisado | Verificado en vivo |
 | Fase 1 · Tarea 5: modelos de posiciones y eventos en Odoo, con restricciones únicas | Hecho y revisado | 17 pruebas |
 | Fase 1 · Tarea 6: conector de sincronización (posiciones, eventos, watermark, reintentos, aislamiento por dispositivo) | Hecho y revisado (4 rondas de correcciones y revisión de seguridad) | 53 pruebas |
+| Fase 1 · Tarea 7: `ir.cron` cada minuto llama a `cron_sincronizar`; botón «Sincronizar ahora» llama a `action_sincronizar_ahora` | Implementada. La suite de Odoo no se ejecutó: Docker Desktop estaba apagado y no hay `.env` en esta máquina | `odoo/addons/logistica_traccar/tests/test_cron.py` (3 pruebas, sin correr) |
 
 ### Qué falta
 
 **Fase 1, tareas que no se han empezado:**
 
-- **Tarea 7 — cron y botón manual.** Crear el `ir.cron` que llama a `traccar.server.cron_sincronizar` con el intervalo de `logistica.traccar_poll_minutes`. Conservar el usuario por defecto del cron (uid 1): la compuerta de `cron_sincronizar` solo deja pasar al sistema o a un gestor de flota. El botón «Sincronizar ahora» debe llamar a `action_sincronizar_ahora`, que es el único punto de entrada del usuario.
 - **Tarea 8 — simulador OsmAnd y verificación de eventos.** Enviar posiciones al puerto 5055 de Traccar y comprobar que aparecen eventos `deviceOverspeed` y `geofenceEnter`. Verificar la unidad del atributo `speedLimit` (el valor sembrado, 30, es provisional) y la forma de la consulta de eventos con `type` repetido.
 - **Tarea 9 — pruebas E2E y estáticas.** La prueba E2E debe llamar a `action_sincronizar_ahora` (no a `sincronizar_todo`, que ahora es privado). El escaneo estático de datos quemados fallará mientras `scripts/verify_integration.py` siga en el repositorio.
 - **Tarea 10 — entorno limpio.** Levantar un proyecto de compose aparte con puertos alternos (override fuera del repositorio) y sembrar desde cero, sin tocar el entorno de desarrollo. Borrar solo los volúmenes de ese proyecto.
@@ -197,6 +197,7 @@ Una vez autenticado en [http://localhost:8069/web/login](http://localhost:8069/w
    - Verás el servidor configurado (`http://traccar:8082`).
    - Puedes usar el botón **"Probar Conexión"** para verificar la comunicación en tiempo real.
    - El botón **"Sincronizar Dispositivos"** consulta la API de Traccar e importa automáticamente los dispositivos GPS registrados.
+   - El botón **"Sincronizar ahora"** (solo gestores de flota) trae posiciones y eventos. Lo mismo hace el cron cada minuto, con el usuario del sistema.
 3. **Dispositivos GPS**: En **Rastreo Traccar > Dispositivos GPS** se listan los identificadores IMEI / Client ID con su estado (`online` / `offline`) y última telemetría.
 4. **Vehículos con GPS**: En **Flota > Vehículos**:
    - Abre cualquier vehículo (ej. `LOG-001`).

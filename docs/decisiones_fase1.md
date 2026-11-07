@@ -112,3 +112,11 @@ Seeder: la primera ejecucion creo el usuario y sus 3 permisos y actualizo `tracc
 4. El esquema exige exactamente un usuario de integracion con `readonly=true` y `administrator=false`. Las dos pruebas nuevas de `test_schema.py` se escribieron junto con la implementacion, no con una ejecucion en rojo previa.
 5. Si la clave del usuario existente no se acepta (401), el seeder la actualiza por PUT. Si el perfil difiere, tambien corrige el perfil.
 6. `scripts/verify_integration.py` no se toco (su borrado sigue pendiente de aprobacion).
+
+## Tarea 7: cron y boton manual (2026-11-07)
+
+- `ir.cron` `logistica_traccar.ir_cron_traccar_sincronizar`: activo, cada 1 minuto, `numbercall = -1`, `doall = False`, codigo `model.cron_sincronizar()`.
+- `user_id` no se escribe en el XML. Al cargar los datos del modulo el entorno es el superusuario, asi que el cron queda en uid 1. `cron_sincronizar` rechaza a cualquier otro usuario que no sea gestor de flota.
+- `noupdate="1"`: un `-u logistica_traccar` no pisa el intervalo si alguien lo cambia en Ajustes.
+- El boton «Sincronizar ahora» de la ficha del servidor llama a `action_sincronizar_ahora` y solo lo ve `fleet.fleet_group_manager`. No llama a `sincronizar_todo` (privado desde la tarea 6).
+- `logistica.traccar_poll_minutes` no se redefinió. Ya vale `1` en `odoo/addons/logistica_base/data/logistica_config_data.xml`. El cron no consulta ese parametro en cada vuelta: `interval_number` es la agenda de Odoo. Cambiar el parametro no mueve el cron. Queda asi a proposito, para no tener dos sitios escribiendo la misma clave ni un cron que se reescriba solo.
