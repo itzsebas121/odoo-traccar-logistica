@@ -27,13 +27,14 @@ Esta sección es el punto de partida para seguir implementando. Lo que aquí se 
 | Fase 1 · Tarea 6: conector de sincronización (posiciones, eventos, watermark, reintentos, aislamiento por dispositivo) | Hecho y revisado (4 rondas de correcciones y revisión de seguridad) | 53 pruebas |
 | Fase 1 · Tarea 7: `ir.cron` cada minuto llama a `cron_sincronizar`; botón «Sincronizar ahora» llama a `action_sincronizar_ahora` | Implementada. La suite de Odoo no se ejecutó: Docker Desktop estaba apagado y no hay `.env` en esta máquina | `odoo/addons/logistica_traccar/tests/test_cron.py` (3 pruebas, sin correr) |
 | Fase 1 · Tarea 8 (código): `seeds/simular.py` envía la ruta OsmAnd de `simulacion.json` | Hecho en local, sin red. Falta la comprobación en vivo de `deviceOverspeed`, `geofenceEnter` y la unidad de `speedLimit` | `python -m unittest seeds.tests.test_simular seeds.tests.test_schema` → 13 OK |
+| Fase 1 · Tarea 9 (código): escaneo estático y pruebas E2E | El escaneo pasa, con `scripts/verify_integration.py` como única excepción conocida. El E2E no se corrió: faltan las variables del stack | `python -m unittest tests.estatico.test_sin_datos_quemados tests.e2e.test_flujo` → 3 OK, 5 omitidas |
 
 ### Qué falta
 
 **Fase 1, tareas que no se han empezado:**
 
 - **Tarea 8 — lo que falta es la verificación en vivo.** El simulador ya está (`python seeds/simular.py`, con `TRACCAR_OSMAND_URL`). Falta levantar Traccar, enviar la ruta y comprobar `deviceOverspeed` y `geofenceEnter`. El `speedLimit` sembrado (30) sigue siendo provisional: no se confirmó si Traccar lo lee en nudos o en km/h. Tampoco se confirmó la consulta de eventos con `type` repetido.
-- **Tarea 9 — pruebas E2E y estáticas.** La prueba E2E debe llamar a `action_sincronizar_ahora` (no a `sincronizar_todo`, que ahora es privado). El escaneo estático de datos quemados fallará mientras `scripts/verify_integration.py` siga en el repositorio.
+- **Tarea 9 — lo que falta es correr el E2E contra el stack.** Las pruebas ya están (`tests/README.md`). Llaman a `action_sincronizar_ahora`. En esta máquina se omitieron porque no hay `.env`. El escaneo estático ya pasa; `scripts/verify_integration.py` queda como excepción hasta que se apruebe borrarlo. Los reinicios de contenedor piden `E2E_REINICIO=1`.
 - **Tarea 10 — entorno limpio.** Levantar un proyecto de compose aparte con puertos alternos (override fuera del repositorio) y sembrar desde cero, sin tocar el entorno de desarrollo. Borrar solo los volúmenes de ese proyecto.
 - **Tarea 11 — documentación.** Completar este README con los comandos reales, las variables, la lista de pruebas y el checklist de Fase 1; corregir `docs/decisiones_fase1.md` (dice que la sincronización no está en el arranque, y que el POST de dispositivos devolvió 401/403 cuando fue 400).
 - **Tarea 12 — cierre.** Evidencia final de todas las suites y revisión de credenciales fuera de `seeds/data/` y `.env`.

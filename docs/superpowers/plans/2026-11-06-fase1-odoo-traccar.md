@@ -227,16 +227,18 @@
 **Interfaces:**
 - Consumes: Tasks 2–8.
 
-- [ ] **Step 1: Escribir las pruebas E2E que fallan:**
+**Hecho el 2026-11-07, con desviaciones:** el E2E llama a `action_sincronizar_ahora`, no a `sincronizar_todo`. El escaneo no busca placas ni nombres de persona (ya viven en las pruebas de ETL/BI). Un literal `password` dentro de `tests/` no cuenta. `scripts/verify_integration.py` es la única excepción, a la espera de que se apruebe borrarlo. Los reinicios solo corren con `E2E_REINICIO=1`.
+
+- [x] **Step 1: Escribir las pruebas E2E que fallan:**
   - `test_seed_idempotente`: dos ejecuciones de `seed.py` → la segunda reporta `creados: []`.
   - `test_posicion_en_odoo_vehiculo_correcto`: tras simular y sincronizar, la última posición del dispositivo de un vehículo aparece en `logistica.traccar.posicion` con su `vehicle_id` correcto.
   - `test_evento_overspeed_y_geocerca_en_odoo`: existen `logistica.traccar.evento` de tipo `deviceOverspeed` y `geofenceEnter`.
   - `test_reinicio_traccar_sin_perdidas`: contar posiciones, `docker compose restart traccar`, esperar healthy, simular un lote nuevo, sincronizar; el conteo sube exactamente por el lote nuevo y no hay duplicados.
   - `test_reinicio_odoo_sin_perdidas`: igual, con `docker compose restart odoo`.
   - `test_sin_datos_quemados`: pasa el escaneo estático.
-- [ ] **Step 2: Ejecutar** `python -m unittest discover -s tests -v` → FAIL donde aún no esté implementado.
-- [ ] **Step 3: Implementar** los helpers y completar hasta que pasen.
-- [ ] **Step 4: Ejecutar** la suite completa desde el host, con las variables de `.env` cargadas.
+- [ ] **Step 2: Ejecutar** `python -m unittest discover -s tests -v` → FAIL donde aún no esté implementado. No se corrió el rojo: las pruebas se escribieron junto con el escáner.
+- [x] **Step 3: Implementar** los helpers y completar hasta que pasen.
+- [ ] **Step 4: Ejecutar** la suite completa desde el host, con las variables de `.env` cargadas. Pendiente: aquí no hay `.env`. Lo estático sí corrió: `python -m unittest tests.estatico.test_sin_datos_quemados tests.e2e.test_flujo seeds.tests.test_simular seeds.tests.test_schema -v` → 16 OK, 5 omitidas (2026-11-07).
 
 ---
 

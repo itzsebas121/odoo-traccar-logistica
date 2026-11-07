@@ -128,3 +128,12 @@ Seeder: la primera ejecucion creo el usuario y sus 3 permisos y actualizo `tracc
 - La ruta de `GPS-ABC-1234` tiene dos puntos: el primero a ~1,1 km al norte del circulo `Bodega central` (radio 300 m), a 10 nudos; el segundo en el centro del circulo, a 40 nudos. El `speedLimit` sembrado sigue en 30 y **no se ha confirmado** si Traccar lo interpreta en nudos o en km/h. Tampoco se comprobo en vivo que aparezcan `deviceOverspeed` y `geofenceEnter`.
 - Pruebas: `python -m unittest seeds.tests.test_simular seeds.tests.test_schema -v` → 13 OK. No abren red.
 - `schema.cargar()` ahora exige `rutas`. `seeds/seed.py` lo llama, asi que un JSON de simulacion sin rutas deja de sembrar. Es intencional: el mismo archivo alimenta al seeder y al simulador.
+
+## Tarea 9: escaneo estatico y E2E (2026-11-07)
+
+- El escaneo vive en `tests/estatico/escaneo.py`. Excluye `seeds/data/`, `.env*`, `docs/`, `backups/` y el indice local `.codegraph/`.
+- Tokens: `uniqueId`, `ref`, `marca`, `modelo`, `cliente` y el `name` de una geocerca (el objeto que tiene `area`). No se buscan placas ni nombres de persona: `ABC-1234` y `Carlos` ya estan en las fixtures de ETL y BI, de la fase anterior. Buscarlos dejaria el escaneo en rojo por codigo que no es de esta fase.
+- Un literal `password` de 8 caracteres o mas cuenta solo fuera de `tests/`. Dentro de las pruebas hay contraseñas ficticias a proposito (por ejemplo, un caracter raro en el DSN del ETL).
+- `scripts/verify_integration.py` es la unica excepcion. El test `test_la_excepcion_conocida_sigue_teniendo_datos_quemados` falla el dia que ese archivo deje de tener datos quemados, para obligar a quitar la excepcion. No se borro el archivo: sigue pendiente de aprobacion.
+- El E2E (`tests/e2e/test_flujo.py`) no se ejecuto contra el stack: faltan las variables. Si faltan, las pruebas se omiten. La sincronizacion usa `action_sincronizar_ahora`. Reiniciar `traccar` u `odoo` exige `E2E_REINICIO=1`.
+- Como la ruta del simulador repite los mismos timestamps, el reinicio comprueba que el conteo de posiciones no baja. No exige un lote nuevo con otros timestamps: el JSON no tiene un segundo lote.
