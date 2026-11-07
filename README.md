@@ -28,13 +28,13 @@ Esta sección es el punto de partida para seguir implementando. Lo que aquí se 
 | Fase 1 · Tarea 7: `ir.cron` cada minuto llama a `cron_sincronizar`; botón «Sincronizar ahora» llama a `action_sincronizar_ahora` | Implementada. La suite de Odoo no se ejecutó: Docker Desktop estaba apagado y no hay `.env` en esta máquina | `odoo/addons/logistica_traccar/tests/test_cron.py` (3 pruebas, sin correr) |
 | Fase 1 · Tarea 8: `seeds/simular.py` envía la ruta OsmAnd de `simulacion.json` | Hecho y verificado en vivo (2026-11-07): genera `deviceOverspeed` y `geofenceEnter`; `speedLimit` va en nudos | `python -m unittest seeds.tests.test_simular seeds.tests.test_schema` → 13 OK; eventos consultados en la API de Traccar |
 | Fase 1 · Tarea 9: escaneo estático y pruebas E2E | El escaneo pasa, con `scripts/verify_integration.py` como única excepción conocida. El E2E corrió contra el stack vivo (2026-11-07): 3 pruebas OK y 3 defectos corregidos (simulador como script, timestamps del simulador, permiso de geocerca del usuario de integración). Con `E2E_REINICIO=1` pasan también los 2 reinicios de contenedor | `python -m unittest tests.e2e.test_flujo -v` → 5 OK; `tests.estatico` + `seeds.tests` → 17 OK |
+| Fase 1 · Tarea 10: verificación desde un entorno limpio | Hecho (2026-11-07): proyecto de compose aparte con puertos 18069/18082/15055 y volúmenes propios; `setup.ps1` termina con código 0 y `tests/` pasa 8 de 8 con reinicios. Encontró 3 defectos (administrador inicial de Traccar, variables de entorno en `setup.ps1`, carrera en el E2E de eventos), ya corregidos. `setup.sh` no recibió el ajuste de variables | Corrida completa desde cero; detalle en `docs/decisiones_fase1.md` |
 
 ### Qué falta
 
 **Fase 1, tareas que no se han empezado:**
 
 - **Tarea 9 — solo queda una decisión tuya.** El E2E completo (5 pruebas, con reinicios) ya pasa contra el stack vivo. `scripts/verify_integration.py` queda como excepción del escaneo hasta que se apruebe borrarlo.
-- **Tarea 10 — entorno limpio.** Levantar un proyecto de compose aparte con puertos alternos (override fuera del repositorio) y sembrar desde cero, sin tocar el entorno de desarrollo. Borrar solo los volúmenes de ese proyecto.
 - **Tarea 11 — documentación.** Completar este README con los comandos reales, las variables, la lista de pruebas y el checklist de Fase 1; corregir `docs/decisiones_fase1.md` (dice que la sincronización no está en el arranque, y que el POST de dispositivos devolvió 401/403 cuando fue 400).
 - **Tarea 12 — cierre.** Evidencia final de todas las suites y revisión de credenciales fuera de `seeds/data/` y `.env`.
 

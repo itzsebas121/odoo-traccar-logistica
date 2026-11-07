@@ -139,6 +139,31 @@ Seeder: la primera ejecucion creo el usuario y sus 3 permisos y actualizo `tracc
 - El E2E (`tests/e2e/test_flujo.py`) no se ejecuto contra el stack: faltan las variables. Si faltan, las pruebas se omiten. La sincronizacion usa `action_sincronizar_ahora`. Reiniciar `traccar` u `odoo` exige `E2E_REINICIO=1`.
 - Como la ruta del simulador repite los mismos timestamps, el reinicio comprueba que el conteo de posiciones no baja. No exige un lote nuevo con otros timestamps: el JSON no tiene un segundo lote. (Reemplazado el 2026-11-07: ver más abajo, el simulador ya desplaza los timestamps.)
 
+### Tarea 10: entorno limpio (2026-11-07)
+
+Un proyecto de compose aparte (`fase1limpia`, volúmenes propios) con puertos alternos: Odoo 18069, Traccar 18082, OsmAnd 15055. No toca el stack de desarrollo. El override vive fuera del repositorio:
+
+```yaml
+services:
+  odoo:
+    ports: !override
+      - "127.0.0.1:18069:8069"
+  traccar:
+    ports: !override
+      - "127.0.0.1:18082:8082"
+      - "15055:5055"
+```
+
+`!override` hace falta porque Compose, al fusionar archivos, suma las listas de `ports` en vez de reemplazarlas (requiere Compose 2.24 o posterior). Se activa con `COMPOSE_PROJECT_NAME=fase1limpia`, `COMPOSE_FILE=compose.yaml;<override>` y las variables `ODOO_URL`, `TRACCAR_URL`, `TRACCAR_OSMAND_URL` apuntando a esos puertos. Luego `scripts\setup.ps1` y `python -m unittest discover -s tests -t . -v` con `E2E_REINICIO=1`.
+
+Resultado de la corrida final desde cero (volúmenes borrados antes): `setup.ps1` con código 0, sembrado de 26 elementos creados y 3 actualizados, y **8 pruebas OK en 53 s** (5 E2E con los dos reinicios y 3 estáticas). `discover -s tests` solo cubre `tests/`; las pruebas de `seeds/`, de los módulos de Odoo y de los servicios se corren con sus propios comandos (ver `tests/README.md`).
+
+La verificación desde cero destapó tres defectos que el entorno de desarrollo escondía:
+
+1. **Traccar nuevo no tiene administrador.** Una instalación vacía responde `newServer: true` en `/api/server`, y el seeder daba por hecho que `TRACCAR_ADMIN_EMAIL` ya existía: el sembrado fallaba con 401 y «un solo comando» no funcionaba en una máquina nueva. Traccar convierte en administrador al primer usuario registrado aunque `registration` sea `false`. `seeds/seed.py` ahora detecta `newServer` y registra a ese usuario con `TRACCAR_ADMIN_EMAIL` y `TRACCAR_ADMIN_PASSWORD`; si el servidor ya tiene usuarios, no hace nada. Solo el primero queda administrador: los demás pasan por el flujo normal.
+2. **`setup.ps1` pisaba el entorno.** Copiaba las claves de `.env` sobre las variables ya definidas, así que el sembrado de un proyecto con otros puertos habría ido al stack de desarrollo. Ahora una variable ya definida en el entorno manda sobre `.env`. Solo se cambió `setup.ps1`: `setup.sh` carga `.env` igual y **sigue sin ese ajuste** (Linux no se probó).
+3. **El E2E de eventos tenía una carrera.** Traccar guarda la posición antes de generar sus eventos, así que sincronizar justo después de simular puede no verlos; llegan en la pasada siguiente del cron (comprobado: minutos después Odoo tenía `deviceOverspeed` y `geofenceEnter`). La prueba ahora reintenta la sincronización hasta 90 s. El comportamiento del sistema era correcto.
+
 ### Tarea 9: corrida en vivo del E2E (2026-11-07) y tres defectos que encontró
 
 Con el stack vivo y `.env` cargado, `python -m unittest tests.e2e.test_flujo -v` pasa 3 pruebas (seed idempotente, posición en Odoo con el vehículo correcto, eventos `deviceOverspeed` y `geofenceEnter` en Odoo). Con `E2E_REINICIO=1` pasan también `test_reinicio_traccar_sin_perdidas` y `test_reinicio_odoo_sin_perdidas`: 5 OK en 45 s (corrida de la usuaria en su consola, que tiene `docker`). Sin esa variable los reinicios se omiten. La primera corrida falló y destapó tres defectos reales:

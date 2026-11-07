@@ -249,9 +249,11 @@
 **Interfaces:**
 - Consumes: `scripts/setup.ps1`, `seeds/seed.py`, `tests/`.
 
-- [ ] **Step 1: Crear el override** `$SCRATCHPAD/puertos-limpio.yaml` que cambia `odoo` a `127.0.0.1:18069:8069`, `traccar` a `127.0.0.1:18082:8082` y `5055` a `15055:5055`.
-- [ ] **Step 2: Levantar un proyecto aparte** `docker compose -p fase1limpia -f compose.yaml -f <override> up -d --wait`. El stack de desarrollo no se toca.
-- [ ] **Step 3: Sembrar y probar** con las URLs del proyecto limpio (`ODOO_URL=http://127.0.0.1:18069`, `TRACCAR_URL=http://127.0.0.1:18082`, `TRACCAR_OSMAND_URL=http://127.0.0.1:15055`). Ejecutar `scripts/setup` (instala módulos desde cero) y luego `python -m unittest discover -s tests -v`.
+**Hecho el 2026-11-07, con desviaciones y tres defectos hallados** (detalle en `docs/decisiones_fase1.md`, «Tarea 10»). El proyecto se levantó con `COMPOSE_PROJECT_NAME` y `COMPOSE_FILE` en vez de `-p`/`-f`, con un script fuera del repositorio. La corrida final desde cero: `setup.ps1` terminó con código 0 y `python -m unittest discover -s tests -t . -v` → 8 OK en 53 s, con `E2E_REINICIO=1`.
+
+- [x] **Step 1: Crear el override** `$SCRATCHPAD/puertos-limpio.yaml` que cambia `odoo` a `127.0.0.1:18069:8069`, `traccar` a `127.0.0.1:18082:8082` y `5055` a `15055:5055`.
+- [x] **Step 2: Levantar un proyecto aparte** `docker compose -p fase1limpia -f compose.yaml -f <override> up -d --wait`. El stack de desarrollo no se toca.
+- [x] **Step 3: Sembrar y probar** con las URLs del proyecto limpio (`ODOO_URL=http://127.0.0.1:18069`, `TRACCAR_URL=http://127.0.0.1:18082`, `TRACCAR_OSMAND_URL=http://127.0.0.1:15055`). Ejecutar `scripts/setup` (instala módulos desde cero) y luego `python -m unittest discover -s tests -v`.
 - [ ] **Step 4: Limpiar** `docker compose -p fase1limpia -f compose.yaml -f <override> down -v` (solo borra volúmenes de ese proyecto).
 
 ---
