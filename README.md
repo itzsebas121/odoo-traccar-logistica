@@ -25,11 +25,12 @@ Esta sección es el punto de partida para seguir implementando. Lo que aquí se 
 | Fase 1 · Tarea 4: usuario de integración en Traccar (solo lectura), sincronización de la secuencia de usuarios | Hecho y revisado | Verificado en vivo |
 | Fase 1 · Tarea 5: modelos de posiciones y eventos en Odoo, con restricciones únicas | Hecho y revisado | 17 pruebas |
 | Fase 1 · Tarea 6: conector de sincronización (posiciones, eventos, watermark, reintentos, aislamiento por dispositivo) | Hecho y revisado (4 rondas de correcciones y revisión de seguridad) | 53 pruebas |
-| Fase 1 · Tarea 7: `ir.cron` cada minuto llama a `cron_sincronizar`; botón «Sincronizar ahora» llama a `action_sincronizar_ahora` | Implementada. La suite de Odoo no se ejecutó: Docker Desktop estaba apagado y no hay `.env` en esta máquina | `odoo/addons/logistica_traccar/tests/test_cron.py` (3 pruebas, sin correr) |
+| Fase 1 · Tarea 7: `ir.cron` cada minuto llama a `cron_sincronizar`; botón «Sincronizar ahora» llama a `action_sincronizar_ahora` | Hecho y verificado (2026-11-07): la suite de Odoo de `logistica_traccar` pasa completa, incluidas las 3 pruebas del cron | `odoo/addons/logistica_traccar/tests/test_cron.py`; suite completa: 56 pruebas, 0 fallos, 0 errores |
 | Fase 1 · Tarea 8: `seeds/simular.py` envía la ruta OsmAnd de `simulacion.json` | Hecho y verificado en vivo (2026-11-07): genera `deviceOverspeed` y `geofenceEnter`; `speedLimit` va en nudos | `python -m unittest seeds.tests.test_simular seeds.tests.test_schema` → 13 OK; eventos consultados en la API de Traccar |
 | Fase 1 · Tarea 9: escaneo estático y pruebas E2E | El escaneo pasa, con `scripts/verify_integration.py` como única excepción conocida. El E2E corrió contra el stack vivo (2026-11-07): 3 pruebas OK y 3 defectos corregidos (simulador como script, timestamps del simulador, permiso de geocerca del usuario de integración). Con `E2E_REINICIO=1` pasan también los 2 reinicios de contenedor | `python -m unittest tests.e2e.test_flujo -v` → 5 OK; `tests.estatico` + `seeds.tests` → 17 OK |
 | Fase 1 · Tarea 10: verificación desde un entorno limpio | Hecho (2026-11-07): proyecto de compose aparte con puertos 18069/18082/15055 y volúmenes propios; `setup.ps1` termina con código 0 y `tests/` pasa 8 de 8 con reinicios. Encontró 3 defectos (administrador inicial de Traccar, variables de entorno en `setup.ps1`, carrera en el E2E de eventos), ya corregidos. `setup.sh` no recibió el ajuste de variables | Corrida completa desde cero; detalle en `docs/decisiones_fase1.md` |
 | Fase 1 · Tarea 11: documentación | Hecho (2026-11-07): comandos, variables, mapeo Odoo ↔ Traccar, checklist con evidencia y preparación para la Fase 2; textos desactualizados de `docs/decisiones_fase1.md` corregidos | Revisión contra lo ejecutado en las Tareas 8 a 10 |
+| Fase 1 · Tarea 12: cierre y evidencia | Hecho (2026-11-07): `bi` y `ml` detenidos, suites ejecutadas en el stack de desarrollo y revisión de credenciales fuera de `seeds/data/` y `.env` (sin coincidencias de secretos únicos) | Odoo 56 OK; sin Docker 17 OK; E2E 5 OK con reinicios (corrida del usuario) |
 
 ### Qué falta
 
@@ -122,7 +123,7 @@ Las decisiones están en `docs/decisiones_fase1.md` y en el plan `docs/superpowe
 - [x] Reiniciar Traccar u Odoo no pierde datos (`test_reinicio_*`, con `E2E_REINICIO=1`).
 - [x] El usuario de integración es de solo lectura y no administrador.
 - [x] Sin datos de negocio ni credenciales en el código, salvo `scripts/verify_integration.py` (excepción conocida).
-- [ ] Suite de Odoo de `logistica_traccar` (`--test-enable`): no se ha corrido en esta máquina.
+- [x] Suite de Odoo de `logistica_traccar` (`--test-enable`): 56 pruebas, 0 fallos, 0 errores (2026-11-07).
 - [ ] `scripts/setup.sh` en Linux: solo sintaxis revisada.
 - [ ] Pendientes de seguridad de la lista de arriba (control de gestor en «Probar Conexión», cabeceras en errores, rotación de credenciales).
 

@@ -278,7 +278,9 @@
 
 ### Task 12: Cierre y evidencia
 
-- [ ] **Step 1:** Detener los contenedores de analítica que no se usan en esta fase: `docker compose stop bi ml`.
-- [ ] **Step 2:** Ejecutar la suite completa en el stack de desarrollo y guardar la salida en `$SCRATCHPAD`.
-- [ ] **Step 3:** Ejecutar `grep` de credenciales y valores de negocio fuera de `seeds/data/` y `.env`; el resultado debe ser vacío.
-- [ ] **Step 4:** Reportar al usuario con los comandos y su salida. No se hace commit hasta que lo pida.
+**Hecho el 2026-11-07.** Evidencia: `docker compose stop bi ml` sin errores; suite de Odoo de `logistica_traccar` → `0 failed, 0 error(s) of 56 tests`; sin Docker → 17 OK; E2E → 5 OK con `E2E_REINICIO=1`. La salida de la corrida sin Docker se guardó en el directorio temporal de la sesión, fuera del repositorio. La búsqueda de credenciales no halló ningún secreto de valor único en archivos versionados; tres variables valen `admin` y no se pueden buscar sin falsos positivos, y para eso está el escaneo estático.
+
+- [x] **Step 1:** Detener los contenedores de analítica que no se usan en esta fase: `docker compose stop bi ml`.
+- [x] **Step 2:** Ejecutar la suite completa en el stack de desarrollo y guardar la salida en `$SCRATCHPAD`.
+- [x] **Step 3:** Ejecutar `grep` de credenciales y valores de negocio fuera de `seeds/data/` y `.env`; el resultado debe ser vacío.
+- [x] **Step 4:** Reportar al usuario con los comandos y su salida. (Los commits locales se hicieron después, a petición de la usuaria.)
