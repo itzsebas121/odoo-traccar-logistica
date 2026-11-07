@@ -137,4 +137,14 @@ Seeder: la primera ejecucion creo el usuario y sus 3 permisos y actualizo `tracc
 - Un literal `password` de 8 caracteres o mas cuenta solo fuera de `tests/`. Dentro de las pruebas hay contraseñas ficticias a proposito (por ejemplo, un caracter raro en el DSN del ETL).
 - `scripts/verify_integration.py` es la unica excepcion. El test `test_la_excepcion_conocida_sigue_teniendo_datos_quemados` falla el dia que ese archivo deje de tener datos quemados, para obligar a quitar la excepcion. No se borro el archivo: sigue pendiente de aprobacion.
 - El E2E (`tests/e2e/test_flujo.py`) no se ejecuto contra el stack: faltan las variables. Si faltan, las pruebas se omiten. La sincronizacion usa `action_sincronizar_ahora`. Reiniciar `traccar` u `odoo` exige `E2E_REINICIO=1`.
-- Como la ruta del simulador repite los mismos timestamps, el reinicio comprueba que el conteo de posiciones no baja. No exige un lote nuevo con otros timestamps: el JSON no tiene un segundo lote.
+- Como la ruta del simulador repite los mismos timestamps, el reinicio comprueba que el conteo de posiciones no baja. No exige un lote nuevo con otros timestamps: el JSON no tiene un segundo lote. (Reemplazado el 2026-11-07: ver más abajo, el simulador ya desplaza los timestamps.)
+
+### Tarea 9: corrida en vivo del E2E (2026-11-07) y tres defectos que encontró
+
+Con el stack vivo y `.env` cargado, `python -m unittest tests.e2e.test_flujo -v` pasa 3 pruebas (seed idempotente, posición en Odoo con el vehículo correcto, eventos `deviceOverspeed` y `geofenceEnter` en Odoo). Los dos reinicios de contenedor se omiten sin `E2E_REINICIO=1`. La primera corrida falló y destapó tres defectos reales:
+
+1. **`python seeds/simular.py` no arrancaba** (`No module named 'seeds'`). `seed.py` se ejecuta como script y `simular.py` solo funcionaba como paquete. Ahora `simular.py` prueba `from seeds import schema` y, si falla, `import schema`. Funciona de las dos formas.
+2. **Odoo nunca veía las posiciones simuladas.** Un dispositivo sin watermark se sincroniza desde su `create_date` (hoy), y `simulacion.json` traía timestamps fijos de 2025-11-07, fuera de la ventana. El simulador ahora desplaza los timestamps para que el último punto sea «ahora» y conserva el espacio entre puntos. Cada corrida genera posiciones nuevas, lo que además permite probar los reinicios con lotes nuevos. Prueba: `test_timestamps_se_desplazan_a_ahora_conservando_el_espacio`.
+3. **Odoo no recibía `geofenceEnter` ni `geofenceExit`.** Traccar oculta los eventos de geocerca a quien no tiene permiso sobre ella, y el usuario de integración solo tenía permiso sobre dispositivos. Comprobado con sus credenciales: `GET /api/geofences` devolvía `[]` y los eventos solo traían `deviceOverspeed`. `seeds/seed.py` ahora otorga también el permiso `userId`+`geofenceId` (idempotente: la segunda corrida no crea nada).
+
+Dato extra: la consulta de eventos con el parámetro `type` repetido (`type=a&type=b`) funciona en Traccar y es la que usa el conector. Queda cerrado ese pendiente de la Tarea 8.

@@ -238,7 +238,7 @@
   - `test_sin_datos_quemados`: pasa el escaneo estático.
 - [ ] **Step 2: Ejecutar** `python -m unittest discover -s tests -v` → FAIL donde aún no esté implementado. No se corrió el rojo: las pruebas se escribieron junto con el escáner.
 - [x] **Step 3: Implementar** los helpers y completar hasta que pasen.
-- [ ] **Step 4: Ejecutar** la suite completa desde el host, con las variables de `.env` cargadas. Pendiente: aquí no hay `.env`. Lo estático sí corrió: `python -m unittest tests.estatico.test_sin_datos_quemados tests.e2e.test_flujo seeds.tests.test_simular seeds.tests.test_schema -v` → 16 OK, 5 omitidas (2026-11-07).
+- [ ] **Step 4: Ejecutar** la suite completa desde el host, con las variables de `.env` cargadas. **2026-11-07:** corrido contra el stack vivo, pasan 3 pruebas E2E; faltan los 2 reinicios (`E2E_REINICIO=1`, requieren Docker en la consola del usuario). Detalle y defectos corregidos en `docs/decisiones_fase1.md`. Antes no se pudo: no había `.env`. Lo estático sí corrió: `python -m unittest tests.estatico.test_sin_datos_quemados tests.e2e.test_flujo seeds.tests.test_simular seeds.tests.test_schema -v` → 16 OK, 5 omitidas (2026-11-07).
 
 ---
 

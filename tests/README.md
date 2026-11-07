@@ -39,4 +39,11 @@ Get-Content .env | ForEach-Object {
 python -m unittest tests.e2e.test_flujo -v
 ```
 
-`test_reinicio_traccar_sin_perdidas` y `test_reinicio_odoo_sin_perdidas` reinician contenedores. Solo corren si además `E2E_REINICIO=1`.
+`test_reinicio_traccar_sin_perdidas` y `test_reinicio_odoo_sin_perdidas` reinician contenedores. Solo corren si además `E2E_REINICIO=1` (hace falta `docker` en el PATH de la consola):
+
+```powershell
+$env:E2E_REINICIO = "1"
+python -m unittest tests.e2e.test_flujo -v
+```
+
+`seeds/simular.py` desplaza los timestamps de `simulacion.json` para que el último punto sea «ahora»: así cada corrida entra en la ventana de sincronización de Odoo.

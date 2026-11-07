@@ -72,6 +72,18 @@ class SimuladorTest(unittest.TestCase):
                     'lat': 1.0, 'lon': 2.0, 'speed': 10, 'timestamp': 1700000000,
                 })
 
+    def test_timestamps_se_desplazan_a_ahora_conservando_el_espacio(self):
+        _odoo, _traccar, simulacion = schema.cargar()
+        originales = [p['timestamp'] for r in simulacion['rutas'] for p in r['puntos']]
+        ahora = 1900000000
+        with mock.patch('seeds.simular._enviar') as enviar:
+            enviadas = simular.ejecutar('http://127.0.0.1:5055', 0, ahora=ahora)
+        enviados = [llamada.args[2]['timestamp'] for llamada in enviar.call_args_list]
+        self.assertEqual(enviadas, len(originales))
+        self.assertEqual(max(enviados), ahora)
+        self.assertEqual([b - a for a, b in zip(enviados, enviados[1:])],
+                         [b - a for a, b in zip(originales, originales[1:])])
+
     def test_sin_url_osmand_falla(self):
         with mock.patch.dict('os.environ', {'TRACCAR_OSMAND_URL': ''}, clear=False):
             with self.assertRaisesRegex(simular.ErrorSimulacion, 'TRACCAR_OSMAND_URL'):

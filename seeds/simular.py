@@ -12,7 +12,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from seeds import schema
+try:
+    from seeds import schema
+except ImportError:  # ejecutado como script: python seeds/simular.py
+    import schema
 
 
 class ErrorSimulacion(RuntimeError):
@@ -66,15 +69,22 @@ def _enviar(base, unique_id, punto):
         raise ErrorSimulacion(f'OsmAnd respondio HTTP {codigo}')
 
 
-def ejecutar(base, espera_s=0.0):
-    """Envia cada punto de cada ruta. Devuelve cuantas posiciones se enviaron."""
+def ejecutar(base, espera_s=0.0, ahora=None):
+    """Envia cada punto de cada ruta. Devuelve cuantas posiciones se enviaron.
+
+    Los timestamps del JSON se desplazan para que el ultimo punto sea "ahora" y se conserve el
+    espacio entre puntos: Odoo solo sincroniza desde que existe el dispositivo, asi que un
+    timestamp fijo del pasado nunca entraria en la ventana.
+    """
     _odoo, _traccar, simulacion = schema.cargar()
+    ultimo = max(p['timestamp'] for r in simulacion['rutas'] for p in r['puntos'])
+    desplazamiento = int(time.time() if ahora is None else ahora) - int(ultimo)
     enviadas = 0
     for ruta in simulacion['rutas']:
         for punto in ruta['puntos']:
             if enviadas and espera_s:
                 time.sleep(espera_s)
-            _enviar(base, ruta['uniqueId'], punto)
+            _enviar(base, ruta['uniqueId'], dict(punto, timestamp=int(punto['timestamp']) + desplazamiento))
             enviadas += 1
     return enviadas
 

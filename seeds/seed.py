@@ -198,7 +198,7 @@ def _clave_aceptada(url, correo, clave):
 def _sembrar_usuario_integracion(traccar, entorno, datos, ids_dispositivo, informe):
     """Usuario de integracion (F1-D7): clave natural = email. Solo lectura, sin administrador.
 
-    Recibe permiso sobre cada dispositivo para que el cron de Odoo pueda leer sus posiciones y eventos.
+    Recibe permiso sobre cada dispositivo y cada geocerca para que el cron de Odoo pueda leer sus posiciones y eventos.
     """
     entrada = datos['usuarios'][0]
     correo = entorno['INTEGRATION_TRACCAR_EMAIL']
@@ -233,6 +233,18 @@ def _sembrar_usuario_integracion(traccar, entorno, datos, ids_dispositivo, infor
             informe.omitidos.append(etiqueta_permiso)
         else:
             traccar.llamar('POST', '/api/permissions', {'userId': id_usuario, 'deviceId': id_dispositivo})
+            informe.creados.append(etiqueta_permiso)
+
+    # Traccar oculta los eventos geofenceEnter/geofenceExit a quien no tiene permiso sobre la geocerca.
+    geocercas = {g['name']: g['id'] for g in traccar.llamar('GET', '/api/geofences')}
+    geocercas_vinculadas = {g['id'] for g in traccar.llamar('GET', f'/api/geofences?userId={id_usuario}')}
+    for geocerca in datos['geocercas']:
+        nombre = geocerca['name']
+        etiqueta_permiso = f'traccar.permission {correo} / {nombre}'
+        if geocercas[nombre] in geocercas_vinculadas:
+            informe.omitidos.append(etiqueta_permiso)
+        else:
+            traccar.llamar('POST', '/api/permissions', {'userId': id_usuario, 'geofenceId': geocercas[nombre]})
             informe.creados.append(etiqueta_permiso)
 
 

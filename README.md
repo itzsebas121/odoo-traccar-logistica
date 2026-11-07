@@ -27,13 +27,13 @@ Esta sección es el punto de partida para seguir implementando. Lo que aquí se 
 | Fase 1 · Tarea 6: conector de sincronización (posiciones, eventos, watermark, reintentos, aislamiento por dispositivo) | Hecho y revisado (4 rondas de correcciones y revisión de seguridad) | 53 pruebas |
 | Fase 1 · Tarea 7: `ir.cron` cada minuto llama a `cron_sincronizar`; botón «Sincronizar ahora» llama a `action_sincronizar_ahora` | Implementada. La suite de Odoo no se ejecutó: Docker Desktop estaba apagado y no hay `.env` en esta máquina | `odoo/addons/logistica_traccar/tests/test_cron.py` (3 pruebas, sin correr) |
 | Fase 1 · Tarea 8: `seeds/simular.py` envía la ruta OsmAnd de `simulacion.json` | Hecho y verificado en vivo (2026-11-07): genera `deviceOverspeed` y `geofenceEnter`; `speedLimit` va en nudos | `python -m unittest seeds.tests.test_simular seeds.tests.test_schema` → 13 OK; eventos consultados en la API de Traccar |
-| Fase 1 · Tarea 9 (código): escaneo estático y pruebas E2E | El escaneo pasa, con `scripts/verify_integration.py` como única excepción conocida. El E2E no se corrió: faltan las variables del stack | `python -m unittest tests.estatico.test_sin_datos_quemados tests.e2e.test_flujo` → 3 OK, 5 omitidas |
+| Fase 1 · Tarea 9: escaneo estático y pruebas E2E | El escaneo pasa, con `scripts/verify_integration.py` como única excepción conocida. El E2E corrió contra el stack vivo (2026-11-07): 3 pruebas OK y 3 defectos corregidos (simulador como script, timestamps del simulador, permiso de geocerca del usuario de integración). Faltan los 2 reinicios de contenedor (`E2E_REINICIO=1`) | `python -m unittest tests.e2e.test_flujo -v` → 3 OK, 2 omitidas; `tests.estatico` + `seeds.tests` → 17 OK |
 
 ### Qué falta
 
 **Fase 1, tareas que no se han empezado:**
 
-- **Tarea 9 — lo que falta es correr el E2E contra el stack.** Las pruebas ya están (`tests/README.md`). Llaman a `action_sincronizar_ahora`. En esta máquina se omitieron porque no hay `.env`. El escaneo estático ya pasa; `scripts/verify_integration.py` queda como excepción hasta que se apruebe borrarlo. Los reinicios de contenedor piden `E2E_REINICIO=1`.
+- **Tarea 9 — lo que falta son los dos reinicios de contenedor.** El E2E ya pasa contra el stack vivo (`tests/README.md`); falta correrlo con `E2E_REINICIO=1` desde una consola con `docker`. `scripts/verify_integration.py` queda como excepción hasta que se apruebe borrarlo.
 - **Tarea 10 — entorno limpio.** Levantar un proyecto de compose aparte con puertos alternos (override fuera del repositorio) y sembrar desde cero, sin tocar el entorno de desarrollo. Borrar solo los volúmenes de ese proyecto.
 - **Tarea 11 — documentación.** Completar este README con los comandos reales, las variables, la lista de pruebas y el checklist de Fase 1; corregir `docs/decisiones_fase1.md` (dice que la sincronización no está en el arranque, y que el POST de dispositivos devolvió 401/403 cuando fue 400).
 - **Tarea 12 — cierre.** Evidencia final de todas las suites y revisión de credenciales fuera de `seeds/data/` y `.env`.
