@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_logistica_planificador_form" model="ir.ui.view">
+        <field name="name">logistica.planificador.form</field>
+        <field name="model">logistica.planificador</field>
+        <field name="arch" type="xml">
+            <form string="Planificar despacho">
+                <p class="text-muted">
+                    Se proponen rutas desde la bodega con las entregas preparadas que no están en una ruta activa.
+                    Las rutas quedan en borrador hasta que las apruebe.
+                </p>
+                <group>
+                    <field name="date"/>
+                    <field name="bodega_id"/>
+                    <field name="vehicle_ids" widget="many2many_tags"/>
+                    <field name="time_limit_s"/>
+                </group>
+                <footer>
+                    <button name="action_proponer" string="Proponer rutas" type="object" class="btn-primary"/>
+                    <button string="Cerrar" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_logistica_planificador" model="ir.actions.act_window">
+        <field name="name">Planificar despacho</field>
+        <field name="res_model">logistica.planificador</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <record id="action_entregas_por_despachar" model="ir.actions.act_window">
+        <field name="name">Pedidos por despachar</field>
+        <field name="res_model">logistica.entrega</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('state', '=', 'preparado')]</field>
+    </record>
+</odoo>

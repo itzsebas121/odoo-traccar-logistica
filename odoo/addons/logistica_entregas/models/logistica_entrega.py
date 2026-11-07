@@ -195,7 +195,11 @@ class LogisticaEntrega(models.Model):
         Device = self.env['traccar.device'].sudo()
         if 'last_position_time' not in Device._fields:
             return vacio
-        device = Device.search([('vehicle_id', '=', vehiculo.id)], limit=1)
+        # El vínculo real vive en la ficha de flota (fleet.vehicle.traccar_device_id, F1-R20);
+        # traccar.device.vehicle_id no se usa para resolver el vehículo.
+        device = Device.browse()
+        if 'traccar_device_id' in vehiculo._fields:
+            device = vehiculo.sudo().traccar_device_id
         if not device or not device.last_position_time:
             return vacio
         age = (fields.Datetime.now() - device.last_position_time).total_seconds()

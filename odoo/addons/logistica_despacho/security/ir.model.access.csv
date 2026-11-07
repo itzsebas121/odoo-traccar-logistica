@@ -1,4 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_logistica_ruta_user,logistica.ruta.user,model_logistica_ruta,base.group_user,1,1,1,1
-access_logistica_ruta_parada_user,logistica.ruta.parada.user,model_logistica_ruta_parada,base.group_user,1,1,1,1
-
+access_logistica_ruta_user,logistica.ruta.user,model_logistica_ruta,base.group_user,1,0,0,0
+access_logistica_ruta_manager,logistica.ruta.manager,model_logistica_ruta,fleet.fleet_group_manager,1,1,1,1
+access_logistica_ruta_parada_user,logistica.ruta.parada.user,model_logistica_ruta_parada,base.group_user,1,0,0,0
+access_logistica_ruta_parada_manager,logistica.ruta.parada.manager,model_logistica_ruta_parada,fleet.fleet_group_manager,1,1,1,1
