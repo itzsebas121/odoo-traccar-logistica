@@ -141,7 +141,7 @@ Seeder: la primera ejecucion creo el usuario y sus 3 permisos y actualizo `tracc
 
 ### Tarea 9: corrida en vivo del E2E (2026-11-07) y tres defectos que encontró
 
-Con el stack vivo y `.env` cargado, `python -m unittest tests.e2e.test_flujo -v` pasa 3 pruebas (seed idempotente, posición en Odoo con el vehículo correcto, eventos `deviceOverspeed` y `geofenceEnter` en Odoo). Los dos reinicios de contenedor se omiten sin `E2E_REINICIO=1`. La primera corrida falló y destapó tres defectos reales:
+Con el stack vivo y `.env` cargado, `python -m unittest tests.e2e.test_flujo -v` pasa 3 pruebas (seed idempotente, posición en Odoo con el vehículo correcto, eventos `deviceOverspeed` y `geofenceEnter` en Odoo). Con `E2E_REINICIO=1` pasan también `test_reinicio_traccar_sin_perdidas` y `test_reinicio_odoo_sin_perdidas`: 5 OK en 45 s (corrida de la usuaria en su consola, que tiene `docker`). Sin esa variable los reinicios se omiten. La primera corrida falló y destapó tres defectos reales:
 
 1. **`python seeds/simular.py` no arrancaba** (`No module named 'seeds'`). `seed.py` se ejecuta como script y `simular.py` solo funcionaba como paquete. Ahora `simular.py` prueba `from seeds import schema` y, si falla, `import schema`. Funciona de las dos formas.
 2. **Odoo nunca veía las posiciones simuladas.** Un dispositivo sin watermark se sincroniza desde su `create_date` (hoy), y `simulacion.json` traía timestamps fijos de 2025-11-07, fuera de la ventana. El simulador ahora desplaza los timestamps para que el último punto sea «ahora» y conserva el espacio entre puntos. Cada corrida genera posiciones nuevas, lo que además permite probar los reinicios con lotes nuevos. Prueba: `test_timestamps_se_desplazan_a_ahora_conservando_el_espacio`.
