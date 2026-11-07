@@ -1,12 +1,15 @@
 # Arranque de un solo comando (Windows PowerShell 5.1).
 # Pasos: .env -> comprobacion de marcadores -> servicios sanos -> base logistica_dev -> modulos (-i o -u) -> seeds (en el host).
 # Uso desde la raiz del repo: powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
+# -ConAnalitica: además arranca routing, ml y bi (perfil analitica) y prepara el ETL (bootstrap de bases y roles).
+param([switch]$ConAnalitica)
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
 
 $Base = "logistica_dev"
 $Modulos = @("contacts", "fleet", "sale_management", "website", "website_sale", "payment_custom",
-             "logistica_base", "logistica_despacho", "logistica_traccar", "logistica_entregas", "logistica_checkout")
+             "logistica_base", "logistica_despacho", "logistica_traccar", "logistica_entregas", "logistica_checkout",
+             "logistica_conductor", "logistica_analitica_ia")
 $ClavesSecretas = @("ODOO_DB_PASSWORD", "ODOO_ADMIN_PASSWORD", "TRACCAR_DB_PASSWORD", "TRACCAR_ADMIN_PASSWORD")
 
 # Ejecuta docker compose; si el comando falla, detiene el script. Devuelve su salida.
@@ -107,6 +110,12 @@ if (Test-Path seeds\seed.py) {
     if ($LASTEXITCODE -ne 0) { throw "El sembrado fallo (codigo $LASTEXITCODE)." }
 } else {
     Write-Host "      AVISO: seeds\seed.py no existe todavia (pendiente: Tarea 3 del plan). Se omite el sembrado." -ForegroundColor Yellow
+}
+
+if ($ConAnalitica) {
+    Write-Host "[extra] Analitica (routing, ml, bi) y bootstrap del ETL"
+    Invoke-Compose @('--profile', 'analitica', 'up', '-d', '--wait', 'routing', 'ml', 'bi') | Out-Null
+    Invoke-Compose @('--profile', 'etl', 'run', '--rm', 'etl', 'bootstrap') | Out-Null
 }
 
 Write-Host "Listo. ERP Odoo: http://localhost:8069/web/login | Traccar: http://localhost:8082" -ForegroundColor Green

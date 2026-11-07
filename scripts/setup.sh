@@ -6,9 +6,14 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 export MSYS_NO_PATHCONV=1  # Git Bash en Windows: evita reescribir /entrypoint.sh como ruta
 
+# --con-analitica: ademas arranca routing, ml y bi (perfil analitica) y prepara el ETL (bootstrap).
+CON_ANALITICA=0
+[ "${1:-}" = "--con-analitica" ] && CON_ANALITICA=1
+
 BASE=logistica_dev
 MODULOS=(contacts fleet sale_management website website_sale payment_custom
-         logistica_base logistica_despacho logistica_traccar logistica_entregas logistica_checkout)
+         logistica_base logistica_despacho logistica_traccar logistica_entregas logistica_checkout
+         logistica_conductor logistica_analitica_ia)
 CLAVES_SECRETAS=(ODOO_DB_PASSWORD ODOO_ADMIN_PASSWORD TRACCAR_DB_PASSWORD TRACCAR_ADMIN_PASSWORD)
 
 echo "[1/5] Archivo .env"
@@ -97,11 +102,18 @@ if [ -f seeds/seed.py ]; then
   # Carga las claves de .env en el proceso; los valores no se imprimen.
   while IFS='=' read -r clave valor || [ -n "$clave" ]; do
     [[ "$clave" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
-    export "$clave=$(limpia_valor "$valor")"
+    # Una variable ya definida en el entorno manda sobre .env.
+    [ -z "${!clave+x}" ] && export "$clave=$(limpia_valor "$valor")"
   done < .env
   python3 seeds/seed.py
 else
   echo "      AVISO: seeds/seed.py no existe todavia (pendiente: Tarea 3 del plan). Se omite el sembrado."
+fi
+
+if [ "$CON_ANALITICA" = "1" ]; then
+  echo "[extra] Analitica (routing, ml, bi) y bootstrap del ETL"
+  docker compose --profile analitica up -d --wait routing ml bi
+  docker compose --profile etl run --rm etl bootstrap
 fi
 
 echo "Listo. ERP Odoo: http://localhost:8069/web/login | Traccar: http://localhost:8082"
