@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="conductor_layout" name="Conductor: diseño móvil">
+        <t t-call="web.layout">
+            <t t-set="title">Conductor</t>
+            <t t-set="head">
+                <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <meta name="csrf-token" t-att-content="request.csrf_token()"/>
+                <style>
+                    body { margin: 0; font-family: sans-serif; background: #f3f4f6; color: #111827; }
+                    .c-barra { background: #714b67; color: #fff; padding: 12px 16px; display: flex; justify-content: space-between; }
+                    .c-barra a { color: #fff; text-decoration: none; }
+                    .c-cuerpo { padding: 12px; max-width: 640px; margin: 0 auto; }
+                    .c-tarjeta { display: block; background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 10px; color: inherit; text-decoration: none; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+                    .c-estado { display: inline-block; background: #e5e7eb; border-radius: 12px; padding: 2px 10px; font-size: .85em; }
+                    .c-siguiente { border: 3px solid #2563eb; }
+                    .c-etiqueta { color: #2563eb; font-weight: bold; }
+                    .c-boton, button { display: block; width: 100%; box-sizing: border-box; padding: 16px; margin: 6px 0; border: 0; border-radius: 10px; font-size: 1.1em; color: #fff; background: #714b67; text-align: center; text-decoration: none; }
+                    .c-ok { background: #047857; } .c-mal { background: #b91c1c; } .c-gris { background: #4b5563; }
+                    select, textarea, input[type=text] { width: 100%; box-sizing: border-box; padding: 12px; font-size: 1em; margin: 4px 0; }
+                    .c-error { background: #fee2e2; border: 1px solid #b91c1c; border-radius: 10px; padding: 14px; }
+                    .c-hecha { opacity: .65; }
+                </style>
+            </t>
+            <div class="c-barra">
+                <a href="/logistica/conductor"><strong>Mis rutas</strong></a>
+                <a href="/web/session/logout?redirect=/web/login">Salir</a>
+            </div>
+            <div class="c-cuerpo"><t t-out="0"/></div>
+        </t>
+    </template>
+
+    <template id="conductor_rutas" name="Conductor: mis rutas">
+        <t t-call="logistica_conductor.conductor_layout">
+            <h2>Mis rutas</h2>
+            <p t-if="not rutas">No tiene rutas asignadas.</p>
+            <a t-foreach="rutas" t-as="r" class="c-tarjeta" t-attf-href="/logistica/conductor/ruta/{{r.id}}">
+                <strong t-esc="r.name"/>
+                <span class="c-estado" t-esc="estados[r.state]"/>
+                <div>
+                    <span t-esc="r.date"/> · <span t-esc="r.vehicle_plate"/> ·
+                    <span t-esc="r.total_stops"/> parada(s)
+                </div>
+            </a>
+        </t>
+    </template>
+
+    <template id="conductor_ruta" name="Conductor: detalle de ruta">
+        <t t-call="logistica_conductor.conductor_layout">
+            <h2><span t-esc="ruta.name"/> <span class="c-estado" t-esc="estados[ruta.state]"/></h2>
+            <p>
+                Vehículo <strong t-esc="ruta.vehicle_plate"/> ·
+                <span t-esc="ruta.delivered_stops"/> entregada(s),
+                <span t-esc="ruta.failed_stops"/> no entregada(s),
+                <span t-esc="ruta.pending_stops"/> pendiente(s)
+            </p>
+
+            <t t-if="ruta.state == 'planificada'">
+                <form method="post" t-attf-action="/logistica/conductor/ruta/{{ruta.id}}/confirmar-carga">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <button type="submit">Confirmar carga</button>
+                </form>
+            </t>
+            <t t-if="ruta.state == 'carga_confirmada'">
+                <form method="post" t-attf-action="/logistica/conductor/ruta/{{ruta.id}}/iniciar">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <button type="submit" class="c-ok">Iniciar recorrido</button>
+                </form>
+            </t>
+            <t t-if="ruta.state == 'en_recorrido'">
+                <form method="post" t-attf-action="/logistica/conductor/ruta/{{ruta.id}}/cerrar">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <button type="submit" class="c-gris">Cerrar ruta</button>
+                </form>
+                <details>
+                    <summary>Interrumpir ruta</summary>
+                    <form method="post" t-attf-action="/logistica/conductor/ruta/{{ruta.id}}/interrumpir">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                        <textarea name="motivo" rows="2" placeholder="Motivo de la interrupción" required="required"></textarea>
+                        <button type="submit" class="c-mal">Interrumpir</button>
+                    </form>
+                </details>
+            </t>
+
+            <h3>Paradas</h3>
+            <div t-foreach="paradas" t-as="p"
+                 t-attf-class="c-tarjeta #{'c-siguiente' if siguiente and p.id == siguiente.id else ''} #{'c-hecha' if p.state != 'pendiente' else ''}">
+                <div t-if="siguiente and p.id == siguiente.id" class="c-etiqueta">Siguiente parada</div>
+                <strong><span t-esc="p.sequence"/>. <span t-esc="p.entrega_id.name"/></strong>
+                <span class="c-estado" t-esc="estados_parada[p.state]"/>
+                <div t-esc="p.entrega_id.recipient_name"/>
+                <div t-esc="p.entrega_id.destination_address"/>
+                <div t-if="p.entrega_id.phone">Tel. <span t-esc="p.entrega_id.phone"/></div>
+                <div t-if="p.entrega_id.delivery_reference" t-esc="p.entrega_id.delivery_reference"/>
+                <div t-if="p.failed_reason">Motivo: <span t-esc="p.failed_reason"/></div>
+
+                <t t-if="ruta.state == 'en_recorrido' and p.state == 'pendiente'">
+                    <a class="c-boton c-gris" target="_blank"
+                       t-attf-href="https://www.google.com/maps/dir/?api=1&amp;destination={{p.latitude}},{{p.longitude}}">Navegar</a>
+                    <form t-if="not p.actual_arrival_at" method="post"
+                          t-attf-action="/logistica/conductor/parada/{{p.id}}/llegada">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                        <button type="submit">Llegué</button>
+                    </form>
+                    <form method="post" t-attf-action="/logistica/conductor/parada/{{p.id}}/entregado">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                        <button type="submit" class="c-ok">Entregado</button>
+                    </form>
+                    <details>
+                        <summary>No entregado</summary>
+                        <form method="post" t-attf-action="/logistica/conductor/parada/{{p.id}}/no-entregado">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <select name="motivo" required="required">
+                                <option value="">Motivo…</option>
+                                <option t-foreach="motivos" t-as="m" t-att-value="m[0]" t-esc="m[1]"/>
+                            </select>
+                            <textarea name="notas" rows="2" placeholder="Notas (opcional)"></textarea>
+                            <button type="submit" class="c-mal">Registrar no entregado</button>
+                        </form>
+                    </details>
+                </t>
+            </div>
+        </t>
+    </template>
+
+    <template id="conductor_error" name="Conductor: error">
+        <t t-call="logistica_conductor.conductor_layout">
+            <div class="c-error"><strong>No se pudo completar la acción.</strong>
+                <p t-esc="mensaje"/></div>
+            <a class="c-boton c-gris" t-att-href="volver">Volver</a>
+        </t>
+    </template>
+
+    <record id="action_logistica_conductor" model="ir.actions.act_url">
+        <field name="name">Portal del conductor</field>
+        <field name="url">/logistica/conductor</field>
+        <field name="target">self</field>
+    </record>
+
+    <menuitem id="menu_logistica_conductor"
+              name="Portal del conductor"
+              parent="logistica_base.menu_logistica_root"
+              action="action_logistica_conductor"
+              groups="logistica_conductor.group_conductor"
+              sequence="5"/>
+</odoo>
