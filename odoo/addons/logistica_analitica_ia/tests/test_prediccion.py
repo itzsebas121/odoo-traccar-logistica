@@ -139,6 +139,24 @@ class TestPrediccion(TransactionCase):
         with self.assertRaises(UserError):
             consulta.unlink()
 
+    def test_asistente_y_metricas_como_gestor_de_flota(self):
+        """Los asistentes (modelos transitorios) necesitan permisos propios: se prueban sin ser superusuario."""
+        gestor = self.env['res.users'].with_context(no_reset_password=True).create({
+            'name': 'Gestor IA', 'login': 'gestor_ia_test',
+            'groups_id': [(6, 0, [self.env.ref('base.group_user').id,
+                                  self.env.ref('fleet.fleet_group_manager').id])]})
+        wizard = self.env['logistica.prediccion.wizard'].with_user(gestor).create({
+            'vehicle_id': self.vehiculo.id, 'fecha': date(2026, 11, 9), 'hora': 9.0, 'origin_zone': 'centro'})
+        with mock.patch(ML + '.predict', return_value=dict(PREDICCION)), mock.patch(RUTA, return_value=dict(GEOMETRIA)):
+            accion = wizard.action_predecir()
+        consulta = self.env['logistica.prediccion.consulta'].with_user(gestor).browse(accion['res_id'])
+        self.assertEqual(consulta.predicted_zone, 'ficoa')
+        self.assertEqual(consulta.user_id, gestor)
+        datos = {'accuracy': 0.7, 'labels': ['centro'], 'confusion_matrix': [[1]]}
+        with mock.patch(ML + '.metrics', return_value=datos):
+            valores = self.env['logistica.prediccion.metricas'].with_user(gestor).default_get(['accuracy'])
+        self.assertEqual(valores['accuracy'], 0.7)
+
     def test_vehiculo_sin_placa(self):
         sin_placa = self.env['fleet.vehicle'].create({'model_id': self.vehiculo.model_id.id})
         with self.assertRaises(UserError):

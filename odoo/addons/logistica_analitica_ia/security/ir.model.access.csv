@@ -1,3 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_logistica_prediccion_consulta_flota,logistica.prediccion.consulta.flota,model_logistica_prediccion_consulta,fleet.fleet_group_user,1,0,1,0
 access_logistica_prediccion_consulta_gestor,logistica.prediccion.consulta.gestor,model_logistica_prediccion_consulta,fleet.fleet_group_manager,1,0,1,0
+access_logistica_prediccion_wizard_flota,logistica.prediccion.wizard.flota,model_logistica_prediccion_wizard,fleet.fleet_group_user,1,1,1,1
+access_logistica_prediccion_metricas_flota,logistica.prediccion.metricas.flota,model_logistica_prediccion_metricas,fleet.fleet_group_user,1,1,1,1

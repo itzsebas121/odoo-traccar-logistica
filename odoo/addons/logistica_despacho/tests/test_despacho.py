@@ -136,6 +136,23 @@ class TestDespacho(TransactionCase):
         with self.assertRaises(UserError):
             self.env['logistica.ruta.parada'].create({'route_id': ruta.id, 'entrega_id': nueva.id})
 
+    def test_asistentes_como_gestor_de_flota(self):
+        """Los asistentes (modelos transitorios) necesitan permisos propios: se prueban sin ser superusuario."""
+        gestor = self.env['res.users'].with_context(no_reset_password=True).create({
+            'name': 'Gestor despacho', 'login': 'gestor_despacho_test',
+            'groups_id': [(6, 0, [self.env.ref('base.group_user').id,
+                                  self.env.ref('fleet.fleet_group_manager').id])]})
+        entrega, veh = self._entrega(), self._vehiculo()
+        plan = self.env['logistica.planificador'].with_user(gestor).create({'vehicle_ids': [(6, 0, [veh.id])]})
+        with patch(OPTIMIZE, return_value=self._respuesta(veh, [entrega])):
+            accion = plan.action_proponer()
+        ruta = self.env['logistica.ruta'].browse(accion['domain'][0][2])
+        self.assertEqual(len(ruta), 1)
+        motivo = self.env['logistica.ruta.motivo'].with_user(gestor).create({
+            'ruta_id': ruta.id, 'accion': 'cancelar', 'motivo': 'Prueba de permisos'})
+        motivo.action_confirmar()
+        self.assertEqual(ruta.state, 'cancelada')
+
     # ------------------------------------------------------- máquina de estados
     def test_aprobar_plan(self):
         e1, e2 = self._entrega(), self._entrega()

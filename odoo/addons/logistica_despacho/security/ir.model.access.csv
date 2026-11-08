@@ -3,3 +3,5 @@ access_logistica_ruta_user,logistica.ruta.user,model_logistica_ruta,base.group_u
 access_logistica_ruta_manager,logistica.ruta.manager,model_logistica_ruta,fleet.fleet_group_manager,1,1,1,1
 access_logistica_ruta_parada_user,logistica.ruta.parada.user,model_logistica_ruta_parada,base.group_user,1,0,0,0
 access_logistica_ruta_parada_manager,logistica.ruta.parada.manager,model_logistica_ruta_parada,fleet.fleet_group_manager,1,1,1,1
+access_logistica_planificador_manager,logistica.planificador.manager,model_logistica_planificador,fleet.fleet_group_manager,1,1,1,1
+access_logistica_ruta_motivo_flota,logistica.ruta.motivo.flota,model_logistica_ruta_motivo,fleet.fleet_group_user,1,1,1,1
