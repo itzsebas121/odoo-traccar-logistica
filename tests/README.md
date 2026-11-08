@@ -47,3 +47,18 @@ python -m unittest tests.e2e.test_flujo -v
 ```
 
 `seeds/simular.py` desplaza los timestamps de `simulacion.json` para que el último punto sea «ahora»: así cada corrida entra en la ventana de sincronización de Odoo.
+
+## Todos los módulos de Odoo y la verificación de extremo a extremo
+
+Pruebas de **todos** los módulos de logística (instala los que faltan, actualiza el resto, corre sus pruebas en la base de desarrollo y reinicia Odoo al final). La salida completa queda en `%TEMP%\odoo-tests.txt`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\test_odoo.ps1
+```
+
+Los 14 criterios de §13 con datos reales (necesita `.env` cargado, el stack levantado, Docker en la consola y los datos de `python seeds/seed.py`). **Modifica la base de desarrollo**: ver el encabezado del script. La primera vez construye las imágenes de routing, ml, bi y etl:
+
+```powershell
+python seeds/seed.py
+python scripts/verify_flujo.py
+```

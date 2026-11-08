@@ -452,6 +452,8 @@ Implementa §3.1, §4.1, §5 M2, §12 (token), D5, D8. Nuevo módulo que extiend
 
 ### Task 8: `logistica_despacho` — planificación, rutas, carga y ejecución
 
+> **Hecho el 2026-11-08** (19 pruebas de despacho, 0 fallos). Desviaciones y decisiones: `docs/decisiones_tareas_8_13.md`.
+
 Implementa §3.2 (planificación, rutas, monitoreo de incidencias), §5 M4, §7 etapas 3–4, §8.3, §8.4, §9, §1.1 reglas 5–7. Reemplaza `logistica.ruta` y `logistica.ruta.parada` de la versión actual.
 
 **Files:**
@@ -467,7 +469,7 @@ Implementa §3.2 (planificación, rutas, monitoreo de incidencias), §5 M4, §7 
 - Consumes: C1 (`/optimize`), C6 de Tasks 5 y 6 (`logistica.bodega`, `logistica.entrega`, `action_marcar_*`, `_registrar_evento`), `fleet.vehicle.logistica_capacidad`, `fleet.vehicle.driver_id`.
 - Produces: C6 (`logistica.ruta`, `logistica.ruta.parada`, `logistica.planificador`).
 
-- [ ] **Step 1: Escribir pruebas que fallan** (con `routing_client` parcheado con `unittest.mock`)
+- [x] **Step 1: Escribir pruebas que fallan** (con `routing_client` parcheado con `unittest.mock`)
   - `test_planificador_rutas_desde_bodega`: el origen enviado a `/optimize` es la bodega activa; el resultado crea rutas `borrador` con paradas en el orden devuelto.
   - `test_planificador_solo_preparados`: una entrega en `en_preparacion` no entra en la propuesta.
   - `test_no_asignados_quedan_preparados`: una parada en `unassigned` deja la entrega en `preparado` y registra el motivo.
@@ -481,10 +483,10 @@ Implementa §3.2 (planificación, rutas, monitoreo de incidencias), §5 M4, §7 
   - `test_interrumpir_durante_ejecucion`: `en_recorrido` → `interrumpida` con motivo; entregas no entregadas → `pendiente_reprogramacion`.
   - `test_capacidad_del_vehiculo`: el payload a `/optimize` lleva `capacity` de `logistica_capacidad`.
 
-- [ ] **Step 2: Ejecutar y verificar que fallan**
+- [x] **Step 2: Ejecutar y verificar que fallan**
   Expected: FAIL.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
   - `logistica.ruta`: campos de C6; `_order` por fecha; `name` con secuencia `logistica.ruta` (`RUTA/%(year)s/`).
   - Máquina de estados: `borrador → planificada` (aprobación); `planificada → carga_confirmada` (conductor); `carga_confirmada → en_recorrido`; `en_recorrido → cerrada`; `borrador|planificada → cancelada`; `en_recorrido → interrumpida`.
   - `write` de `stop_ids` en estados `carga_confirmada`, `en_recorrido`, `cerrada`, `cancelada`, `interrumpida` → `UserError` (regla §1.1 #7 y §8.4).
@@ -493,15 +495,17 @@ Implementa §3.2 (planificación, rutas, monitoreo de incidencias), §5 M4, §7 
   - `assert_driver(user)`: el usuario debe tener `partner_id == driver_id` de la ruta (usado en Task 10).
   - `logistica.ruta.parada`: `action_marcar_llegada` (evento, sin cambio de estado de entrega), `action_marcar_entregado`, `action_marcar_no_entregado(motivo, notas)`: delegan en la entrega (Task 6).
 
-- [ ] **Step 4: Ejecutar pruebas y verificar que pasan**
+- [x] **Step 4: Ejecutar pruebas y verificar que pasan**
   Expected: `0 failed, 0 error(s)`, 12 pruebas.
 
-- [ ] **Step 5: Verificar actualización**
+- [x] **Step 5: Verificar actualización**
   Run: `docker compose exec -T odoo /entrypoint.sh odoo -d logistica_dev -u logistica_despacho --stop-after-init`. Expected: sin errores.
 
 ---
 
 ### Task 9: `logistica_traccar` — monitoreo, posiciones, llegada por proximidad e informes
+
+> **Hecho el 2026-11-08** (88 pruebas del módulo). `cron_poll_positions` no se crea: lo cubre `cron_sincronizar` de la Fase 1. Mapa solo para gestores de flota.
 
 Implementa §5 M5, §6 (flujo, consultas, llegada vs. entrega, fallos), §3.2 (monitoreo GPS). Extiende el módulo existente.
 
@@ -519,7 +523,7 @@ Implementa §5 M5, §6 (flujo, consultas, llegada vs. entrega, fallos), §3.2 (m
 - Consumes: Traccar (`/api/positions`, `/api/reports/route|trips|stops`); C6 de Tasks 5, 6 y 8 (`logistica.configuracion`, `logistica.ruta.parada`, `action_marcar_llegada`).
 - Produces: C6 (`logistica.traccar.posicion`, `traccar.device._registrar_posicion`, `traccar.server.get_*`, `cron_poll_positions`).
 
-- [ ] **Step 1: Escribir pruebas que fallan**
+- [x] **Step 1: Escribir pruebas que fallan**
   - `test_cron_crea_posicion_por_vehiculo`: `/api/positions` mock con una posición del dispositivo vinculado → una `logistica.traccar.posicion` con el `vehicle_id` correcto.
   - `test_sin_duplicados_al_repetir`: el mismo `id` de posición en dos sondeos → un solo registro.
   - `test_posicion_desactualizada_marca_stale`: `gps_time` hace 301 s → `is_stale=True`; el JSON de monitoreo incluye `ultima_ubicacion_conocida` y `antiguedad_s`, nunca un valor simulado.
@@ -530,24 +534,26 @@ Implementa §5 M5, §6 (flujo, consultas, llegada vs. entrega, fallos), §3.2 (m
   - `test_informes_parametros`: `get_route_report` construye `deviceId`, `from` y `to` en ISO-8601 UTC.
   - `test_monitoreo_sin_credenciales`: el JSON de `/logistica/monitoreo/data` no contiene `password`, `Authorization` ni `base_url`.
 
-- [ ] **Step 2: Ejecutar y verificar que fallan**
+- [x] **Step 2: Ejecutar y verificar que fallan**
   Expected: FAIL.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
   - `cron_poll_positions()`: una sola llamada a `/api/positions` (sin `deviceId`); por cada posición con dispositivo vinculado a un vehículo: `_registrar_posicion`. Errores de red → `state='error'`, `last_error_message`; no se relanzan.
   - `_check_proximidad(lat, lon)` en `logistica.ruta.parada`: distancia haversine a la entrega; dentro de `arrival_radius_m` y en `en_recorrido` → `action_marcar_llegada` con el GPS.
   - Monitoreo: mapa Leaflet con la última posición por vehículo, hora, antigüedad, marca de desactualizado y recorrido de la ruta activa (`get_route_report`).
   - Llamadas a Traccar solo desde el servidor; `auth='user'`.
 
-- [ ] **Step 4: Ejecutar pruebas y verificar que pasan**
+- [x] **Step 4: Ejecutar pruebas y verificar que pasan**
   Expected: `0 failed, 0 error(s)`, 9 pruebas.
 
-- [ ] **Step 5: Verificar actualización**
+- [x] **Step 5: Verificar actualización**
   Run: `docker compose exec -T odoo /entrypoint.sh odoo -d logistica_dev -u logistica_traccar --stop-after-init`. Expected: sin errores.
 
 ---
 
 ### Task 10: `logistica_conductor` — portal móvil restringido
+
+> **Hecho el 2026-11-08** (13 pruebas HTTP). El grupo es `logistica_conductor.group_conductor`. El paso 5 (prueba manual en el navegador) queda para ti: ver el checklist del README.
 
 Implementa §3.3, §5 M6, §7 etapas 4–5, §8.2 y la sección «Seguridad» del Módulo 6. Nuevo módulo.
 
@@ -562,7 +568,7 @@ Implementa §3.3, §5 M6, §7 etapas 4–5, §8.2 y la sección «Seguridad» de
 - Consumes: C6 de Tasks 6 y 8 (`logistica.ruta` métodos y `assert_driver`, `logistica.ruta.parada.action_marcar_*`).
 - Produces: rutas HTTP descritas arriba.
 
-- [ ] **Step 1: Escribir pruebas que fallan**
+- [x] **Step 1: Escribir pruebas que fallan**
   - `test_conductor_solo_ve_sus_rutas`: conductor A ve solo su ruta en `/logistica/conductor`; `GET /logistica/conductor/ruta/<id de B>` → `403` o `404`.
   - `test_regla_registro_por_conductor`: búsqueda ORM como conductor A → solo rutas con `driver_id == A.partner_id`.
   - `test_usuario_sin_grupo_403`: usuario sin grupo conductor → `403`.
@@ -572,16 +578,16 @@ Implementa §3.3, §5 M6, §7 etapas 4–5, §8.2 y la sección «Seguridad» de
   - `test_orden_de_paradas`: la página muestra las paradas ordenadas por `sequence` y marca la siguiente pendiente.
   - `test_conductor_no_entrega_ajena`: conductor A no puede marcar una parada de la ruta de B → `403`.
 
-- [ ] **Step 2: Ejecutar y verificar que fallan**
+- [x] **Step 2: Ejecutar y verificar que fallan**
   Expected: FAIL.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
   - Controladores con `auth='user'`; cada ruta/parada se resuelve con `request.env` (reglas de registro activas) y se verifica con `assert_driver`; no se usa `sudo()` para datos del conductor.
   - Idempotencia: el estado de la parada decide; si ya está registrada → `409`.
   - Snapshot GPS: al registrar, se adjunta el último GPS del vehículo (Task 6 `_gps_snapshot`).
   - Mensajes de error en español; el cuerpo de error no revela datos de otras rutas.
 
-- [ ] **Step 4: Ejecutar pruebas y verificar que pasan**
+- [x] **Step 4: Ejecutar pruebas y verificar que pasan**
   Expected: `0 failed, 0 error(s)`, 8 pruebas.
 
 - [ ] **Step 5: Verificar en el navegador (prueba manual)**
@@ -590,6 +596,8 @@ Implementa §3.3, §5 M6, §7 etapas 4–5, §8.2 y la sección «Seguridad» de
 ---
 
 ### Task 11: `logistica_analitica_ia` — consulta de destinos probables en Odoo
+
+> **Hecho el 2026-11-08** (14 pruebas).
 
 Implementa §5 M7, §10.4 (mapa y ruta vial), §5 «Distinción» (no asigna pedidos). Nuevo módulo.
 
@@ -604,7 +612,7 @@ Implementa §5 M7, §10.4 (mapa y ruta vial), §5 «Distinción» (no asigna ped
 - Consumes: C2 (`/predict`, `/metrics`), C1 (`/route`), `logistica.zona.centroide` (Task 5), `fleet.vehicle`.
 - Produces: C6 (`logistica.prediccion.consulta`); acción «Predecir destino».
 
-- [ ] **Step 1: Escribir pruebas que fallan**
+- [x] **Step 1: Escribir pruebas que fallan**
   - `test_consulta_guarda_auditoria`: `ml_client` mock → consulta con `predicted_zone`, `class_probabilities` JSON, `model_version`, `alternatives` (3).
   - `test_no_asigna_pedidos`: ejecutar una predicción no cambia estados de `logistica.entrega`, `logistica.ruta` ni `sale.order`.
   - `test_ml_caido_mensaje_claro`: ML devuelve `503` o no responde → `UserError` con el mensaje «El modelo predictivo no está disponible»; no se crea consulta.
@@ -612,23 +620,25 @@ Implementa §5 M7, §10.4 (mapa y ruta vial), §5 «Distinción» (no asigna ped
   - `test_zona_origen_obligatoria`: sin `origin_zone` → `ValidationError`.
   - `test_probabilidades_suman_uno`: las probabilidades guardadas suman 1 ± 1e-6.
 
-- [ ] **Step 2: Ejecutar y verificar que fallan**
+- [x] **Step 2: Ejecutar y verificar que fallan**
   Expected: FAIL.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
   - Wizard: vehículo, fecha, hora, zona de origen → `action_predecir()`: llama a C2 `/predict` con `vehicle_code` = placa, `reference_datetime` en UTC; guarda la consulta; llama a C1 `/route` desde el centroide de origen al centroide del destino predicho.
   - Vista de resultado: destino probable, alternativas con probabilidades, mapa Leaflet con la ruta, enlace a `/metrics` (accuracy, F1, matriz de confusión, baseline).
   - Ninguna escritura sobre pedidos, entregas o rutas (§5 M7).
 
-- [ ] **Step 4: Ejecutar pruebas y verificar que pasan**
+- [x] **Step 4: Ejecutar pruebas y verificar que pasan**
   Expected: `0 failed, 0 error(s)`, 6 pruebas.
 
-- [ ] **Step 5: Verificar actualización**
+- [x] **Step 5: Verificar actualización**
   Run: instalar con `-i logistica_analitica_ia`. Expected: sin errores.
 
 ---
 
 ### Task 12: Datos de demostración y dispositivos GPS
+
+> **Hecho el 2026-11-08** con desviaciones: la demostración está en `seeds/data/*.json` y `seeds/seed.py` (no `seeds/demo_data.py` ni `gps_demo.py`); los pasos se verificaron con `tests/e2e/test_flujo.py` y `verify_flujo.py`.
 
 Implementa los datos de §11 (bodega, 3 vehículos y conductores, 5 pedidos web) y deja listas las condiciones de §13 (≥3 vehículos/conductores con dispositivo verificable).
 
@@ -641,23 +651,23 @@ Implementa los datos de §11 (bodega, 3 vehículos y conductores, 5 pedidos web)
 - Consumes: C6 de Tasks 5–10; Traccar REST y OsmAnd.
 - Produces: datos que consume Task 13.
 
-- [ ] **Step 1: Escribir pruebas que fallan** (`seeds/tests/test_seeds.py`, ejecutadas contra el stack)
+- [x] **Step 1: Escribir pruebas que fallan** (`seeds/tests/test_seeds.py`, ejecutadas contra el stack)
   - `test_seed_idempotente`: dos ejecuciones → 1 bodega activa, 3 `fleet.vehicle` con conductor, 3 `traccar.device`, 5 `product.template` publicados, 5 `sale.order` confirmados con destino y 5 `logistica.entrega` en `en_preparacion`.
   - `test_vehiculos_con_dispositivo_unico`: cada vehículo tiene un dispositivo distinto (`uniqueId` `LOG-001`…`LOG-003`).
   - `test_posiciones_en_traccar`: tras `gps_demo.py`, `/api/positions` devuelve posiciones para los 3 dispositivos con `fixTime` reciente.
 
-- [ ] **Step 2: Ejecutar y verificar que fallan**
+- [x] **Step 2: Ejecutar y verificar que fallan**
   Expected: FAIL.
 
-- [ ] **Step 3: Implementar**
+- [x] **Step 3: Implementar**
   - `seeds/demo_data.py`: crea o reutiliza cada registro por clave natural (placa, nombre, `uniqueId`); usuarios conductor con `is_driver=True` y grupo `logistica.group_conductor`.
   - `seeds/gps_demo.py`: envía posiciones con `timestamp` UTC actual y `speed` en nudos (Traccar lo convierte).
   - Lo de la especificación §11 (cinco pedidos) se crea con `sale.order` y `action_confirm()`; las entregas quedan en `en_preparacion` (sin preparar, para la prueba de Task 13).
 
-- [ ] **Step 4: Ejecutar pruebas y verificar que pasan**
+- [x] **Step 4: Ejecutar pruebas y verificar que pasan**
   Run: `docker compose exec -T odoo python3 /mnt/extra-addons/../seeds/demo_data.py` (ver ruta real en el contenedor), luego `python3 seeds/gps_demo.py`. Expected: pruebas en verde.
 
-- [ ] **Step 5: Verificar idempotencia**
+- [x] **Step 5: Verificar idempotencia**
   Run: volver a ejecutar ambos scripts. Expected: sin duplicados.
 
 ---
@@ -665,6 +675,8 @@ Implementa los datos de §11 (bodega, 3 vehículos y conductores, 5 pedidos web)
 ## Phase C — Integración y verificación
 
 ### Task 13: Verificación de extremo a extremo y documentación
+
+> **Hecho el 2026-11-08:** `python scripts/verify_flujo.py` → 14/14 criterios; el paso 5 (instalación sobre una base nueva `logistica_dev_prueba`) no se hizo: se verificó antes el arranque desde cero de la Fase 1 en un proyecto limpio.
 
 Cierra los 14 criterios de §13 con una prueba automatizada y actualiza los scripts de despliegue.
 
@@ -677,7 +689,7 @@ Cierra los 14 criterios de §13 con una prueba automatizada y actualiza los scri
 - Consumes: todas las tareas anteriores.
 - Produces: informe con PASS/FAIL por criterio.
 
-- [ ] **Step 1: Escribir la verificación** (un bloque por criterio de §13, en el mismo orden)
+- [x] **Step 1: Escribir la verificación** (un bloque por criterio de §13, en el mismo orden)
   1. Cliente navega, compra sin cuenta y marca destino → flujo HTTP `/shop` → `/shop/cart` → `/shop/address` con coordenadas → pago de prueba.
   2. El pedido aparece en Odoo con productos, contacto y coordenadas → XML-RPC `sale.order`.
   3. Pasa a preparación sin aprobación manual → `logistica.entrega.state == 'en_preparacion'`.
@@ -693,13 +705,13 @@ Cierra los 14 criterios de §13 con una prueba automatizada y actualiza los scri
   13. El BI usa el DWH → `GET http://127.0.0.1:8501/_stcore/health` y ausencia de dependencias de Odoo (Task 4).
   14. El modelo de IA predice destinos, incluye métricas y presenta ruta vial → `/predict`, `/metrics`, `/route`.
 
-- [ ] **Step 2: Ejecutar y verificar que falla**
+- [x] **Step 2: Ejecutar y verificar que falla**
   Run: `python scripts/verify_flujo.py`. Expected: FAIL en los criterios no cumplidos todavía.
 
-- [ ] **Step 3: Corregir lo que falle**
+- [x] **Step 3: Corregir lo que falle**
   Cada fallo se corrige en la tarea que lo produce; no se relajan las comprobaciones.
 
-- [ ] **Step 4: Ejecutar la verificación completa**
+- [x] **Step 4: Ejecutar la verificación completa**
   Run: `python scripts/verify_flujo.py`. Expected: `14/14 criterios cumplidos` y código de salida `0`.
 
 - [ ] **Step 5: Verificar instalación limpia y actualización**

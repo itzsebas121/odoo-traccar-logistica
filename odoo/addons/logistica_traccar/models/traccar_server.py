@@ -2,6 +2,7 @@
 import base64
 import json
 import logging
+import re
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -38,6 +39,15 @@ def _fecha_utc(texto):
     if fecha.tzinfo is not None:
         fecha = fecha.astimezone(timezone.utc).replace(tzinfo=None)
     return fecha
+
+
+_AUTORIZACION = re.compile(r'(?i)\b(Basic|Bearer)\s+[A-Za-z0-9+/=._~-]+')
+
+
+def _sin_secretos(texto, secreto=None):
+    """Quita de un mensaje de error cualquier cabecera de autorización y el secreto del servidor."""
+    texto = _AUTORIZACION.sub(r'\1 ***', str(texto))
+    return texto.replace(secreto, '***') if secreto else texto
 
 
 def _a_utc(fecha):
@@ -149,8 +159,14 @@ class TraccarServer(models.Model):
             headers['Authorization'] = f"Bearer {secreto}"
         return headers
 
+    def _limpiar_error(self, texto):
+        self.ensure_one()
+        return _sin_secretos(texto, self._secreto())
+
     def action_test_connection(self):
         self.ensure_one()
+        # Envía la credencial a la base_url configurada: solo un gestor de flota puede dispararlo.
+        self._exigir_gestor_flota()
         url = self.base_url.rstrip('/') + '/api/server'
         headers = self._get_auth_headers()
         try:
@@ -173,14 +189,14 @@ class TraccarServer(models.Model):
                     }
                 }
             else:
-                error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
+                error_msg = self._limpiar_error(f"HTTP {response.status_code}: {response.text[:200]}")
                 self.write({
                     'state': 'error',
                     'last_error_message': error_msg,
                 })
                 raise UserError(_('Fallo de conexión a Traccar: %s') % error_msg)
         except requests.RequestException as e:
-            error_msg = str(e)
+            error_msg = self._limpiar_error(e)
             self.write({
                 'state': 'error',
                 'last_error_message': error_msg,
@@ -203,9 +219,9 @@ class TraccarServer(models.Model):
                 respuesta = requests.get(url, headers=headers, params=params, timeout=_TIMEOUT)
                 if respuesta.status_code == 200:
                     return respuesta.json()
-                error = f"HTTP {respuesta.status_code}: {respuesta.text[:200]}"
+                error = self._limpiar_error(f"HTTP {respuesta.status_code}: {respuesta.text[:200]}")
             except (requests.RequestException, ValueError) as exc:
-                error = str(exc)
+                error = self._limpiar_error(exc)
             _logger.warning('traccar_request_error ruta=%s intento=%s error=%s', path, intento + 1, error)
             if intento < len(_ESPERAS):
                 time.sleep(_ESPERAS[intento])

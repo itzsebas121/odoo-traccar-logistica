@@ -160,6 +160,37 @@ class TestMonitoreoTraccar(_BaseMonitoreo, TransactionCase):
                 'deviceId': 41, 'from': '2026-11-06T11:00:00Z', 'to': '2026-11-06T13:00:00Z'})
             self.assertEqual(get.call_args.kwargs['headers']['Accept'], 'application/json')
 
+    def test_probar_conexion_solo_gestor(self):
+        usuario = self.env['res.users'].with_context(no_reset_password=True).create({
+            'name': 'Interno', 'login': 'interno-probar-conexion',
+            'groups_id': [(6, 0, [self.env.ref('base.group_user').id])]})
+        gestor = self.env['res.users'].with_context(no_reset_password=True).create({
+            'name': 'Gestor', 'login': 'gestor-probar-conexion',
+            'groups_id': [(6, 0, [self.env.ref('base.group_user').id,
+                                  self.env.ref('fleet.fleet_group_manager').id])]})
+        with mock.patch.object(modulo.requests, 'get', return_value=_respuesta({'version': '6.0'})) as get:
+            with self.assertRaises(AccessError):
+                self.servidor.with_user(usuario).action_test_connection()
+            self.assertFalse(get.called)  # se rechaza antes de enviar la credencial
+            self.servidor.with_user(gestor).action_test_connection()
+        self.assertEqual(self.servidor.state, 'connected')
+
+    def test_errores_no_guardan_cabeceras_ni_secreto(self):
+        self.servidor.password = 'clave-secreta-error'
+        reloj = mock.patch.object(modulo, 'time')
+        reloj.start()
+        self.addCleanup(reloj.stop)
+        mensaje = 'fallo Authorization: Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ== con clave-secreta-error'
+        with mock.patch.object(modulo.requests, 'get', side_effect=requests.ConnectionError(mensaje)):
+            with self.assertRaises(Exception):
+                self.servidor._request('/api/devices')
+            with self.assertRaises(Exception):
+                self.servidor.action_test_connection()
+        guardado = self.servidor.last_error_message
+        self.assertTrue(guardado)
+        self.assertNotIn('QWxhZGRpbjpvcGVuIHNlc2FtZQ==', guardado)
+        self.assertNotIn('clave-secreta-error', guardado)
+
     def test_informes_solo_personal_de_flota(self):
         usuario = self.env['res.users'].with_context(no_reset_password=True).create({
             'name': 'Sin flota', 'login': 'sin-flota-informes',

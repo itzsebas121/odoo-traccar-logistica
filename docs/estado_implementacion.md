@@ -4,6 +4,7 @@
 
 **Actualización 2026-11-07 (Fase 1, no reescribe esta tabla):** la tarea 7 de `docs/superpowers/plans/2026-11-06-fase1-odoo-traccar.md` ya está en el código: cron de un minuto hacia `cron_sincronizar` y botón «Sincronizar ahora». La tarea 8 tiene el simulador OsmAnd (`seeds/simular.py`) y sus pruebas locales; la comprobación en vivo de eventos no se hizo. La tarea 9 tiene el escaneo estático y el E2E escrito; el E2E no se corrió contra el stack. La tarea 9 de *este* documento (monitoreo GPS: llegada por proximidad, mapa, informes) sigue pendiente. El detalle vive en el README, sección de estado.
 **Estado de la Fase 1 (Odoo ↔ Traccar):** [README, sección «Estado del proyecto»](../README.md), con el checklist y la evidencia; las decisiones y hallazgos están en [decisiones_fase1.md](decisiones_fase1.md).
+**Actualización 2026-11-08:** las tareas 8 a 13 de este plan (despacho, monitoreo GPS, portal del conductor, analítica IA, datos de demostración y verificación de extremo a extremo) están implementadas y verificadas: `scripts/verify_flujo.py` cumple los 14 criterios de §13 y las pruebas de Odoo pasan sin fallos. Las secciones «Pendiente» y «Pasos siguientes» de abajo describen el estado del 2026-11-05. Detalle en [decisiones_tareas_8_13.md](decisiones_tareas_8_13.md) y en el README.
 **Especificación:** [flujo_funcional_odoo_traccar.md](flujo_funcional_odoo_traccar.md)
 **Plan de implementación:** [superpowers/plans/2026-11-05-rastreo-analitica-rutas.md](superpowers/plans/2026-11-05-rastreo-analitica-rutas.md)
 

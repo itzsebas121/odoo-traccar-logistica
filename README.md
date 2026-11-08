@@ -4,7 +4,7 @@ Proyecto universitario integrador que combina **Odoo 16 Community**, **Traccar G
 
 ---
 
-## 🚧 Estado del proyecto y pendientes (actualizado 2026-11-07)
+## 🚧 Estado del proyecto y pendientes (actualizado 2026-11-08)
 
 Esta sección es el punto de partida para seguir implementando. Lo que aquí se lista es el estado real verificado con pruebas y revisiones; lo que no está listo se marca como pendiente.
 
@@ -31,35 +31,55 @@ Esta sección es el punto de partida para seguir implementando. Lo que aquí se 
 | Fase 1 · Tarea 10: verificación desde un entorno limpio | Hecho (2026-11-07): proyecto de compose aparte con puertos 18069/18082/15055 y volúmenes propios; `setup.ps1` termina con código 0 y `tests/` pasa 8 de 8 con reinicios. Encontró 3 defectos (administrador inicial de Traccar, variables de entorno en `setup.ps1`, carrera en el E2E de eventos), ya corregidos. `setup.sh` no recibió el ajuste de variables | Corrida completa desde cero; detalle en `docs/decisiones_fase1.md` |
 | Fase 1 · Tarea 11: documentación | Hecho (2026-11-07): comandos, variables, mapeo Odoo ↔ Traccar, checklist con evidencia y preparación para la Fase 2; textos desactualizados de `docs/decisiones_fase1.md` corregidos | Revisión contra lo ejecutado en las Tareas 8 a 10 |
 | Fase 1 · Tarea 12: cierre y evidencia | Hecho (2026-11-07): `bi` y `ml` detenidos, suites ejecutadas en el stack de desarrollo y revisión de credenciales fuera de `seeds/data/` y `.env` (sin coincidencias de secretos únicos) | Odoo 56 OK; sin Docker 17 OK; E2E 5 OK con reinicios (corrida del usuario) |
+| Plan general · Tarea 8: `logistica_despacho` (planificador, rutas con 7 estados, paradas, carga, cierre, interrupción) | Hecho y verificado (2026-11-08). El planificador parte de la bodega activa; una ruta iniciada no admite pedidos; los fallidos no cuentan como entregados | 19 pruebas de despacho |
+| Plan general · Tarea 9: `logistica_traccar` (monitoreo) | Hecho y verificado: GPS desactualizado con «última ubicación conocida», llegada por proximidad que solo registra `posible_llegada`, informes de ruta/viajes/paradas, mapa `/logistica/monitoreo` sin credenciales (solo gestores de flota) | 88 pruebas del módulo |
+| Plan general · Tarea 10: `logistica_conductor` (portal móvil) | Hecho y verificado: grupo con reglas de registro por conductor, acciones idempotentes (409 al repetir), CSRF | 13 pruebas HTTP |
+| Plan general · Tarea 11: `logistica_analitica_ia` | Hecho y verificado: asistente «Predecir destino», auditoría inmutable, métricas, ruta en mapa; no toca pedidos, entregas ni rutas | 14 pruebas |
+| Plan general · Tarea 12: datos de demostración | Hecho: el seeder publica 5 productos, alinea la bodega con la geocerca, crea un usuario por conductor y los 5 pedidos confirmados; el simulador cubre los 3 dispositivos | 19 pruebas de seeds; 2 pruebas E2E nuevas |
+| Plan general · Tarea 13: verificación de extremo a extremo | Hecho: `python scripts/verify_flujo.py` → **14/14 criterios cumplidos** (2026-11-08); `scripts/test_odoo.ps1` → **0 fallos en 146 pruebas** de Odoo | Corridas en vivo en la base de desarrollo |
+| Seguridad: «Probar Conexión» y errores | Hecho: solo un gestor de flota dispara «Probar Conexión»; los mensajes de error ya no guardan cabeceras de autorización ni el secreto | 2 pruebas nuevas |
 
 ### Qué falta
 
-**Fase 1, tareas que no se han empezado:**
+**Fase 1 y tareas 8 a 13 del plan general: hechas** (ver tabla). Lo que sigue son decisiones tuyas, límites conocidos y revisiones manuales.
 
-- **Tarea 9 — solo queda una decisión tuya.** El E2E completo (5 pruebas, con reinicios) ya pasa contra el stack vivo. `scripts/verify_integration.py` queda como excepción del escaneo hasta que se apruebe borrarlo.
-- **Tarea 12 — cierre.** Evidencia final de todas las suites y revisión de credenciales fuera de `seeds/data/` y `.env`.
+**Decisiones tuyas (seguridad):**
 
-**Pendientes de seguridad (prioridad alta, ya en `main` o en esta misma subida):**
+1. **`scripts/verify_integration.py` contiene la contraseña de admin de Traccar en código.** Lo reemplaza `scripts/verify_flujo.py`. Su borrado fue denegado por el clasificador de permisos y **requiere tu aprobación**; sigue siendo la única excepción del escaneo estático.
+2. **Credenciales expuestas en un transcript de sesión.** Se imprimieron las líneas de `TRACCAR_ADMIN_PASSWORD` e `INTEGRATION_TRACCAR_PASSWORD` en un subagente. Conviene rotar la contraseña del usuario de integración (el seeder actualiza el usuario cuando la contraseña se rechaza). La de admin es tu login: no se rota sin tu decisión.
+3. **Historial de git.** La contraseña fija de `seeds/demo_data.py` (ya borrado) sigue en el historial de commits anteriores. Rotar esa contraseña de desarrollo.
+4. **Migración de la contraseña** (`logistica_traccar`, `migrations/16.0.1.1.0`): tras la copia puede quedar texto plano en la columna vieja o en tuplas muertas. Considerar `DROP COLUMN` solo después de una copia exitosa.
 
-1. **«Probar Conexión» no tiene control de gestor** (`traccar.server.action_test_connection`). Cualquier usuario interno puede dispararlo y hacer que Odoo envíe la credencial de Traccar a la `base_url` configurada por un gestor. Corrección: llamar a `_exigir_gestor_flota()` al inicio del método.
-2. **Mensajes de error con cabeceras.** `_request` guarda `str(exc)` en `last_error_message`, que los usuarios internos pueden leer. Redactar la cabecera de autorización antes de guardar.
-3. **Migración de la contraseña.** Si hay conflicto o tras la copia, puede quedar texto plano en la columna vieja o en tuplas muertas. Considerar `DROP COLUMN` solo después de una copia exitosa.
-4. **`scripts/verify_integration.py` contiene la contraseña de admin de Traccar en código.** Su borrado fue denegado por el clasificador de permisos y **requiere tu aprobación**.
-5. **Credenciales expuestas en un transcript de sesión.** Se imprimieron las líneas de `TRACCAR_ADMIN_PASSWORD` e `INTEGRATION_TRACCAR_PASSWORD` en un subagente. **Decisión tuya:** rotar la contraseña del usuario de integración (el seeder actualiza el usuario cuando la contraseña se rechaza). La de admin es tu login: no se rota sin tu decisión.
-6. **Historial de git.** La contraseña fija de `seeds/demo_data.py` (ya borrado en esta subida) sigue en el historial de los commits anteriores. Rotar esa contraseña de desarrollo.
+**Otras decisiones tuyas:**
 
-**Pendientes de decisión tuya:**
-
-- Aprobar el borrado de `scripts/verify_integration.py`.
 - Confirmar que se quitó la restauración desde `database/snapshot/` en `setup.ps1` y `setup.sh` (ruling F1-R10: `seeds/data/` es la única fuente de datos de ejemplo). El snapshot sigue en el repositorio.
-- Validar las coordenadas, el emparejamiento conductor–vehículo y las marcas de `seeds/data/`: son ilustrativas, no reales.
+- Validar las coordenadas, el emparejamiento conductor–vehículo y las marcas de `seeds/data/`: son ilustrativas, no reales. La demostración usa coordenadas de Bogotá (geocerca, bodega logística y pedidos), mientras las zonas de `logistica_base` son aproximadas de Ambato.
+
+**Límites conocidos de las tareas 8 a 13:**
+
+- **Las pantallas no se han visto en un navegador.** Las pruebas cubren el comportamiento (ORM y HTTP) y las vistas se instalan sin errores, pero nadie ha abierto las vistas de Odoo, el portal móvil ni los mapas con ojos humanos. Ver el checklist manual más abajo.
+- La **hora de corte** (`dispatch_cutoff`) existe en la configuración, pero el planificador no la aplica todavía.
+- `logistica.entrega.route_id` sigue siendo un entero (el ruling R11 de convertirlo en Many2one se difirió); `ruta_id` es el Many2one calculado.
+- El conductor es un **usuario interno** con el grupo «Conductor de reparto» y reglas de registro, no un usuario de portal: puede abrir `/web`, pero solo ve lo suyo.
+- El mapa de monitoreo exige ser **gestor de flota**: Odoo limita a «Flota / Usuario» a los vehículos que conduce.
+- Cancelar una ruta se permite también desde «carga confirmada» (el plan solo lo pedía desde borrador y planificada).
+- Al cerrar una ruta, las entregas no entregadas pasan a «pendiente de reprogramación» (D7).
+- `scripts/setup.sh`, `scripts/test_odoo.ps1` y la rama Linux de `verify_flujo.py` no se probaron en Linux. `verify_flujo.py` **modifica la base de desarrollo** (ver su encabezado).
+- Leaflet se carga desde un CDN con SRI; empaquetarlo localmente es una mejora.
 
 **Menores diferidos (no bloquean; revisar antes de cerrar la entrega):**
 
 - Seeder: sin timeout en XML-RPC; el informe se pierde si hay error; `active_test=False` trata archivados como presentes; `traccar.server` se identifica por `base_url`; errores de JSON y de respuestas vacías producen trazas en lugar de mensajes.
 - Conector: reintento también en respuestas 4xx (debe ser solo en errores de conexión y 5xx); un dispositivo sin posición válida vuelve a pedir todo su historial en cada corrida; falta prueba de «posiciones correctas, eventos fallan»; `traccar.device.vehicle_id` es un campo inerte que hay que quitar de las vistas.
 - ETL: limpieza de roles de prueba sin guardas; helper de prueba repetido.
-- BI: selección de fecha única (corregido); SIMULADO solo marcado con un aviso.
+- BI: SIMULADO solo marcado con un aviso.
+
+**Checklist manual en el navegador** (con Odoo en `http://localhost:8069`, usuario admin):
+
+1. Logística → «Planificar despacho»: elegir vehículos y «Proponer rutas»; abrir una ruta, «Aprobar plan».
+2. Abrir `/logistica/conductor` con un conductor (usuario `carlos`, `luis` o `pedro`; clave `DEMO_CONDUCTOR_PASSWORD`): confirmar carga, iniciar, «Llegué», «Entregado» y «No entregado».
+3. Logística → «Monitoreo GPS»: ver los vehículos, la antigüedad de la señal y la ruta activa.
+4. Logística → Analítica IA → «Predecir destino» y «Métricas del modelo».
 
 ### Cómo levantar el entorno
 
