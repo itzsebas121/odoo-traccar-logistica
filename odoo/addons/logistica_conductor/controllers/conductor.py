@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 import logging
+import json
+import requests
 
 from werkzeug.exceptions import Forbidden, NotFound
 
-from odoo import _, http
+from odoo import _, fields, http
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.http import request
 
@@ -91,10 +93,81 @@ class ConductorController(http.Controller):
         siguiente = False
         if ruta.state == 'en_recorrido':
             siguiente = next((p for p in paradas if p.state == 'pendiente'), False)
+        mapa = self._mapa_payload(ruta)
         return request.render('logistica_conductor.conductor_ruta', {
             'ruta': ruta, 'paradas': paradas, 'siguiente': siguiente,
             'estados': dict(ESTADOS_RUTA), 'estados_parada': ESTADOS_PARADA,
-            'motivos': MOTIVOS_NO_ENTREGA})
+            'motivos': MOTIVOS_NO_ENTREGA, 'mapa_json': json.dumps(mapa, ensure_ascii=False)})
+
+    def _geometria_ruta(self, ruta, puntos, origen=None):
+        """Obtiene geometría vial por segmentos desde el servicio de routing."""
+        base = request.env['ir.config_parameter'].sudo().get_param(
+            'logistica.routing_url') or 'http://routing:8000'
+        coordenadas = [origen or [ruta.bodega_id.latitude, ruta.bodega_id.longitude]] + [
+            [p.latitude, p.longitude] for p in puntos if p.latitude or p.longitude]
+        geometria = []
+        for origen, destino in zip(coordenadas, coordenadas[1:]):
+            try:
+                respuesta = requests.get(base.rstrip('/') + '/route', params={
+                    'origin_lat': origen[0], 'origin_lon': origen[1],
+                    'dest_lat': destino[0], 'dest_lon': destino[1]}, timeout=8)
+                tramo = respuesta.json().get('geometry') if respuesta.status_code == 200 else []
+                if tramo:
+                    geometria.extend(tramo if not geometria else tramo[1:])
+                    continue
+            except (requests.RequestException, ValueError):
+                pass
+            geometria.extend([origen] if not geometria else [])
+            geometria.append(destino)
+        return geometria or coordenadas
+
+    def _mapa_payload(self, ruta):
+        # La ruta ya fue validada como propia; se usa sudo únicamente para leer
+        # vehículo/dispositivo y construir el mapa, sin conceder acceso general
+        # del conductor a fleet.vehicle o traccar.device.
+        ruta_mapa = ruta.sudo()
+        puntos = ruta.stop_ids.sorted('sequence')
+        recorrido = []
+        dispositivo = ruta_mapa.vehicle_id.traccar_device_id
+        if dispositivo and ruta_mapa.started_at:
+            try:
+                posiciones = dispositivo.server_id.get_route_report(
+                    dispositivo, ruta_mapa.started_at, fields.Datetime.now())
+                recorrido = [[p['latitude'], p['longitude']] for p in posiciones
+                             if p.get('latitude') is not None and p.get('longitude') is not None]
+            except UserError:
+                recorrido = []
+        gps = dispositivo._estado_gps() if dispositivo else None
+        origen_dinamico = None
+        if ruta_mapa.state == 'en_recorrido' and gps and gps.get('tiene_posicion'):
+            ultima = gps['ultima_ubicacion_conocida']
+            origen_dinamico = [ultima['latitud'], ultima['longitud']]
+        puntos_pendientes = [p for p in puntos if p.state == 'pendiente']
+        # Cuando la ruta ya no tiene pendientes, conservar la geometría completa
+        # para que el conductor pueda revisar el recorrido planificado.
+        puntos_para_ruta = puntos_pendientes or list(puntos)
+        origen_recalculo = origen_dinamico if puntos_pendientes else None
+        return {
+            'ruta': ruta.name, 'estado': ruta.state,
+            'origen': [ruta_mapa.bodega_id.latitude, ruta_mapa.bodega_id.longitude],
+            'planificada': [[ruta_mapa.bodega_id.latitude, ruta_mapa.bodega_id.longitude]] +
+                [[p.latitude, p.longitude] for p in puntos if p.latitude or p.longitude],
+            'geometria': self._geometria_ruta(ruta_mapa, puntos_para_ruta, origen_recalculo),
+            'recorrido': recorrido,
+            'posicion': dispositivo._estado_gps() if dispositivo else None,
+            'paradas': [{'orden': p.sequence, 'nombre': p.entrega_id.name,
+                         'direccion': p.destination_address or '', 'latitud': p.latitude,
+                         'longitud': p.longitude, 'estado': p.state} for p in puntos],
+        }
+
+    @http.route('/logistica/conductor/ruta/<int:route_id>/mapa-data', type='http', auth='user', csrf=False)
+    def mapa_data(self, route_id, **kwargs):
+        ruta = self._ruta_propia(route_id)
+        if not ruta:
+            raise NotFound()
+        payload = self._mapa_payload(ruta)
+        return request.make_response(json.dumps(payload, ensure_ascii=False),
+                                     headers=[('Content-Type', 'application/json')])
 
     # ------------------------------------------------------------- acciones de ruta
     def _accion_ruta(self, route_id, nombre_metodo, *args):

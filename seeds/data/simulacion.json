@@ -1,86 +1,145 @@
 {
-  "_comentario": "Cinco pedidos web de la seccion 11 y una ruta OsmAnd. Coordenadas ficticias en Bogota. La ruta de GPS-ABC-1234 sale fuera del circulo 'Bodega central' (radio 300 m) y el segundo punto cae en el centro, a 40 nudos: por encima del speedLimit provisional de 30. Verificado en vivo: speedLimit va en nudos. Las rutas de los otros dos dispositivos quedan fuera del circulo 'Bodega central' y por debajo del speedLimit: dejan posiciones para los tres vehiculos sin generar eventos.",
+  "_comentario": "Rutas de demostracion desde la UTA hacia los sectores de regreso. Los pedidos son destinos de clientes; el planificador los asigna a los vehiculos disponibles.",
   "pedidos": [
     {
-      "ref": "PED-001",
-      "cliente": "Cliente web 1",
-      "latitud": 4.6533,
-      "longitud": -74.0836
+      "ref": "UTA-PED-001",
+      "cliente": "Cliente La Manzana de Oro",
+      "latitud": -1.2415,
+      "longitud": -78.6355
     },
     {
-      "ref": "PED-002",
-      "cliente": "Cliente web 2",
-      "latitud": 4.678,
-      "longitud": -74.058
+      "ref": "UTA-PED-002",
+      "cliente": "Cliente Alobamba",
+      "latitud": -1.326,
+      "longitud": -78.635
     },
     {
-      "ref": "PED-003",
-      "cliente": "Cliente web 3",
-      "latitud": 4.61,
-      "longitud": -74.125
+      "ref": "UTA-PED-003",
+      "cliente": "Cliente Mocha",
+      "latitud": -1.452,
+      "longitud": -78.67
     },
     {
-      "ref": "PED-004",
-      "cliente": "Cliente web 4",
-      "latitud": 4.591,
-      "longitud": -74.095
+      "ref": "UTA-PED-004",
+      "cliente": "Cliente Viñas",
+      "latitud": -1.268,
+      "longitud": -78.615
     },
     {
-      "ref": "PED-005",
-      "cliente": "Cliente web 5",
-      "latitud": 4.705,
-      "longitud": -74.045
+      "ref": "UTA-PED-005",
+      "cliente": "Cliente Píllaro",
+      "latitud": -1.168,
+      "longitud": -78.545
+    },
+    {
+      "ref": "UTA-PED-006",
+      "cliente": "Cliente Picaihua",
+      "latitud": -1.27,
+      "longitud": -78.59
+    },
+    {
+      "ref": "UTA-PED-007",
+      "cliente": "Cliente Huachi Grande",
+      "latitud": -1.3,
+      "longitud": -78.64
+    },
+    {
+      "ref": "UTA-PED-008",
+      "cliente": "Cliente Cevallos",
+      "latitud": -1.35,
+      "longitud": -78.615
     }
   ],
   "rutas": [
     {
-      "uniqueId": "GPS-ABC-1234",
+      "uniqueId": "GPS-UTA-0001",
       "puntos": [
         {
-          "lat": 4.6197,
-          "lon": -74.0817,
+          "lat": -1.26,
+          "lon": -78.65,
           "speed": 10,
           "timestamp": 1762473600
         },
         {
-          "lat": 4.6097,
-          "lon": -74.0817,
+          "lat": -1.2491,
+          "lon": -78.6267,
           "speed": 40,
-          "timestamp": 1762473660
+          "timestamp": 1762473900
+        },
+        {
+          "lat": -1.2415,
+          "lon": -78.6355,
+          "speed": 15,
+          "timestamp": 1762474200
         }
       ]
     },
     {
-      "uniqueId": "GPS-DEF-5678",
+      "uniqueId": "GPS-UTA-0002",
       "puntos": [
         {
-          "lat": 4.615,
-          "lon": -74.085,
+          "lat": -1.2491,
+          "lon": -78.6267,
           "speed": 12,
           "timestamp": 1762473600
         },
         {
-          "lat": 4.616,
-          "lon": -74.086,
-          "speed": 15,
-          "timestamp": 1762473660
+          "lat": -1.268,
+          "lon": -78.615,
+          "speed": 12,
+          "timestamp": 1762473900
+        },
+        {
+          "lat": -1.3,
+          "lon": -78.64,
+          "speed": 12,
+          "timestamp": 1762474200
         }
       ]
     },
     {
-      "uniqueId": "GPS-GHI-9012",
+      "uniqueId": "GPS-UTA-0003",
       "puntos": [
         {
-          "lat": 4.6,
-          "lon": -74.075,
-          "speed": 8,
+          "lat": -1.2491,
+          "lon": -78.6267,
+          "speed": 14,
           "timestamp": 1762473600
         },
         {
-          "lat": 4.599,
-          "lon": -74.0745,
-          "speed": 10,
-          "timestamp": 1762473660
+          "lat": -1.326,
+          "lon": -78.635,
+          "speed": 14,
+          "timestamp": 1762473900
+        },
+        {
+          "lat": -1.452,
+          "lon": -78.67,
+          "speed": 14,
+          "timestamp": 1762474200
+        }
+      ]
+    },
+    {
+      "uniqueId": "GPS-UTA-0004",
+      "puntos": [
+        {
+          "lat": -1.2491,
+          "lon": -78.6267,
+          "speed": 16,
+          "timestamp": 1762473600
+        },
+        {
+          "lat": -1.35,
+          "lon": -78.615,
+          "speed": 16,
+          "timestamp": 1762473900
+        },
+        {
+          "lat": -1.168,
+          "lon": -78.545,
+          "speed": 16,
+          "timestamp": 1762474200
         }
       ]
     }

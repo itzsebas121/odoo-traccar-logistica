@@ -9,7 +9,9 @@ from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
 
-TIMEOUT_S = 15
+# El optimizador admite hasta 30 s de cálculo; el cliente necesita margen para
+# serialización y red antes de declarar el servicio caído.
+TIMEOUT_S = 45
 PARAM_URL = 'logistica.routing_url'
 
 

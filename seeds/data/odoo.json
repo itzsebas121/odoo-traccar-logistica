@@ -1,53 +1,63 @@
 {
-  "_comentario": "Datos maestros de Odoo de la Fase 1 (datos ficticios de docs/flujo_funcional_odoo_traccar.md, seccion 11). Las claves con nombre de campo de Odoo (name, is_company, function, license_plate) se pasan tal cual al modelo; las claves que empiezan por _ son documentacion. Marca y modelo son los del antiguo seeds/demo_data.py, porque la especificacion no los fija. La asignacion conductor-vehiculo es ilustrativa (1 a 1): la especificacion solo nombra conductores y vehiculos. Fase 2 de la demo: 'bodega_logistica' alinea la bodega activa de Odoo con la geocerca de Traccar; 'productos' son los cinco articulos publicados en la tienda; 'usuarios_conductor' crea un usuario por conductor (la contrasena sale de DEMO_CONDUCTOR_PASSWORD en .env, nunca de este archivo).",
+  "_comentario": "Escenario realista de reparto universitario: la sede es la UTA en Ambato y los pedidos representan entregas que aparecen en el regreso a casa del equipo. El planificador decide la asignacion final segun distancia, capacidad y vehiculos disponibles.",
   "traccar_server": {
     "name": "Servidor Traccar local"
   },
   "bodega": {
-    "name": "Bodega central",
+    "name": "Sede UTA",
     "is_company": true
   },
   "marca": "Hino",
   "modelo": "Dutro 300",
   "conductores": [
     {
-      "name": "Carlos",
+      "name": "Sebastian Tipan",
       "is_company": false,
       "function": "Conductor"
     },
     {
-      "name": "Luis",
+      "name": "Angelica Martinez",
       "is_company": false,
       "function": "Conductor"
     },
     {
-      "name": "Pedro",
+      "name": "Bryan Viteri",
+      "is_company": false,
+      "function": "Conductor"
+    },
+    {
+      "name": "Daniel Moyolema",
       "is_company": false,
       "function": "Conductor"
     }
   ],
   "vehiculos": [
     {
-      "license_plate": "ABC-1234",
-      "conductor": "Carlos",
-      "uniqueId": "GPS-ABC-1234"
+      "license_plate": "UTA-0001",
+      "conductor": "Sebastian Tipan",
+      "uniqueId": "GPS-UTA-0001"
     },
     {
-      "license_plate": "DEF-5678",
-      "conductor": "Luis",
-      "uniqueId": "GPS-DEF-5678"
+      "license_plate": "UTA-0002",
+      "conductor": "Angelica Martinez",
+      "uniqueId": "GPS-UTA-0002"
     },
     {
-      "license_plate": "GHI-9012",
-      "conductor": "Pedro",
-      "uniqueId": "GPS-GHI-9012"
+      "license_plate": "UTA-0003",
+      "conductor": "Bryan Viteri",
+      "uniqueId": "GPS-UTA-0003"
+    },
+    {
+      "license_plate": "UTA-0004",
+      "conductor": "Daniel Moyolema",
+      "uniqueId": "GPS-UTA-0004"
     }
   ],
   "bodega_logistica": {
-    "name": "Bodega central",
-    "address": "Bodega de la demostracion (ilustrativa)",
-    "latitude": 4.6097,
-    "longitude": -74.0817
+    "name": "Sede UTA",
+    "address": "Universidad Técnica de Ambato, Ambato",
+    "latitude": -1.2491,
+    "longitude": -78.6267
   },
   "productos": [
     {
@@ -88,16 +98,24 @@
   ],
   "usuarios_conductor": [
     {
-      "login": "carlos",
-      "conductor": "Carlos"
+      "login": "sebastipan109@gmail.com",
+      "conductor": "Sebastian Tipan",
+      "password_env": "SEBASTIAN_PASSWORD"
     },
     {
-      "login": "luis",
-      "conductor": "Luis"
+      "login": "angelica.martinez@uta.local",
+      "conductor": "Angelica Martinez",
+      "password_env": "ANGELICA_PASSWORD"
     },
     {
-      "login": "pedro",
-      "conductor": "Pedro"
+      "login": "bryan.viteri@uta.local",
+      "conductor": "Bryan Viteri",
+      "password_env": "BRYAN_PASSWORD"
+    },
+    {
+      "login": "daniel.moyolema@uta.local",
+      "conductor": "Daniel Moyolema",
+      "password_env": "DANIEL_PASSWORD"
     }
   ]
 }

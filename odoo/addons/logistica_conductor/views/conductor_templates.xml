@@ -7,24 +7,54 @@
                 <meta name="viewport" content="width=device-width, initial-scale=1"/>
                 <meta name="csrf-token" t-att-content="request.csrf_token()"/>
                 <style>
-                    body { margin: 0; font-family: sans-serif; background: #f3f4f6; color: #111827; }
-                    .c-barra { background: #714b67; color: #fff; padding: 12px 16px; display: flex; justify-content: space-between; }
+                    * { box-sizing: border-box; }
+                    body { margin: 0; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f7f7f8; color: #16151a; }
+                    .c-barra { background:#fff; color:#202033; padding:16px 18px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:1100; border-bottom:1px solid #ecebf4; }
+                    .c-marca { display:flex; align-items:center; gap:14px; } .c-logo { font-size:1.8rem; font-weight:800; letter-spacing:-.08em; color:#714b67; } .c-app { font-weight:600; color:#25243b; }
+                    .c-avatar { width:38px; height:38px; border-radius:50%; background:#4e5d88; color:#fff; display:grid; place-items:center; font-weight:800; }
                     .c-barra a { color: #fff; text-decoration: none; }
-                    .c-cuerpo { padding: 12px; max-width: 640px; margin: 0 auto; }
+                    .c-cuerpo { padding: 16px 16px 156px; max-width: 720px; margin: 0 auto; }
+                    .c-hero h2 { margin: 4px 0; font-size:1.65rem; } .c-hero p { margin:4px 0 16px; color:#6b6570; }
+                    .c-progreso { background:#fff; border-radius:16px; padding:16px; box-shadow:0 2px 10px rgba(30,20,40,.08); margin-bottom:14px; }
+                    .c-progreso-head { display:flex; justify-content:space-between; gap:12px; font-weight:700; }
+                    .c-barra-progreso { height:8px; background:#ece9ee; border-radius:99px; overflow:hidden; margin-top:12px; }
+                    .c-barra-progreso span { display:block; height:100%; background:#714b67; border-radius:99px; }
                     .c-tarjeta { display: block; background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 10px; color: inherit; text-decoration: none; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
-                    .c-estado { display: inline-block; background: #e5e7eb; border-radius: 12px; padding: 2px 10px; font-size: .85em; }
+                    .c-estado { display:inline-block; background:#d8f7e8; color:#087443; border-radius:999px; padding:7px 13px; font-size:.86em; font-weight:800; }
                     .c-siguiente { border: 3px solid #2563eb; }
                     .c-etiqueta { color: #2563eb; font-weight: bold; }
                     .c-boton, button { display: block; width: 100%; box-sizing: border-box; padding: 16px; margin: 6px 0; border: 0; border-radius: 10px; font-size: 1.1em; color: #fff; background: #714b67; text-align: center; text-decoration: none; }
-                    .c-ok { background: #047857; } .c-mal { background: #b91c1c; } .c-gris { background: #4b5563; }
+                    .c-ok { background:#0b9b58; } .c-mal { background:#fff; color:#c5222d; border:2px solid #e0444d; } .c-gris { background:#714b67; }
                     select, textarea, input[type=text] { width: 100%; box-sizing: border-box; padding: 12px; font-size: 1em; margin: 4px 0; }
                     .c-error { background: #fee2e2; border: 1px solid #b91c1c; border-radius: 10px; padding: 14px; }
                     .c-hecha { opacity: .65; }
+                    #c-mapa-wrap { position: relative; margin: 12px 0 10px; overflow:hidden; border-radius:16px; box-shadow:0 2px 10px rgba(30,20,40,.12); }
+                    #c-mapa { height: min(66vh, 620px); min-height: 360px; border-radius: 0; }
+                    .c-flotantes { position:absolute; z-index:1000; left:12px; right:12px; bottom:14px; display:flex; gap:8px; overflow-x:auto; padding:4px; }
+                    .c-flotantes button { flex:0 0 auto; width:auto; margin:0; padding:10px 12px; font-size:.9em; background:#fff; color:#111827; box-shadow:0 2px 8px rgba(0,0,0,.25); }
+                    .c-flotantes button.c-activa { background:#2563eb; color:#fff; }
+                    .c-acciones { position:absolute; z-index:1000; top:14px; right:14px; left:14px; display:flex; gap:8px; }
+                    .c-acciones form { flex:1; }
+                    .c-acciones button { margin:0; padding:12px 8px; font-size:.95em; box-shadow:0 2px 8px rgba(0,0,0,.22); }
+                    .c-siguiente-card { border:2px solid #714b67; }
+                    .c-siguiente-titulo { color:#714b67; font-weight:800; margin-bottom:8px; }
+                    .c-siguiente-head { background:#ebe8fe; margin:-16px -16px 14px; padding:14px 16px; border-radius:14px 14px 0 0; display:flex; justify-content:space-between; color:#68438f; font-weight:800; }
+                    .c-llegada { background:#d1f5e4; color:#087443; border-radius:16px; padding:16px; margin:12px 0; display:flex; gap:12px; align-items:center; }
+                    .c-llegada strong { display:block; font-size:1.1rem; color:#111827; }
+                    .c-cliente { border:1px solid #d8d0ef; border-radius:16px; padding:16px; background:#fff; }
+                    .c-seccion { font-size:1.15rem; margin:18px 0 8px; }
+                    .c-vacio { background:#fff; border:1px solid #e6e8f2; border-radius:14px; padding:16px; color:#53607a; }
+                    .c-boton-violeta { background:#774fb0; }
+                    .c-boton-outline { background:#fff; color:#68438f; border:1px solid #774fb0; }
+                    .c-bottom { position:fixed; bottom:0; left:0; right:0; z-index:1100; background:#fff; border-top:1px solid #e5e1e7; display:flex; justify-content:space-around; padding:8px 10px calc(8px + env(safe-area-inset-bottom)); }
+                    .c-bottom a { color:#6b6570; text-decoration:none; font-size:.78rem; text-align:center; padding:5px 8px; }
+                    .c-bottom a:first-child { color:#714b67; font-weight:800; }
+                    @media (max-width: 520px) { .c-cuerpo { padding:0 12px 156px; } #c-mapa { height:68vh; min-height:420px; } }
                 </style>
             </t>
             <div class="c-barra">
-                <a href="/logistica/conductor"><strong>Mis rutas</strong></a>
-                <a href="/web/session/logout?redirect=/web/login">Salir</a>
+                <div class="c-marca"><span class="c-logo">odoo</span><span class="c-app">Logística · Conductor</span></div>
+                <div class="c-marca"><span class="c-avatar"><t t-esc="request.env.user.name[:2].upper()"/></span><a href="/web/session/logout?redirect=/web/login" style="color:#714b67">Salir</a></div>
             </div>
             <div class="c-cuerpo"><t t-out="0"/></div>
         </t>
@@ -47,13 +77,81 @@
 
     <template id="conductor_ruta" name="Conductor: detalle de ruta">
         <t t-call="logistica_conductor.conductor_layout">
-            <h2><span t-esc="ruta.name"/> <span class="c-estado" t-esc="estados[ruta.state]"/></h2>
-            <p>
+            <div class="c-hero"><h2>Mi recorrido <span class="c-estado" t-esc="estados[ruta.state]"/></h2><p>Gestiona tus entregas del día</p></div>
+            <div class="c-progreso">
+                <div class="c-progreso-head"><span t-esc="ruta.name"/><span><t t-esc="ruta.delivered_stops"/>/<t t-esc="ruta.total_stops"/> entregas</span></div>
+                <div>Vehículo <strong t-esc="ruta.vehicle_plate"/></div>
+                <div class="c-barra-progreso"><span t-attf-style="width: {{ruta.progress}}%;"/></div>
+            </div>
+            <p class="c-resumen">
                 Vehículo <strong t-esc="ruta.vehicle_plate"/> ·
                 <span t-esc="ruta.delivered_stops"/> entregada(s),
                 <span t-esc="ruta.failed_stops"/> no entregada(s),
                 <span t-esc="ruta.pending_stops"/> pendiente(s)
             </p>
+            <div id="c-mapa-wrap">
+                <div id="c-mapa"></div>
+                <div id="c-acciones-mapa" class="c-acciones"></div>
+                <div id="c-paradas-flotantes" class="c-flotantes"></div>
+            </div>
+            <p id="c-mapa-estado" class="c-estado">Cargando mapa…</p>
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+                  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+                    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+            <script type="text/javascript">
+                (function () {
+                    var mapa = L.map('c-mapa').setView([-1.2491, -78.6267], 12);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19, attribution: '&amp;copy; OpenStreetMap'
+                    }).addTo(mapa);
+                    var capas = L.layerGroup().addTo(mapa);
+                    function dibujar(d) {
+                                capas.clearLayers(); var puntos = [];
+                                L.polyline(d.geometria || d.planificada, {color:'#7c3aed', dashArray:'8 6', weight:4})
+                                    .bindTooltip('Ruta planificada').addTo(capas);
+                                d.planificada.forEach(function (p) { puntos.push(p); });
+                                (d.geometria || []).forEach(function (p) { puntos.push(p); });
+                                L.marker(d.origen).bindTooltip('Sede').addTo(capas);
+                                d.paradas.forEach(function (p) {
+                                    var color = p.estado === 'entregado' ? '#047857' :
+                                        (p.estado === 'no_entregado' ? '#b91c1c' : '#6b7280');
+                                    L.circleMarker([p.latitud,p.longitud], {radius:7,color:color,fillColor:color,fillOpacity:.8})
+                                        .bindPopup(p.orden + '. ' + p.nombre + '<br/>' + p.direccion).addTo(capas);
+                                });
+                                var flotantes = document.getElementById('c-paradas-flotantes');
+                                flotantes.innerHTML = '';
+                                d.paradas.forEach(function (p) {
+                                    var b = document.createElement('button');
+                                    b.type = 'button'; b.textContent = p.orden + '. ' + p.nombre;
+                                    if (p.estado === 'pendiente') b.className = 'c-activa';
+                                    b.onclick = function () { mapa.setView([p.latitud,p.longitud], 15); };
+                                    flotantes.appendChild(b);
+                                });
+                                if (d.recorrido.length > 1) {
+                                    L.polyline(d.recorrido, {color:'#2563eb', weight:5})
+                                        .bindTooltip('Recorrido GPS real').addTo(capas);
+                                    d.recorrido.forEach(function (p) { puntos.push(p); });
+                                }
+                                if (d.posicion &amp;&amp; d.posicion.tiene_posicion) {
+                                    var u=d.posicion.ultima_ubicacion_conocida;
+                                    L.circleMarker([u.latitud,u.longitud], {radius:9,color:'#111827',fillColor:'#06b6d4',fillOpacity:.9})
+                                        .bindPopup('Posición actual<br/>Velocidad: '+u.velocidad_kmh+' km/h').addTo(capas);
+                                    puntos.push([u.latitud,u.longitud]);
+                                }
+                                if (puntos.length) mapa.fitBounds(puntos, {padding:[20,20], maxZoom:12});
+                                document.getElementById('c-mapa-estado').textContent =
+                                    'Línea morada: ruta planificada · línea azul: recorrido GPS real';
+                    }
+                    function cargar() {
+                        fetch('/logistica/conductor/ruta/<t t-esc="ruta.id"/>/mapa-data', {credentials: 'same-origin'})
+                            .then(function (r) { if (!r.ok) { throw new Error('HTTP '+r.status); } return r.json(); })
+                            .then(dibujar)
+                            .catch(function () { document.getElementById('c-mapa-estado').textContent='Ruta planificada cargada; GPS pendiente de actualización.'; });
+                    }
+                    cargar(); setInterval(cargar, 30000);
+                }());
+            </script>
 
             <t t-if="ruta.state == 'planificada'">
                 <form method="post" t-attf-action="/logistica/conductor/ruta/{{ruta.id}}/confirmar-carga">
@@ -82,7 +180,31 @@
                 </details>
             </t>
 
-            <h3>Paradas</h3>
+            <h3>Próxima parada</h3>
+            <t t-if="siguiente">
+                <div class="c-tarjeta c-siguiente-card">
+                    <div class="c-siguiente-head"><span>◉  Siguiente parada</span><span><t t-esc="siguiente.sequence"/> de <t t-esc="ruta.total_stops"/></span></div>
+                    <strong t-esc="siguiente.entrega_id.recipient_name"/>
+                    <div t-esc="siguiente.entrega_id.destination_address"/>
+                    <div t-if="siguiente.entrega_id.phone">Tel. <t t-esc="siguiente.entrega_id.phone"/></div>
+                </div>
+                <t t-if="not siguiente.actual_arrival_at and ruta.state == 'en_recorrido'">
+                    <a class="c-boton c-boton-violeta" target="_blank"
+                       t-attf-href="https://www.google.com/maps/dir/?api=1&amp;destination={{siguiente.latitude}},{{siguiente.longitude}}">➤   Navegar al destino</a>
+                    <form method="post" t-attf-action="/logistica/conductor/parada/{{siguiente.id}}/llegada">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                        <button type="submit" class="c-boton-outline">⌖   He llegado</button>
+                    </form>
+                </t>
+                <t t-if="siguiente.actual_arrival_at and ruta.state == 'en_recorrido'">
+                    <div class="c-llegada"><span style="font-size:1.8rem">✓</span><div><strong>Llegaste al destino</strong><span>Estás en la parada <t t-esc="siguiente.sequence"/> de <t t-esc="ruta.total_stops"/></span></div></div>
+                    <div class="c-cliente"><strong t-esc="siguiente.entrega_id.recipient_name"/><div t-esc="siguiente.entrega_id.destination_address"/><div t-if="siguiente.entrega_id.phone">☎  <t t-esc="siguiente.entrega_id.phone"/></div></div>
+                    <h3 class="c-seccion">Registrar entrega</h3>
+                    <form method="post" t-attf-action="/logistica/conductor/parada/{{siguiente.id}}/entregado"><input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/><button type="submit" class="c-ok">✓   Entregado</button></form>
+                    <details><summary class="c-boton c-mal">✕   No entregado</summary><form method="post" t-attf-action="/logistica/conductor/parada/{{siguiente.id}}/no-entregado"><input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/><select name="motivo" required="required"><option value="">Motivo…</option><option t-foreach="motivos" t-as="m" t-att-value="m[0]" t-esc="m[1]"/></select><textarea name="notas" rows="2" placeholder="Observaciones (opcional)"></textarea><button type="submit" class="c-mal">Registrar no entregado</button></form></details>
+                </t>
+            </t>
+            <h3>Detalle de la ruta</h3>
             <div t-foreach="paradas" t-as="p"
                  t-attf-class="c-tarjeta #{'c-siguiente' if siguiente and p.id == siguiente.id else ''} #{'c-hecha' if p.state != 'pendiente' else ''}">
                 <div t-if="siguiente and p.id == siguiente.id" class="c-etiqueta">Siguiente parada</div>
@@ -94,7 +216,7 @@
                 <div t-if="p.entrega_id.delivery_reference" t-esc="p.entrega_id.delivery_reference"/>
                 <div t-if="p.failed_reason">Motivo: <span t-esc="p.failed_reason"/></div>
 
-                <t t-if="ruta.state == 'en_recorrido' and p.state == 'pendiente'">
+                <t t-if="ruta.state == 'en_recorrido' and p.state == 'pendiente' and (not siguiente or p.id != siguiente.id)">
                     <a class="c-boton c-gris" target="_blank"
                        t-attf-href="https://www.google.com/maps/dir/?api=1&amp;destination={{p.latitude}},{{p.longitude}}">Navegar</a>
                     <form t-if="not p.actual_arrival_at" method="post"
@@ -120,6 +242,12 @@
                     </details>
                 </t>
             </div>
+            <nav class="c-bottom" aria-label="Navegación del conductor">
+                <a href="/logistica/conductor">⌂<br/>Mi ruta</a>
+                <a href="#c-mapa-wrap">⌖<br/>Mapa</a>
+                <a href="#c-paradas-flotantes">☷<br/>Entregas</a>
+                <a href="/web">⚙<br/>Configuración</a>
+            </nav>
         </t>
     </template>
 

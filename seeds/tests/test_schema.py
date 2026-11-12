@@ -12,15 +12,15 @@ class EsquemaSeedsTest(unittest.TestCase):
 
     def test_json_validos_pasan_con_los_datos_de_la_seccion_11(self):
         schema.validar_todo(self.odoo, self.traccar, self.simulacion)
-        self.assertEqual(['ABC-1234', 'DEF-5678', 'GHI-9012'],
+        self.assertEqual(['UTA-0001', 'UTA-0002', 'UTA-0003', 'UTA-0004'],
                          [v['license_plate'] for v in self.odoo['vehiculos']])
-        self.assertEqual(['Carlos', 'Luis', 'Pedro'],
+        self.assertEqual(['Sebastian Tipan', 'Angelica Martinez', 'Bryan Viteri', 'Daniel Moyolema'],
                          [c['name'] for c in self.odoo['conductores']])
-        self.assertEqual(3, len(self.traccar['dispositivos']))
-        self.assertEqual(5, len(self.simulacion['pedidos']))
+        self.assertEqual(4, len(self.traccar['dispositivos']))
+        self.assertEqual(8, len(self.simulacion['pedidos']))
         self.assertEqual(5, len(self.odoo['productos']))
-        self.assertEqual(3, len(self.odoo['usuarios_conductor']))
-        self.assertEqual(3, len(self.simulacion['rutas']))
+        self.assertEqual(4, len(self.odoo['usuarios_conductor']))
+        self.assertEqual(4, len(self.simulacion['rutas']))
 
     def test_dispositivo_sin_uniqueId_falla_nombrando_el_campo(self):
         traccar = copy.deepcopy(self.traccar)

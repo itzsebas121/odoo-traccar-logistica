@@ -1,7 +1,10 @@
 {
-  "_comentario": "Datos de Traccar de la Fase 1, con las claves de su API REST (name, uniqueId, attributes, area). Cada dispositivo lista en 'geocercas' las geocercas a las que se le concede permiso (par dispositivo-geocerca). Coordenadas ficticias (ilustrativas). attributes.speedLimit va en NUDOS (verificado en vivo en la Tarea 8).",
+  "_comentario": "Dispositivos GPS del equipo que salen desde la sede UTA. La geocerca de la sede sirve para detectar salida y regreso.",
   "geocercas": [
-    {"name": "Bodega central", "area": "CIRCLE (4.6097 -74.0817, 300)"}
+    {
+      "name": "Sede UTA",
+      "area": "CIRCLE (-1.2491 -78.6267, 300)"
+    }
   ],
   "usuarios": [
     {
@@ -13,24 +16,47 @@
   ],
   "dispositivos": [
     {
-      "uniqueId": "GPS-ABC-1234",
-      "name": "ABC-1234",
-      "attributes": {"speedLimit": 30},
-      "geocercas": ["Bodega central"],
+      "uniqueId": "GPS-UTA-0001",
+      "name": "UTA-0001",
+      "attributes": {
+        "speedLimit": 30
+      },
+      "geocercas": [
+        "Sede UTA"
+      ],
       "_nota": "speedLimit en nudos"
     },
     {
-      "uniqueId": "GPS-DEF-5678",
-      "name": "DEF-5678",
-      "attributes": {"speedLimit": 30},
-      "geocercas": ["Bodega central"],
+      "uniqueId": "GPS-UTA-0002",
+      "name": "UTA-0002",
+      "attributes": {
+        "speedLimit": 30
+      },
+      "geocercas": [
+        "Sede UTA"
+      ],
       "_nota": "speedLimit en nudos"
     },
     {
-      "uniqueId": "GPS-GHI-9012",
-      "name": "GHI-9012",
-      "attributes": {"speedLimit": 30},
-      "geocercas": ["Bodega central"],
+      "uniqueId": "GPS-UTA-0003",
+      "name": "UTA-0003",
+      "attributes": {
+        "speedLimit": 30
+      },
+      "geocercas": [
+        "Sede UTA"
+      ],
+      "_nota": "speedLimit en nudos"
+    },
+    {
+      "uniqueId": "GPS-UTA-0004",
+      "name": "UTA-0004",
+      "attributes": {
+        "speedLimit": 30
+      },
+      "geocercas": [
+        "Sede UTA"
+      ],
       "_nota": "speedLimit en nudos"
     }
   ]

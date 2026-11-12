@@ -25,7 +25,8 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "127.0.0.1:8069:8069"
+      # Acceso desde otros dispositivos de la red local (por ejemplo, el celular).
+      - "8069:8069"
     environment:
       HOST: db
       PORT: "5432"
@@ -49,7 +50,7 @@ services:
         condition: service_healthy
     entrypoint: ["/bin/sh", "/entrypoint-custom.sh"]
     ports:
-      - "127.0.0.1:8082:8082"
+      - "8082:8082"
       - "5055:5055"
     environment:
       TRACCAR_DB_HOST: db
@@ -72,10 +73,9 @@ services:
 
   routing:
     build: ./services/routing
-    profiles: ["analitica"]
     restart: unless-stopped
     environment:
-      ROUTING_OSRM_URL: ${ROUTING_OSRM_URL:-}
+      ROUTING_OSRM_URL: ${ROUTING_OSRM_URL:-https://router.project-osrm.org}
       ROUTING_TIME_LIMIT_S: ${ROUTING_TIME_LIMIT_S:-5}
     ports:
       - "127.0.0.1:8001:8000"

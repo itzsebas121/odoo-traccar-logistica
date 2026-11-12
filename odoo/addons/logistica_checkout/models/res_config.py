@@ -9,10 +9,12 @@ class LogisticaConfiguracion(models.Model):
 
     # Rectángulo de cobertura (aproximado: Ambato). Si min >= max en algún eje,
     # la cobertura se considera no definida y solo se valida el rango.
-    coverage_lat_min = fields.Float(string='Latitud mínima de cobertura', digits=(10, 7), default=-1.35)
-    coverage_lat_max = fields.Float(string='Latitud máxima de cobertura', digits=(10, 7), default=-1.15)
-    coverage_lon_min = fields.Float(string='Longitud mínima de cobertura', digits=(10, 7), default=-78.70)
-    coverage_lon_max = fields.Float(string='Longitud máxima de cobertura', digits=(10, 7), default=-78.52)
+    # Cobertura de demostración: UTA y corredores hacia Ambato, Mocha,
+    # Píllaro, Cevallos y sectores cercanos.
+    coverage_lat_min = fields.Float(string='Latitud mínima de cobertura', digits=(10, 7), default=-1.50)
+    coverage_lat_max = fields.Float(string='Latitud máxima de cobertura', digits=(10, 7), default=-1.10)
+    coverage_lon_min = fields.Float(string='Longitud mínima de cobertura', digits=(10, 7), default=-78.75)
+    coverage_lon_max = fields.Float(string='Longitud máxima de cobertura', digits=(10, 7), default=-78.50)
     checkout_auto_confirm = fields.Boolean(
         string='Confirmar pedidos web al completar el pago de prueba', default=True,
         help='D5: con el método de pago de prueba (payment_custom) el pedido se confirma '

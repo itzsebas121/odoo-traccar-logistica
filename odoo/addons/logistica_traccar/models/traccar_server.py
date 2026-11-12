@@ -310,6 +310,7 @@ class TraccarServer(models.Model):
     def _guardar_posiciones(self, dispositivo, vehiculo, datos):
         """Inserta las posiciones nuevas. Descarta ids no positivos, fechas inválidas y coordenadas no válidas."""
         Posicion = self.env['logistica.traccar.posicion'].sudo()
+        Ruta = self.env['logistica.ruta'].sudo()
         validas = {}
         descartadas = 0
         maxima_fix = None
@@ -326,6 +327,8 @@ class TraccarServer(models.Model):
             validas[id_traccar] = {
                 'device_id': dispositivo.id,
                 'vehicle_id': vehiculo.id,
+                'route_id': Ruta.search([('vehicle_id', '=', vehiculo.id),
+                                         ('state', '=', 'en_recorrido')], limit=1).id or False,
                 'traccar_position_id': id_traccar,
                 'fix_time': fix,
                 'latitude': lat,

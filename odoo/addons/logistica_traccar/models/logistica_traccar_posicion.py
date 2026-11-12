@@ -13,6 +13,8 @@ class LogisticaTraccarPosicion(models.Model):
         index=True,
     )
     vehicle_id = fields.Many2one('fleet.vehicle', string='Vehículo')
+    route_id = fields.Many2one('logistica.ruta', string='Ruta activa', index=True,
+                               ondelete='set null', help='Ruta en recorrido al recibir el fix.')
     traccar_position_id = fields.Integer(string='ID Posición Traccar', required=True)
     fix_time = fields.Datetime(string='Fecha/Hora del Fix (UTC)', required=True, index=True)
     latitude = fields.Float(string='Latitud', digits=(10, 7))
