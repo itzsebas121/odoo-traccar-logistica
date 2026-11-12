@@ -32,7 +32,9 @@ services:
     volumes:
       - ./odoo/addons:/mnt/extra-addons
     command: >-
-      odoo -d ${ODOO_DB:-logistica_dev}
+      odoo --db_host=db --db_port=5432 --db_user=odoo
+      --db_password=${ODOO_DB_PASSWORD}
+      -d ${ODOO_DB:-logistica_dev}
       -i contacts,fleet,sale_management,website,website_sale,payment_custom,
       logistica_base,logistica_despacho,logistica_traccar,logistica_entregas,
       logistica_checkout,logistica_conductor,logistica_analitica_ia
