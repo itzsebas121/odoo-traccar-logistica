@@ -345,10 +345,12 @@ def _sembrar_usuarios_conductor(odoo, entorno, informe, usuarios, ids_conductor)
             clave_usuario = entorno.get(usuario.get('password_env', ''), entorno['DEMO_CONDUCTOR_PASSWORD'])
             odoo.ejecutar('res.users', 'create', [{
                 'login': usuario['login'], 'partner_id': partner,
-                'password': clave_usuario, 'groups_id': [(4, id_grupo)]}])
+                'password': clave_usuario, 'lang': 'es_EC',
+                'groups_id': [(4, id_grupo)]}])
             informe.creados.append(etiqueta)
             continue
         grupos = odoo.ejecutar('res.users', 'read', [[existentes[0]], ['groups_id']])[0]['groups_id']
+        odoo.ejecutar('res.users', 'write', [[existentes[0]], {'lang': 'es_EC'}])
         if id_grupo in grupos:
             informe.omitidos.append(etiqueta)
         else:
