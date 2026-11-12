@@ -18,10 +18,32 @@ services:
       timeout: 5s
       retries: 5
 
+  odoo-init:
+    image: odoo:16.0
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HOST: db
+      PORT: "5432"
+      USER: odoo
+      PASSWORD: ${ODOO_DB_PASSWORD:?Configura ODOO_DB_PASSWORD}
+    volumes:
+      - ./odoo/addons:/mnt/extra-addons
+    command: >-
+      odoo -d ${ODOO_DB:-logistica_dev}
+      -i contacts,fleet,sale_management,website,website_sale,payment_custom,
+      logistica_base,logistica_despacho,logistica_traccar,logistica_entregas,
+      logistica_checkout,logistica_conductor,logistica_analitica_ia
+      --without-demo=all --stop-after-init
+
   odoo:
     image: odoo:16.0
     restart: unless-stopped
     depends_on:
+      odoo-init:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
     ports:
@@ -119,7 +141,7 @@ services:
       # Compose evalua las variables de TODOS los servicios, aunque su perfil este inactivo, y un ":?" aqui haria
       # fallar cualquier `docker compose` del proyecto mientras .env no la defina. Si falta, el ETL termina con
       # un error de configuracion claro (etl.config.require).
-      ODOO_PASSWORD:
+      ODOO_PASSWORD: ${ODOO_PASSWORD:-${ODOO_ADMIN_PASSWORD:?Configura ODOO_ADMIN_PASSWORD}}
       TRACCAR_URL: http://traccar:8082
       TRACCAR_USER: ${TRACCAR_ADMIN_EMAIL:-admin@logistica.local}
       TRACCAR_PASSWORD: ${TRACCAR_ADMIN_PASSWORD:?Configura TRACCAR_ADMIN_PASSWORD}
@@ -136,6 +158,30 @@ services:
       DWH_ETL_PASSWORD: ${DWH_ETL_PASSWORD:-}
       # Vacia = no se crea el rol de solo lectura dwh_ro
       DWH_DB_PASSWORD: ${DWH_DB_PASSWORD:-}
+
+  seed:
+    image: python:3.12-slim
+    depends_on:
+      odoo:
+        condition: service_healthy
+      traccar:
+        condition: service_healthy
+    working_dir: /app
+    volumes:
+      - ./:/app:ro
+    environment:
+      ODOO_URL: http://odoo:8069
+      ODOO_DB: ${ODOO_DB:-logistica_dev}
+      ODOO_USER: ${ODOO_USER:-admin}
+      ODOO_PASSWORD:
+      TRACCAR_URL: http://traccar:8082
+      TRACCAR_INTERNAL_URL: http://traccar:8082
+      TRACCAR_ADMIN_EMAIL: ${TRACCAR_ADMIN_EMAIL:?Configura TRACCAR_ADMIN_EMAIL}
+      TRACCAR_ADMIN_PASSWORD: ${TRACCAR_ADMIN_PASSWORD:?Configura TRACCAR_ADMIN_PASSWORD}
+      INTEGRATION_TRACCAR_EMAIL: ${INTEGRATION_TRACCAR_EMAIL:?Configura INTEGRATION_TRACCAR_EMAIL}
+      INTEGRATION_TRACCAR_PASSWORD: ${INTEGRATION_TRACCAR_PASSWORD:?Configura INTEGRATION_TRACCAR_PASSWORD}
+      DEMO_CONDUCTOR_PASSWORD: ${DEMO_CONDUCTOR_PASSWORD:?Configura DEMO_CONDUCTOR_PASSWORD}
+    command: ["python", "seeds/seed.py"]
 
   bi:
     build: ./services/bi
