@@ -552,12 +552,23 @@ def criterio_11(ctx):
 def criterio_12(ctx):
     """El ETL extrae ambas APIs, valida y carga el modelo dimensional."""
     docker('--profile', 'etl', 'run', '--rm', 'etl', 'bootstrap', mostrar=True)
-    docker('--profile', 'etl', 'run', '--rm', 'etl', 'run', '--mode', 'full', mostrar=True)
-    for tabla, minimo in (('dim_vehiculo', 3), ('fact_entregas', 1), ('fact_posicion_gps', 1)):
+    # El ETL sale con código 3 si otra corrida (la del programador etl-scheduler) está en curso: se espera y se repite.
+    for _intento in range(6):
+        corrida = subprocess.run(['docker', 'compose', '--profile', 'etl', 'run', '--rm', 'etl', 'run', '--mode', 'full'],
+                                 cwd=str(RAIZ))
+        if corrida.returncode != 3:
+            break
+        time.sleep(10)
+    exigir(corrida.returncode == 0, 'La corrida completa del ETL falló (código %s).' % corrida.returncode)
+    for tabla, minimo in (('dim_vehiculo', 3), ('dim_zona', 1), ('fact_entregas', 1), ('fact_posicion_gps', 1),
+                          ('fact_rutas', 1), ('fact_paradas', 1), ('fact_ventas', 1)):
         salida = docker('exec', '-T', 'db', 'psql', '-U', 'odoo', '-d', 'logistica_dwh', '-tAc',
                         'SELECT count(*) FROM %s' % tabla)
         filas = int(salida.strip() or 0)
         exigir(filas >= minimo, 'La tabla %s del DWH tiene %d filas; se esperaban al menos %d.' % (tabla, filas, minimo))
+    estado = docker('exec', '-T', 'db', 'psql', '-U', 'odoo', '-d', 'logistica_dwh', '-tAc',
+                    "SELECT estado FROM etl_ejecucion WHERE modo <> 'simulate' ORDER BY lote_id DESC LIMIT 1").strip()
+    exigir(estado == 'ok', 'La última corrida registrada en etl_ejecucion quedó «%s».' % estado)
 
 
 def criterio_13(ctx):

@@ -111,9 +111,11 @@ else
 fi
 
 if [ "$CON_ANALITICA" = "1" ]; then
-  echo "[extra] Analitica (routing, ml, bi) y bootstrap del ETL"
+  echo "[extra] Analitica (routing, ml, bi), bootstrap del ETL y programador"
   docker compose --profile analitica up -d --wait routing ml bi
   docker compose --profile etl run --rm etl bootstrap
+  # El programador hace la primera carga completa al arrancar y luego una corrida cada ETL_INTERVAL_MIN minutos.
+  docker compose --profile analitica up -d etl-scheduler
 fi
 
 echo "Listo. ERP Odoo: http://localhost:8069/web/login | Traccar: http://localhost:8082"

@@ -64,6 +64,20 @@ docker compose ps
 curl http://localhost:8001/health
 ```
 
+## ETL y Data Warehouse
+
+El ETL (`services/etl`) copia Odoo y Traccar a un Data Warehouse en PostgreSQL (`logistica_dwh`), que leen el panel BI (http://localhost:8501) y el modelo de destinos. Detalle, modelo dimensional y reglas de calidad en [services/etl/README.md](services/etl/README.md).
+
+Con las claves `ETL_STG_PASSWORD`, `DWH_ETL_PASSWORD` y `DWH_DB_PASSWORD` definidas en `.env`:
+
+```bash
+docker compose --profile etl run --rm etl bootstrap          # crea bases, roles y tablas
+docker compose --profile analitica up -d etl-scheduler       # carga inicial y una corrida cada 15 min
+docker compose --profile etl run --rm etl report             # estado de las corridas y rechazos
+```
+
+También se puede lanzar a mano: `etl run --mode full` o `etl run`. `etl simulate` agrega histórico marcado como SIMULADO para entrenar el modelo. Si las bases vienen de la versión anterior del ETL, usar `etl bootstrap --reset` (recrea las dos bases; sus datos son derivados).
+
 ## Base de datos y restauración
 
 Base Odoo principal: `logistica_dev`.
