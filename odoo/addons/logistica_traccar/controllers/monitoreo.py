@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import json
 import logging
+import threading
+import time
 from datetime import timedelta
 
 from werkzeug.exceptions import Forbidden
@@ -13,6 +15,39 @@ _logger = logging.getLogger(__name__)
 
 # El recorrido de la ruta activa se limita para no pedir a Traccar un historial enorme.
 MAX_RECORRIDO_H = 12
+# El mapa se refresca cada 10 s por cada usuario abierto; el recorrido se reutiliza unos segundos para no
+# pedir a Traccar un informe por vehículo y por pestaña en cada refresco (caché por proceso).
+CACHE_RECORRIDO_S = 20
+_CACHE_MAX = 500
+
+
+class CacheRecorrido:
+    """Caché en memoria con caducidad. Es por proceso; con varios workers cada uno tiene la suya."""
+
+    def __init__(self, ttl_s):
+        self.ttl = ttl_s
+        self._datos = {}
+        self._lock = threading.Lock()
+
+    def obtener(self, clave, calcular, ahora=None):
+        ahora = time.monotonic() if ahora is None else ahora
+        with self._lock:
+            item = self._datos.get(clave)
+            if item and item[0] > ahora:
+                return item[1]
+        valor = calcular()
+        with self._lock:
+            if len(self._datos) >= _CACHE_MAX:
+                self._datos = {c: v for c, v in self._datos.items() if v[0] > ahora}
+            self._datos[clave] = (ahora + self.ttl, valor)
+        return valor
+
+    def reset(self):
+        with self._lock:
+            self._datos.clear()
+
+
+CACHE = CacheRecorrido(CACHE_RECORRIDO_S)
 
 
 class MonitoreoController(http.Controller):
@@ -75,10 +110,15 @@ class MonitoreoController(http.Controller):
         dispositivo = ruta.vehicle_id.traccar_device_id
         if not dispositivo or not ruta.started_at:
             return []
+        clave = (request.env.cr.dbname, dispositivo.id, ruta.id, str(ruta.started_at))
+        return CACHE.obtener(clave, lambda: self._consultar_recorrido(ruta, dispositivo))
+
+    def _consultar_recorrido(self, ruta, dispositivo):
         ahora = fields.Datetime.now()
         desde = max(ruta.started_at, ahora - timedelta(hours=MAX_RECORRIDO_H))
         try:
-            posiciones = dispositivo.server_id.get_route_report(dispositivo, desde, ahora)
+            # interactivo: un intento corto y sin escribir el estado del servidor (ver traccar.server._request).
+            posiciones = dispositivo.server_id.get_route_report(dispositivo, desde, ahora, interactivo=True)
         except UserError as exc:
             _logger.warning('monitoreo_recorrido_error ruta=%s error=%s', ruta.id, exc)
             return []

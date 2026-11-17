@@ -184,6 +184,9 @@ Configurar como secretos las variables mínimas:
 ```text
 ODOO_DB_PASSWORD
 ODOO_ADMIN_PASSWORD
+ODOO_MASTER_PASSWORD
+ODOO_PROXY_MODE=True
+ODOO_WORKERS=2
 TRACCAR_DB_PASSWORD
 TRACCAR_ADMIN_PASSWORD
 TRACCAR_ADMIN_EMAIL
@@ -213,4 +216,20 @@ Publicar únicamente estos puertos:
 - `8082/TCP`: panel y API de Traccar.
 - `5055/TCP`: dispositivos GPS.
 
-No publicar `5432/TCP` de PostgreSQL. Mantener persistentes los volúmenes de PostgreSQL, Odoo y Traccar. Cuando exista dominio, configurar HTTPS y actualizar las URLs públicas.
+No publicar `5432/TCP` de PostgreSQL.
+
+### Configuración de Odoo en producción
+
+El servicio `odoo` genera su configuración al arrancar ([odoo/init/odoo-entrypoint.sh](odoo/init/odoo-entrypoint.sh)):
+
+- Gestor de bases deshabilitado (`list_db = False`), una sola base (`dbfilter`) y contraseña maestra `ODOO_MASTER_PASSWORD` (guardada con hash).
+- `odoo-init` aplica `ODOO_ADMIN_PASSWORD` al usuario `admin`. `ODOO_PASSWORD` vacía usa esa misma clave.
+- `ODOO_PROXY_MODE=True` solo detrás de Traefik/nginx: así Odoo ve la IP real del cliente (límite de consultas del seguimiento público), el esquema `https` y el host público en los enlaces. Con Odoo publicado directamente en un puerto, déjelo en `False`.
+- `ODOO_WORKERS` (por defecto 2). Con workers > 0, el proxy debe enviar la ruta `/websocket` a `odoo:8072` y el resto a `odoo:8069`. En desarrollo local sin proxy use `ODOO_WORKERS=0`.
+- Los módulos se instalan una sola vez (base nueva). Para actualizarlos: `./scripts/update_modules.sh <modulos>` (detiene Odoo, actualiza y lo vuelve a levantar).
+
+### Servicios externos de mapas
+
+- Leaflet se sirve desde Odoo (`logistica_base/static/lib/leaflet`), sin depender de unpkg.
+- `ROUTING_OSRM_URL` apunta por defecto al servidor **de demostración** de OSRM, que limita a ~1 petición/s y no admite uso en producción. El servicio de rutas guarda 10 min las rutas y usa una sola llamada por mapa, pero en producción conviene un OSRM propio o un proveedor contratado; si falla, se dibuja la línea recta.
+- Los mosaicos de `tile.openstreetmap.org` tampoco admiten uso comercial intensivo: para producción use un proveedor de mosaicos propio o contratado. Mantener persistentes los volúmenes de PostgreSQL, Odoo y Traccar. Cuando exista dominio, configurar HTTPS y actualizar las URLs públicas.

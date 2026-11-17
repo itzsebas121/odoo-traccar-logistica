@@ -18,6 +18,8 @@ _INTENTOS = 3
 # Esperas tras el 1.er y el 2.º fallo; el 3.er intento agota sin esperar.
 _ESPERAS = (1, 2)
 _TIMEOUT = 10
+# Peticiones desde páginas web (mapas): una sola, corta, para no retener el worker.
+_TIMEOUT_INTERACTIVO = 4
 # Cada dispositivo se consulta desde su watermark menos este solape, para no perder posiciones tardías.
 _SOLAPE = timedelta(seconds=60)
 _TIPOS_EVENTO = ['deviceOverspeed', 'geofenceEnter', 'geofenceExit', 'deviceOnline', 'deviceOffline']
@@ -207,25 +209,32 @@ class TraccarServer(models.Model):
     # Acceso a Traccar
     # ------------------------------------------------------------------
 
-    def _request(self, path, params=None):
-        """GET a la API de Traccar con hasta _INTENTOS intentos. Al agotarlos registra el error y lanza UserError."""
+    def _request(self, path, params=None, interactivo=False):
+        """GET a la API de Traccar con hasta _INTENTOS intentos. Al agotarlos registra el error y lanza UserError.
+
+        ``interactivo``: para peticiones web (mapas). Un solo intento con timeout corto, sin esperas y sin
+        escribir el estado del servidor: varias páginas consultando a la vez no deben bloquear workers ni
+        chocar al actualizar la misma fila de traccar.server (SerializationFailure)."""
         self.ensure_one()
         url = self.base_url.rstrip('/') + path
         headers = self._get_auth_headers()
         headers['Accept'] = 'application/json'  # los reportes sin este encabezado devuelven XLSX
         error = ''
-        for intento in range(_INTENTOS):
+        intentos = 1 if interactivo else _INTENTOS
+        timeout = _TIMEOUT_INTERACTIVO if interactivo else _TIMEOUT
+        for intento in range(intentos):
             try:
-                respuesta = requests.get(url, headers=headers, params=params, timeout=_TIMEOUT)
+                respuesta = requests.get(url, headers=headers, params=params, timeout=timeout)
                 if respuesta.status_code == 200:
                     return respuesta.json()
                 error = self._limpiar_error(f"HTTP {respuesta.status_code}: {respuesta.text[:200]}")
             except (requests.RequestException, ValueError) as exc:
                 error = self._limpiar_error(exc)
             _logger.warning('traccar_request_error ruta=%s intento=%s error=%s', path, intento + 1, error)
-            if intento < len(_ESPERAS):
+            if intento < intentos - 1 and intento < len(_ESPERAS):
                 time.sleep(_ESPERAS[intento])
-        self.sudo().write({'state': 'error', 'last_error_message': error})
+        if not interactivo:
+            self.sudo().write({'state': 'error', 'last_error_message': error})
         raise UserError(_('No se pudo consultar Traccar (%s): %s') % (path, error))
 
     def _exigir_gestor_flota(self):
@@ -486,17 +495,17 @@ class TraccarServer(models.Model):
         if not (self.env.su or self.env.user.has_group('fleet.fleet_group_user')):
             raise AccessError(_('Solo el personal de flota consulta los informes de Traccar.'))
 
-    def _informe(self, tipo, dispositivo, desde, hasta):
+    def _informe(self, tipo, dispositivo, desde, hasta, interactivo=False):
         """GET /api/reports/<tipo> con deviceId, from y to en ISO 8601 UTC. Lista vacía si no hay datos."""
         self.ensure_one()
         self._exigir_usuario_flota()
         traccar_id = dispositivo if isinstance(dispositivo, int) else dispositivo.traccar_id
         parametros = {'deviceId': traccar_id, 'from': _iso_utc(_a_utc(desde)), 'to': _iso_utc(_a_utc(hasta))}
-        return self._request('/api/reports/' + tipo, parametros) or []
+        return self._request('/api/reports/' + tipo, parametros, interactivo=interactivo) or []
 
-    def get_route_report(self, dispositivo, desde, hasta):
+    def get_route_report(self, dispositivo, desde, hasta, interactivo=False):
         """Posiciones del dispositivo en la ventana (informe de ruta)."""
-        return self._informe('route', dispositivo, desde, hasta)
+        return self._informe('route', dispositivo, desde, hasta, interactivo=interactivo)
 
     def get_trips(self, dispositivo, desde, hasta):
         return self._informe('trips', dispositivo, desde, hasta)

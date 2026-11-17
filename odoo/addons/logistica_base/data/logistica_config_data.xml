@@ -8,9 +8,9 @@
     </record>
     <record id="logistica_bodega_central" model="logistica.bodega">
         <field name="name">Bodega Central</field>
-        <field name="address">Ambato, Tungurahua (ubicación aproximada, editable)</field>
-        <field name="latitude">-1.2400</field>
-        <field name="longitude">-78.6100</field>
+        <field name="address">FISEI, Universidad Técnica de Ambato, campus Huachi, Ambato (editable)</field>
+        <field name="latitude">-1.2676963</field>
+        <field name="longitude">-78.6241805</field>
     </record>
     <function model="ir.config_parameter" name="set_param" eval="('logistica.routing_url', 'http://routing:8000')"/>
     <function model="ir.config_parameter" name="set_param" eval="('logistica.ml_url', 'http://ml:8000')"/>

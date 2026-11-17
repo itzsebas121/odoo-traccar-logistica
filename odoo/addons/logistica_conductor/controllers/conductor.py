@@ -15,6 +15,9 @@ from odoo.addons.logistica_entregas.models.logistica_entrega_evento import MOTIV
 _logger = logging.getLogger(__name__)
 
 GRUPO_CONDUCTOR = 'logistica_conductor.group_conductor'
+# Servicio de rutas: una sola petición por mapa; si tarda más se dibuja la línea recta.
+TIMEOUT_GEOMETRIA_S = 8
+TOPE_PUNTOS_GEOMETRIA = 100  # límite de /route/multi
 ESTADOS_PARADA = {'pendiente': 'Pendiente', 'entregado': 'Entregado', 'no_entregado': 'No entregado'}
 
 
@@ -100,26 +103,29 @@ class ConductorController(http.Controller):
             'motivos': MOTIVOS_NO_ENTREGA, 'mapa_json': json.dumps(mapa, ensure_ascii=False)})
 
     def _geometria_ruta(self, ruta, puntos, origen=None):
-        """Obtiene geometría vial por segmentos desde el servicio de routing."""
+        """Geometría vial de toda la ruta en UNA llamada al servicio de routing (POST /route/multi).
+
+        Antes se pedía tramo por tramo y en serie (unos 2 s por tramo contra OSRM), lo que dejaba la página
+        del conductor esperando decenas de segundos. Si el servicio falla se usa la línea recta."""
         base = request.env['ir.config_parameter'].sudo().get_param(
             'logistica.routing_url') or 'http://routing:8000'
         coordenadas = [origen or [ruta.bodega_id.latitude, ruta.bodega_id.longitude]] + [
             [p.latitude, p.longitude] for p in puntos if p.latitude or p.longitude]
-        geometria = []
-        for origen, destino in zip(coordenadas, coordenadas[1:]):
-            try:
-                respuesta = requests.get(base.rstrip('/') + '/route', params={
-                    'origin_lat': origen[0], 'origin_lon': origen[1],
-                    'dest_lat': destino[0], 'dest_lon': destino[1]}, timeout=8)
-                tramo = respuesta.json().get('geometry') if respuesta.status_code == 200 else []
-                if tramo:
-                    geometria.extend(tramo if not geometria else tramo[1:])
-                    continue
-            except (requests.RequestException, ValueError):
-                pass
-            geometria.extend([origen] if not geometria else [])
-            geometria.append(destino)
-        return geometria or coordenadas
+        if len(coordenadas) < 2:
+            return coordenadas
+        try:
+            respuesta = requests.post(base.rstrip('/') + '/route/multi', json={
+                'points': [{'lat': lat, 'lon': lon} for lat, lon in coordenadas[:TOPE_PUNTOS_GEOMETRIA]]},
+                timeout=TIMEOUT_GEOMETRIA_S)
+            if respuesta.status_code == 200:
+                geometria = respuesta.json().get('geometry') or []
+                if len(geometria) >= 2:
+                    return geometria
+            else:
+                _logger.warning('conductor_geometria_http status=%s', respuesta.status_code)
+        except (requests.RequestException, ValueError) as exc:
+            _logger.warning('conductor_geometria_error error=%s', exc)
+        return coordenadas
 
     def _mapa_payload(self, ruta):
         # La ruta ya fue validada como propia; se usa sudo únicamente para leer
@@ -131,8 +137,9 @@ class ConductorController(http.Controller):
         dispositivo = ruta_mapa.vehicle_id.traccar_device_id
         if dispositivo and ruta_mapa.started_at:
             try:
+                # interactivo: un intento corto, sin reintentos ni escritura del estado del servidor.
                 posiciones = dispositivo.server_id.get_route_report(
-                    dispositivo, ruta_mapa.started_at, fields.Datetime.now())
+                    dispositivo, ruta_mapa.started_at, fields.Datetime.now(), interactivo=True)
                 recorrido = [[p['latitude'], p['longitude']] for p in posiciones
                              if p.get('latitude') is not None and p.get('longitude') is not None]
             except UserError:
@@ -154,14 +161,15 @@ class ConductorController(http.Controller):
                 [[p.latitude, p.longitude] for p in puntos if p.latitude or p.longitude],
             'geometria': self._geometria_ruta(ruta_mapa, puntos_para_ruta, origen_recalculo),
             'recorrido': recorrido,
-            'posicion': dispositivo._estado_gps() if dispositivo else None,
+            'posicion': gps,
             'paradas': [{'orden': p.sequence, 'nombre': p.entrega_id.name,
                          'direccion': p.destination_address or '', 'latitud': p.latitude,
                          'longitud': p.longitude, 'estado': p.state} for p in puntos],
         }
 
-    @http.route('/logistica/conductor/ruta/<int:route_id>/mapa-data', type='http', auth='user', csrf=False)
+    @http.route('/logistica/conductor/ruta/<int:route_id>/mapa-data', type='http', auth='user', methods=['GET'])
     def mapa_data(self, route_id, **kwargs):
+        self._exigir_conductor()
         ruta = self._ruta_propia(route_id)
         if not ruta:
             raise NotFound()

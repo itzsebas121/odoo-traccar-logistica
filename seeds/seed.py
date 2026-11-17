@@ -43,6 +43,9 @@ class Informe:
 
 
 def _leer_entorno():
+    # ODOO_PASSWORD vacia = la clave que odoo-init aplica al admin (ODOO_ADMIN_PASSWORD).
+    if not os.environ.get('ODOO_PASSWORD') and os.environ.get('ODOO_ADMIN_PASSWORD'):
+        os.environ['ODOO_PASSWORD'] = os.environ['ODOO_ADMIN_PASSWORD']
     faltan = [nombre for nombre in VARIABLES_ENTORNO if not os.environ.get(nombre)]
     if faltan:
         raise ErrorSembrado('faltan variables de entorno (revise .env): ' + ', '.join(faltan))

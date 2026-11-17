@@ -29,14 +29,13 @@ services:
       PORT: "5432"
       USER: odoo
       PASSWORD: ${ODOO_DB_PASSWORD:?Configura ODOO_DB_PASSWORD}
+      ODOO_DB: ${ODOO_DB:-logistica_dev}
+      ODOO_ADMIN_PASSWORD: ${ODOO_ADMIN_PASSWORD:?Configura ODOO_ADMIN_PASSWORD}
     volumes:
       - ./odoo/addons:/mnt/extra-addons
-    command: >-
-      odoo --db_host=db --db_port=5432 --db_user=odoo --db_password=${ODOO_DB_PASSWORD}
-      -d ${ODOO_DB:-logistica_dev}
-      -i contacts,fleet,sale_management,website,website_sale,payment_custom,logistica_base,logistica_despacho,logistica_traccar,logistica_entregas,logistica_checkout,logistica_conductor,logistica_analitica_ia
-      --load-language=es_EC
-      --without-demo=all --stop-after-init
+      - ./odoo/init:/opt/logistica-init:ro
+    # Instala los modulos solo en una base nueva y aplica ODOO_ADMIN_PASSWORD (ver odoo/init/odoo-init.sh).
+    entrypoint: ["/bin/bash", "/opt/logistica-init/odoo-init.sh"]
 
   odoo:
     image: odoo:16.0
@@ -49,14 +48,26 @@ services:
     ports:
       # Acceso desde otros dispositivos de la red local (por ejemplo, el celular).
       - "8069:8069"
+    # 8072 (websocket / bus de Odoo con workers > 0): el proxy debe enviar /websocket a este puerto.
+    expose:
+      - "8072"
     environment:
       HOST: db
       PORT: "5432"
       USER: odoo
       PASSWORD: ${ODOO_DB_PASSWORD:?Configura ODOO_DB_PASSWORD}
+      ODOO_DB: ${ODOO_DB:-logistica_dev}
+      ODOO_RC: /tmp/odoo.conf
+      ODOO_MASTER_PASSWORD: ${ODOO_MASTER_PASSWORD:?Configura ODOO_MASTER_PASSWORD}
+      ODOO_PROXY_MODE: ${ODOO_PROXY_MODE:-False}
+      ODOO_WORKERS: ${ODOO_WORKERS:-2}
     volumes:
       - odoo_data:/var/lib/odoo
       - ./odoo/addons:/mnt/extra-addons
+      - ./odoo/init:/opt/logistica-init:ro
+    # Genera /tmp/odoo.conf (sin gestor de bases publico, contrasena maestra, workers, limites, proxy_mode).
+    entrypoint: ["/bin/bash", "/opt/logistica-init/odoo-entrypoint.sh"]
+    command: ["odoo"]
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8069/web/login', timeout=3).status == 200 else 1)"]
       interval: 10s
@@ -65,7 +76,7 @@ services:
       start_period: 60s
 
   traccar:
-    image: traccar/traccar:latest
+    image: traccar/traccar:6.17  # version fija: una nueva puede cambiar esquema o API sin aviso
     restart: unless-stopped
     depends_on:
       db:
@@ -173,7 +184,8 @@ services:
       ODOO_URL: http://odoo:8069
       ODOO_DB: ${ODOO_DB:-logistica_dev}
       ODOO_USER: ${ODOO_USER:-admin}
-      ODOO_PASSWORD:
+      # Vacia = la misma que ODOO_ADMIN_PASSWORD (la que odoo-init aplica al usuario admin).
+      ODOO_PASSWORD: ${ODOO_PASSWORD:-${ODOO_ADMIN_PASSWORD}}
       TRACCAR_URL: http://traccar:8082
       TRACCAR_INTERNAL_URL: http://traccar:8082
       TRACCAR_ADMIN_EMAIL: ${TRACCAR_ADMIN_EMAIL:?Configura TRACCAR_ADMIN_EMAIL}
