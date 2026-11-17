@@ -1,0 +1,7 @@
+[
+  {"id": 1, "code": "centro", "name": "Centro", "latitude": -1.2417, "longitude": -78.6197, "active": true, "write_date": "2026-11-01 00:00:00"},
+  {"id": 2, "code": "ficoa", "name": "Ficoa", "latitude": -1.2230, "longitude": -78.6330, "active": true, "write_date": "2026-11-01 00:00:00"},
+  {"id": 3, "code": "huachi", "name": "Huachi", "latitude": -1.2750, "longitude": -78.6300, "active": true, "write_date": "2026-11-01 00:00:00"},
+  {"id": 4, "code": "izamba", "name": "Izamba", "latitude": -1.2050, "longitude": -78.5900, "active": true, "write_date": "2026-11-01 00:00:00"},
+  {"id": 5, "code": "otra", "name": "Otra / Periferica", "latitude": -1.2800, "longitude": -78.5900, "active": true, "write_date": "2026-11-01 00:00:00"}
+]

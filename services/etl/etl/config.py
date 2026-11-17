@@ -12,12 +12,12 @@ RO_ROLE = "dwh_ro"
 
 
 class ConfigError(RuntimeError):
-    """Falta una variable de entorno obligatoria."""
+    """Falta una variable de entorno obligatoria o tiene un valor invalido."""
 
 
 def env(name, default=None):
-    """Variable no secreta (hosts, nombres de usuario, bases); admite valor por defecto."""
-    return os.environ.get(name, default)
+    """Variable no secreta (hosts, nombres de usuario, bases); admite valor por defecto. Vacia = por defecto."""
+    return os.environ.get(name) or default
 
 
 def require(name):
@@ -27,6 +27,20 @@ def require(name):
         raise ConfigError(
             "Falta la variable de entorno obligatoria %s. Definala en .env (vea .env.example)." % name)
     return value
+
+
+def entero(name, default, minimo=0):
+    """Variable numerica no secreta. Un valor no entero o menor que `minimo` es un error de configuracion."""
+    crudo = env(name)
+    if crudo is None:
+        return default
+    try:
+        valor = int(crudo)
+    except ValueError:
+        raise ConfigError("%s debe ser un numero entero (valor actual: %r)." % (name, crudo))
+    if valor < minimo:
+        raise ConfigError("%s debe ser mayor o igual que %d (valor actual: %d)." % (name, minimo, valor))
+    return valor
 
 
 def staging_db():
@@ -63,3 +77,28 @@ def dwh_params():
 def admin_dsn():
     """DSN del administrador del servidor (solo bootstrap: crea bases y roles)."""
     return require("DWH_ADMIN_DSN")
+
+
+def zona_horaria():
+    """Zona horaria de la operacion: solo para las columnas *_local de dim_tiempo y la fecha de despacho."""
+    return env("ETL_TZ", "America/Guayaquil")
+
+
+def intervalo_min():
+    """Minutos entre corridas del programador."""
+    return entero("ETL_INTERVAL_MIN", 15, minimo=1)
+
+
+def horas_entre_completas():
+    """El programador hace una corrida completa cuando la ultima tiene mas de estas horas (detecta borrados)."""
+    return entero("ETL_FULL_HOURS", 24, minimo=1)
+
+
+def dias_retencion():
+    """Dias que se conserva el crudo de staging. 0 = no se borra nada."""
+    return entero("ETL_RETENTION_DAYS", 30, minimo=0)
+
+
+def dias_ventana_traccar():
+    """Dias hacia atras de la primera extraccion de Traccar (cuando no hay marca de agua)."""
+    return entero("ETL_TRACCAR_DAYS", 30, minimo=1)

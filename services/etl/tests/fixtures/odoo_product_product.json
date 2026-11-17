@@ -1,0 +1,4 @@
+[
+  {"id": 30, "display_name": "[P1] Producto Uno", "default_code": "P1", "categ_id": [1, "All"], "lst_price": 10.0, "write_date": "2026-11-01 00:00:00"},
+  {"id": 31, "display_name": "Producto Dos", "default_code": false, "categ_id": [1, "All"], "lst_price": 12.5, "write_date": "2026-11-01 00:00:00"}
+]

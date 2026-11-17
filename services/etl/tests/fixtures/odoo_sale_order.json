@@ -1,0 +1,6 @@
+[
+  {"id": 11, "name": "S0001", "partner_id": [200, "Cliente A"], "date_order": "2026-11-05 12:25:00", "state": "sale", "amount_total": 32.5, "delivery_latitude": -1.2417, "delivery_longitude": -78.6197, "write_date": "2026-11-05 12:30:00"},
+  {"id": 12, "name": "S0002", "partner_id": [201, "Cliente B"], "date_order": "2026-11-05 12:30:00", "state": "sale", "amount_total": 10.0, "delivery_latitude": -1.2230, "delivery_longitude": -78.6330, "write_date": "2026-11-05 12:35:00"},
+  {"id": 13, "name": "S0003", "partner_id": [202, "Cliente C"], "date_order": "2026-11-05 12:35:00", "state": "sale", "amount_total": 25.0, "delivery_latitude": 0.0, "delivery_longitude": 0.0, "write_date": "2026-11-05 12:40:00"},
+  {"id": 14, "name": "S0004", "partner_id": [200, "Cliente A"], "date_order": "2026-11-05 12:50:00", "state": "draft", "amount_total": 10.0, "delivery_latitude": 0.0, "delivery_longitude": 0.0, "write_date": "2026-11-05 12:50:00"}
+]
