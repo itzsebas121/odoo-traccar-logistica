@@ -131,6 +131,15 @@ class LogisticaDemo(models.AbstractModel):
 
         impuestos = {0: iva('IVA 0%', 0.0), 15: iva('IVA 15%', 15.0)}
         empresa.account_sale_tax_id = impuestos[0]
+        transfer = env.ref('payment.payment_provider_transfer', raise_if_not_found=False)
+        if transfer:
+            vals = {'state': 'enabled', 'is_published': True}
+            if not transfer.journal_id:
+                banco = env['account.journal'].search(
+                    [('type', '=', 'bank'), ('company_id', '=', empresa.id)], limit=1)
+                if banco:
+                    vals['journal_id'] = banco.id
+            transfer.write(vals)
         return impuestos
 
     def _categorias(self, env, nombres):

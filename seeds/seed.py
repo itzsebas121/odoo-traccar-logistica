@@ -361,6 +361,22 @@ def _sembrar_mercado(odoo, informe, productos, mercado, simulacion):
             imagen = base64.b64encode(archivo.read()).decode('ascii')
         odoo.ejecutar('logistica.demo', 'poner_imagen', [producto['default_code'], imagen])
         informe.creados.append(f"foto {producto['default_code']}")
+    ref_pago = odoo.ejecutar('ir.model.data', 'check_object_reference', ['payment', 'payment_provider_transfer'])
+    if ref_pago:
+        id_pago = ref_pago[1]
+        prov = odoo.ejecutar('payment.provider', 'read', [[id_pago], ['state', 'is_published', 'journal_id']])[0]
+        cambios_pago = {}
+        if prov['state'] != 'enabled':
+            cambios_pago['state'] = 'enabled'
+        if not prov['is_published']:
+            cambios_pago['is_published'] = True
+        if not prov['journal_id']:
+            diarios = odoo.ejecutar('account.journal', 'search', [[('type', '=', 'bank')]], {'limit': 1})
+            if diarios:
+                cambios_pago['journal_id'] = diarios[0]
+        if cambios_pago:
+            odoo.ejecutar('payment.provider', 'write', [[id_pago], cambios_pago])
+            informe.actualizados.append('payment.provider Transferencia bancaria (habilitado y publicado)')
 
 
 def _sembrar_usuarios_conductor(odoo, entorno, informe, usuarios, ids_conductor):

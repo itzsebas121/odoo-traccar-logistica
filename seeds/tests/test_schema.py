@@ -17,7 +17,7 @@ class EsquemaSeedsTest(unittest.TestCase):
         self.assertEqual(['Sebastian Tipan', 'Angelica Martinez', 'Bryan Viteri', 'Daniel Moyolema'],
                          [c['name'] for c in self.odoo['conductores']])
         self.assertEqual(4, len(self.traccar['dispositivos']))
-        self.assertEqual(15, len(self.simulacion["pedidos"]))
+        self.assertEqual(0, len(self.simulacion["pedidos"]))
         self.assertEqual(49, len(self.odoo["productos"]))
         self.assertEqual(4, len(self.odoo['usuarios_conductor']))
         self.assertEqual(4, len(self.simulacion['rutas']))
@@ -48,7 +48,14 @@ class EsquemaSeedsTest(unittest.TestCase):
 
     def test_latitud_fuera_de_rango_falla(self):
         simulacion = copy.deepcopy(self.simulacion)
-        simulacion['pedidos'][0]['latitud'] = 95
+        simulacion['pedidos'] = [{
+            'ref': 'TEST-1',
+            'cliente': 'Cliente Prueba',
+            'cliente_ref': 'CLI-TEST',
+            'latitud': 95,
+            'longitud': -78.6,
+            'lineas': [{'producto': 'COM-MAN-1K', 'cantidad': 1}],
+        }]
         with self.assertRaisesRegex(schema.ErrorEsquema, 'latitud'):
             schema.validar_simulacion(simulacion)
 

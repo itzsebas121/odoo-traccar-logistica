@@ -13,6 +13,11 @@
         'views/confirmation_templates.xml',
         'views/tracking_templates.xml',
     ],
+    'assets': {
+        'web.assets_frontend': [
+            'logistica_checkout/static/src/css/bitacora_shop.css',
+        ],
+    },
     'installable': True,
     'application': False,
     'auto_install': False,

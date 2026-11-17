@@ -173,7 +173,9 @@ def validar_traccar(datos):
 def validar_simulacion(datos):
     donde = ARCHIVO_SIMULACION
     raiz = _objeto(datos, donde)
-    pedidos = _lista(_campo(raiz, 'pedidos', donde), f'{donde}: pedidos')
+    pedidos = _campo(raiz, 'pedidos', donde)
+    if not isinstance(pedidos, list):
+        raise ErrorEsquema(f'{donde}: se esperaba una lista en pedidos')
     for i, pedido in enumerate(pedidos):
         donde_p = f'{donde}: pedidos[{i}]'
         _objeto(pedido, donde_p)
@@ -278,7 +280,7 @@ def validar_mercado(mercado, odoo, simulacion):
         if producto['categoria'] not in categorias:
             raise ErrorEsquema(f"{ARCHIVO_ODOO}: el producto {producto['default_code']} usa una categoria "
                                f"que no esta en {donde}: {producto['categoria']}")
-    perfiles = _objeto(_campo(raiz, 'perfiles', donde), f'{donde}: perfiles')
+    perfiles = _objeto(raiz.get('perfiles') or {}, f'{donde}: perfiles')
     for nombre, perfil in perfiles.items():
         usados = list(_objeto(_campo(perfil, 'productos', f'{donde}: perfiles.{nombre}'), donde))
         if perfil.get('extras'):
@@ -286,8 +288,10 @@ def validar_mercado(mercado, odoo, simulacion):
         for codigo in usados:
             if codigo not in codigos:
                 raise ErrorEsquema(f'{donde}: perfiles.{nombre} usa el producto inexistente {codigo}')
-    segmentos = _objeto(_campo(raiz, 'segmentos', donde), f'{donde}: segmentos')
-    clientes = _lista(_campo(raiz, 'clientes', donde), f'{donde}: clientes')
+    segmentos = _objeto(raiz.get('segmentos') or {}, f'{donde}: segmentos')
+    clientes = _campo(raiz, 'clientes', donde)
+    if not isinstance(clientes, list):
+        raise ErrorEsquema(f'{donde}: se esperaba una lista en clientes')
     for i, cliente in enumerate(clientes):
         donde_c = f'{donde}: clientes[{i}]'
         _objeto(cliente, donde_c)

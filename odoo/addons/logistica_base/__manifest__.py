@@ -33,6 +33,8 @@ Módulo Base de Logística
     'assets': {
         'web.assets_backend': [
             'logistica_base/static/src/css/shadcn_backend.css',
+            'logistica_base/static/src/js/bitacora_sidebar.js',
+            'logistica_base/static/src/xml/bitacora_navbar.xml',
         ],
     },
     'installable': True,
