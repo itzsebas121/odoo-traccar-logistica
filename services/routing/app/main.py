@@ -12,6 +12,7 @@ app = FastAPI(title="Servicio de rutas")
 
 MAX_POINTS = 200          # puntos por peticion en /matrix
 MAX_STOPS = 200           # paradas por peticion en /optimize
+MAX_WAYPOINTS = 100       # puntos por peticion en /route/multi (OSRM publico admite hasta 100)
 TOTAL_BUDGET_S = 30.0     # tope de toda la peticion /optimize (matriz + solver)
 SAFETY_MARGIN_S = 1.0     # holgura para armar el modelo y serializar la respuesta
 MIN_SOLVER_S = 1.0
@@ -48,6 +49,15 @@ class MatrixIn(BaseModel):
     @classmethod
     def _limit_points(cls, v):
         return _at_most(v, MAX_POINTS, "puntos")
+
+
+class RouteMultiIn(BaseModel):
+    points: List[Point] = Field(min_length=2)
+
+    @field_validator("points")
+    @classmethod
+    def _limit_points(cls, v):
+        return _at_most(v, MAX_WAYPOINTS, "puntos")
 
 
 class Stop(Point):
@@ -88,6 +98,14 @@ def matrix(body: MatrixIn):
 def route(origin_lat: float = Query(ge=-90, le=90), origin_lon: float = Query(ge=-180, le=180),
           dest_lat: float = Query(ge=-90, le=90), dest_lon: float = Query(ge=-180, le=180)):
     geom, km, minutes, source = provider().route((origin_lat, origin_lon), (dest_lat, dest_lon))
+    return {"geometry": geom, "distance_km": round(km, 3),
+            "duration_min": round(minutes, 2), "source": source}
+
+
+@app.post("/route/multi")
+def route_multi(body: RouteMultiIn):
+    """Geometria vial de toda la secuencia de puntos en una sola llamada (portal del conductor)."""
+    geom, km, minutes, source = provider().route_multi([(p.lat, p.lon) for p in body.points])
     return {"geometry": geom, "distance_km": round(km, 3),
             "duration_min": round(minutes, 2), "source": source}
 

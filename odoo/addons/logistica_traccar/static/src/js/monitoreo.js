@@ -84,15 +84,23 @@
             (obsoletos ? ' · ' + obsoletos + ' con señal antigua' : '');
     }
 
+    // El siguiente refresco se programa al terminar el anterior: si el servidor tarda, las peticiones
+    // no se acumulan (con setInterval se solapaban y ocupaban todos los workers de Odoo).
     function cargar() {
         fetch('/logistica/monitoreo/data', {credentials: 'same-origin'})
             .then(function (r) {
+                if (r.status === 401 || r.status === 403 || r.redirected) {
+                    throw new Error('sesión caducada, recargue la página');
+                }
                 if (!r.ok) { throw new Error('HTTP ' + r.status); }
                 return r.json();
             })
             .then(dibujar)
             .catch(function (e) {
                 document.getElementById('monitoreo-aviso').textContent = 'No se pudo actualizar (' + e.message + ')';
+            })
+            .then(function () {
+                setTimeout(cargar, document.hidden ? REFRESCO_MS * 3 : REFRESCO_MS);
             });
     }
 
@@ -103,6 +111,5 @@
         }).addTo(mapa);
         capas = L.layerGroup().addTo(mapa);
         cargar();
-        setInterval(cargar, REFRESCO_MS);
     });
 }());

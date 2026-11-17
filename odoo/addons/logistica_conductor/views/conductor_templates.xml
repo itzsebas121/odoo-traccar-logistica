@@ -95,13 +95,13 @@
                 <div id="c-paradas-flotantes" class="c-flotantes"></div>
             </div>
             <p id="c-mapa-estado" class="c-estado">Cargando mapa…</p>
-            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-                  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-                    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+            <link rel="stylesheet" href="/logistica_base/static/lib/leaflet/leaflet.css"
+                  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="/>
+            <script src="/logistica_base/static/lib/leaflet/leaflet.js"
+                    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="></script>
             <script type="text/javascript">
                 (function () {
-                    var mapa = L.map('c-mapa').setView([-1.2491, -78.6267], 12);
+                    var mapa = L.map('c-mapa').setView([-1.2676963, -78.6241805], 12);
                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                         maxZoom: 19, attribution: '&amp;copy; OpenStreetMap'
                     }).addTo(mapa);
@@ -139,17 +139,23 @@
                                         .bindPopup('Posición actual<br/>Velocidad: '+u.velocidad_kmh+' km/h').addTo(capas);
                                     puntos.push([u.latitud,u.longitud]);
                                 }
-                                if (puntos.length) mapa.fitBounds(puntos, {padding:[20,20], maxZoom:12});
+                                // Solo se encuadra la primera vez: no se pierde el zoom del conductor en cada refresco.
+                                if (puntos.length &amp;&amp; !window.cMapaEncuadrado) {
+                                    mapa.fitBounds(puntos, {padding:[20,20], maxZoom:12});
+                                    window.cMapaEncuadrado = true;
+                                }
                                 document.getElementById('c-mapa-estado').textContent =
                                     'Línea morada: ruta planificada · línea azul: recorrido GPS real';
                     }
+                    // El siguiente refresco se programa al terminar el anterior para no acumular peticiones.
                     function cargar() {
                         fetch('/logistica/conductor/ruta/<t t-esc="ruta.id"/>/mapa-data', {credentials: 'same-origin'})
-                            .then(function (r) { if (!r.ok) { throw new Error('HTTP '+r.status); } return r.json(); })
+                            .then(function (r) { if (!r.ok || r.redirected) { throw new Error('HTTP '+r.status); } return r.json(); })
                             .then(dibujar)
-                            .catch(function () { document.getElementById('c-mapa-estado').textContent='Ruta planificada cargada; GPS pendiente de actualización.'; });
+                            .catch(function () { document.getElementById('c-mapa-estado').textContent='Ruta planificada cargada; GPS pendiente de actualización.'; })
+                            .then(function () { setTimeout(cargar, document.hidden ? 90000 : 30000); });
                     }
-                    cargar(); setInterval(cargar, 30000);
+                    cargar();
                 }());
             </script>
 

@@ -55,9 +55,9 @@
   ],
   "bodega_logistica": {
     "name": "Sede UTA",
-    "address": "Universidad Técnica de Ambato, Ambato",
-    "latitude": -1.2491,
-    "longitude": -78.6267
+    "address": "Facultad de Ingeniería en Sistemas, Electrónica e Industrial (FISEI), Universidad Técnica de Ambato, campus Huachi, Ambato",
+    "latitude": -1.2676963,
+    "longitude": -78.6241805
   },
   "productos": [
     {

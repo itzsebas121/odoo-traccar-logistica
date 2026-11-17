@@ -14,7 +14,7 @@ BASE=logistica_dev
 MODULOS=(contacts fleet sale_management website website_sale payment_custom
          logistica_base logistica_despacho logistica_traccar logistica_entregas logistica_checkout
          logistica_conductor logistica_analitica_ia)
-CLAVES_SECRETAS=(ODOO_DB_PASSWORD ODOO_ADMIN_PASSWORD TRACCAR_DB_PASSWORD TRACCAR_ADMIN_PASSWORD)
+CLAVES_SECRETAS=(ODOO_DB_PASSWORD ODOO_ADMIN_PASSWORD ODOO_MASTER_PASSWORD TRACCAR_DB_PASSWORD TRACCAR_ADMIN_PASSWORD)
 
 echo "[1/5] Archivo .env"
 if [ -f .env ]; then
@@ -77,15 +77,17 @@ for m in "${MODULOS[@]}"; do
   if grep -qx "$m" <<< "$instalados"; then ya+=("$m"); else nuevos+=("$m"); fi
 done
 join() { local IFS=,; echo "$*"; }
+# Con Odoo detenido: instalar/actualizar mientras el servidor corre choca con sus crons
+# ("could not serialize access due to concurrent update").
+docker compose stop odoo
 if [ ${#nuevos[@]} -gt 0 ]; then
   echo "      Instalando (-i): ${nuevos[*]}"
-  docker compose exec -T odoo /entrypoint.sh odoo -d "$BASE" -i "$(join "${nuevos[@]}")" --without-demo=all --stop-after-init
+  docker compose run --rm --no-deps -T odoo odoo -d "$BASE" -i "$(join "${nuevos[@]}")" --without-demo=all --stop-after-init
 fi
 if [ ${#ya[@]} -gt 0 ]; then
   echo "      Actualizando (-u): ${ya[*]}"
-  docker compose exec -T odoo /entrypoint.sh odoo -d "$BASE" -u "$(join "${ya[@]}")" --stop-after-init
+  docker compose run --rm --no-deps -T odoo odoo -d "$BASE" -u "$(join "${ya[@]}")" --stop-after-init
 fi
-docker compose restart odoo
 docker compose up -d --wait
 
 # Sincroniza la secuencia de tc_users (Traccar) con las filas existentes: evita el duplicate key de POST /api/users
