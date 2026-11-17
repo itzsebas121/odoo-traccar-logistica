@@ -14,6 +14,8 @@ class TestDespacho(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # Estas pruebas cubren el modo «con preparación en bodega» (opción de la configuración).
+        cls.env['logistica.configuracion'].get_config().require_preparation = True
         cls.cliente = cls.env['res.partner'].create({'name': 'Cliente Despacho', 'phone': '0999999999'})
         cls.producto = cls.env['product.product'].create({
             'name': 'Producto Despacho', 'type': 'consu', 'list_price': 10})
@@ -208,12 +210,16 @@ class TestDespacho(TransactionCase):
         with self.assertRaises(UserError):
             ruta.action_cerrar()
         p2.action_marcar_no_entregado('absent')
-        ruta.action_cerrar()
+        # Fase A: la última parada cierra la ruta sola y la fallida vuelve a «Por despachar» (intento 1 de 2).
         self.assertEqual(ruta.state, 'cerrada')
         self.assertTrue(ruta.finished_at)
         self.assertEqual((ruta.delivered_stops, ruta.failed_stops, ruta.pending_stops), (1, 1, 0))
         self.assertEqual(e1.state, 'entregado')
-        self.assertEqual(e2.state, 'pendiente_reprogramacion')
+        self.assertEqual(e2.state, 'preparado')
+        self.assertEqual(e2.estado_simple, 'por_despachar')
+        self.assertTrue(e2.event_ids.filtered(lambda ev: ev.event_type == 'reprogramado'))
+        with self.assertRaises(UserError):
+            ruta.action_cerrar()  # ya cerrada
         self.assertEqual(p2.failed_reason, 'absent')
 
     def test_cancelar_antes_de_iniciar(self):
@@ -242,7 +248,8 @@ class TestDespacho(TransactionCase):
         self.assertEqual(ruta.state, 'interrumpida')
         self.assertEqual(ruta.interrupt_reason, 'Avería del vehículo')
         self.assertEqual(e1.state, 'entregado')
-        self.assertEqual(e2.state, 'pendiente_reprogramacion')
+        # La interrupción no es culpa de la entrega: vuelve sola a la cola.
+        self.assertEqual(e2.state, 'preparado')
 
     # ------------------------------------------------------------ paradas
     def test_parada_entregado_idempotente(self):

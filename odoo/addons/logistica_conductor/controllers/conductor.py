@@ -185,6 +185,12 @@ class ConductorController(http.Controller):
             return self._error(403, _('No tiene permiso para esta ruta.'))
         return self._ejecutar(ruta, lambda: getattr(ruta, nombre_metodo)(*args))
 
+    @http.route('/logistica/conductor/ruta/<int:route_id>/salir',
+                type='http', auth='user', methods=['POST'])
+    def salir(self, route_id, **kwargs):
+        """Fase A: confirma la carga (si falta) e inicia el recorrido en un solo paso."""
+        return self._accion_ruta(route_id, 'action_salir_a_ruta')
+
     @http.route('/logistica/conductor/ruta/<int:route_id>/confirmar-carga',
                 type='http', auth='user', methods=['POST'])
     def confirmar_carga(self, route_id, **kwargs):

@@ -15,7 +15,9 @@
                          style="height: 320px;"
                          t-att-data-centro-lat="ld.get('centro') and ld['centro'][0]"
                          t-att-data-centro-lon="ld.get('centro') and ld['centro'][1]"
-                         t-att-data-cobertura="ld.get('cobertura')"/>
+                         t-att-data-cobertura="ld.get('cobertura')"
+                         t-att-data-radio-km="ld.get('radio_km')"
+                         t-att-data-sede="ld.get('sede')"/>
                     <small id="logistica_map_estado" class="form-text text-muted"/>
                     <input type="hidden" name="delivery_latitude" id="delivery_latitude" t-att-value="ld.get('lat')"/>
                     <input type="hidden" name="delivery_longitude" id="delivery_longitude" t-att-value="ld.get('lon')"/>

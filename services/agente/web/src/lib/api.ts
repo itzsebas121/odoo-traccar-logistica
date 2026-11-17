@@ -117,3 +117,79 @@ export async function enviarMensaje(
     }
   }
 }
+
+// ------------------------------------------------------------------ base de datos
+export type BaseId = 'odoo' | 'traccar'
+export type EstadoBase = {
+  base: BaseId
+  nombre: string
+  existe: boolean
+  tamano_bytes: number
+  filestore_bytes?: number
+  anterior: boolean
+}
+export type Respaldo = { nombre: string; base: BaseId; tamano_bytes: number; creado: number; automatico: boolean }
+export type EstadoBD = {
+  disponible: boolean
+  error?: string
+  bases: EstadoBase[]
+  respaldos: Respaldo[]
+  en_curso: boolean
+  max_subida_mb: number
+}
+export type ResultadoRestauracion = {
+  base: BaseId
+  nombre: string
+  archivo: string
+  segundos: number
+  respaldo_previo: string | null
+  base_anterior: string
+  reiniciar: string
+}
+
+export const apiBD = {
+  estado: () => pedir<EstadoBD>('/api/bd'),
+  respaldar: (base: BaseId, clave_maestra: string) =>
+    pedir<{ nombre: string; tamano_bytes: number }>('/api/bd/respaldos', {
+      method: 'POST',
+      body: JSON.stringify({ base, clave_maestra }),
+    }),
+  borrar: (nombre: string, clave_maestra: string) =>
+    pedir<{ ok: boolean }>(`/api/bd/respaldos/${encodeURIComponent(nombre)}/borrar`, {
+      method: 'POST',
+      body: JSON.stringify({ clave_maestra }),
+    }),
+  urlDescarga: (nombre: string) => `/api/bd/respaldos/${encodeURIComponent(nombre)}`,
+}
+
+/** Restaura desde un archivo subido o un respaldo guardado. XHR para mostrar el avance de la subida. */
+export function restaurarBD(
+  datos: { base: BaseId; clave_maestra: string; confirmacion: string; nombre?: string; archivo?: File },
+  alAvanzar: (porcentaje: number) => void,
+): Promise<ResultadoRestauracion> {
+  return new Promise((resolver, rechazar) => {
+    const formulario = new FormData()
+    formulario.append('base', datos.base)
+    formulario.append('clave_maestra', datos.clave_maestra)
+    formulario.append('confirmacion', datos.confirmacion)
+    if (datos.nombre) formulario.append('nombre', datos.nombre)
+    if (datos.archivo) formulario.append('archivo', datos.archivo)
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', '/api/bd/restaurar')
+    xhr.withCredentials = true
+    xhr.setRequestHeader('X-Agente', '1')
+    xhr.upload.onprogress = (e) => e.lengthComputable && alAvanzar(Math.round((e.loaded / e.total) * 100))
+    xhr.onload = () => {
+      let cuerpo: { detalle?: string } & Partial<ResultadoRestauracion> = {}
+      try {
+        cuerpo = JSON.parse(xhr.responseText)
+      } catch {
+        /* sin JSON */
+      }
+      if (xhr.status >= 200 && xhr.status < 300) resolver(cuerpo as ResultadoRestauracion)
+      else rechazar(new ErrorApi(xhr.status, cuerpo.detalle ?? `Error ${xhr.status}`))
+    }
+    xhr.onerror = () => rechazar(new ErrorApi(0, 'Se perdió la conexión con el servidor.'))
+    xhr.send(formulario)
+  })
+}

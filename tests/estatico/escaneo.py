@@ -17,7 +17,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[2]
 DIR_EXCLUIDOS = {
     '.git', '.codegraph', '__pycache__', '.pytest_cache', '.superpowers',
-    '.idea', '.vscode', 'docs', 'backups',
+    '.idea', '.vscode', 'docs', 'backups', 'node_modules', 'dist',
 }
 EXTENSIONES = {
     '.py', '.xml', '.js', '.json', '.yml', '.yaml', '.md', '.sh', '.ps1',

@@ -97,6 +97,11 @@ class FlujoE2ETest(unittest.TestCase):
             self.assertEqual(contar('product.template', [
                 ('name', '=', producto['name']), ('website_published', '=', True)]), 1, producto['name'])
         for pedido in simulacion['pedidos']:
+            if 'latitud' not in pedido:
+                # Pedido telefonico sin ubicacion: queda en cotizacion y sin entrega (Fase A).
+                self.assertEqual(contar('sale.order', [
+                    ('client_order_ref', '=', pedido['ref']), ('state', '=', 'draft')]), 1, pedido['ref'])
+                continue
             self.assertEqual(contar('sale.order', [
                 ('client_order_ref', '=', pedido['ref']), ('state', '=', 'sale')]), 1, pedido['ref'])
             self.assertEqual(contar('logistica.entrega', [

@@ -32,6 +32,20 @@ TRANSICIONES = {
     'devuelto_bodega': set(),
 }
 
+# Lo que ve el administrador: 5 estados en lugar de los 9 internos (que se mantienen para auditoría).
+ESTADOS_SIMPLES = [
+    ('por_despachar', 'Por despachar'),
+    ('en_ruta', 'En ruta'),
+    ('entregado', 'Entregado'),
+    ('atencion', 'Requiere atención'),
+    ('cerrado', 'Devuelto a bodega'),
+]
+ESTADO_SIMPLE = {
+    'pendiente_preparacion': 'por_despachar', 'en_preparacion': 'por_despachar', 'preparado': 'por_despachar',
+    'asignado': 'en_ruta', 'en_recorrido': 'en_ruta', 'entregado': 'entregado',
+    'no_entregado': 'atencion', 'pendiente_reprogramacion': 'atencion', 'devuelto_bodega': 'cerrado',
+}
+
 TOKEN_VIGENCIA_DIAS = 90
 
 # Solo el servidor (env.su) los escribe; la Tarea 8 fija route_id con sudo (R23).
@@ -68,8 +82,13 @@ class LogisticaEntrega(models.Model):
     recipient_name = fields.Char(string='Destinatario')
     phone = fields.Char(string='Teléfono')
     state = fields.Selection(
-        ESTADOS, string='Estado', default='pendiente_preparacion',
+        ESTADOS, string='Estado detallado', default='pendiente_preparacion',
         required=True, index=True, copy=False)
+    estado_simple = fields.Selection(
+        ESTADOS_SIMPLES, string='Estado', compute='_compute_estado_simple', store=True, index=True)
+    intentos = fields.Integer(
+        string='Intentos fallidos', compute='_compute_intentos',
+        help='Veces que el conductor la marcó «No entregado».')
     tracking_token = fields.Char(
         string='Token de seguimiento', default=lambda self: _nuevo_token(),
         copy=False, readonly=True, index=True,
@@ -91,6 +110,16 @@ class LogisticaEntrega(models.Model):
         ('tracking_token_uniq', 'unique(tracking_token)',
          'El token de seguimiento debe ser único.'),
     ]
+
+    @api.depends('state')
+    def _compute_estado_simple(self):
+        for rec in self:
+            rec.estado_simple = ESTADO_SIMPLE.get(rec.state, 'por_despachar')
+
+    @api.depends('event_ids.event_type')
+    def _compute_intentos(self):
+        for rec in self:
+            rec.intentos = len(rec.event_ids.filtered(lambda ev: ev.event_type == 'no_entregado'))
 
     # ------------------------------------------------------------------
     # Creación
@@ -237,6 +266,41 @@ class LogisticaEntrega(models.Model):
             rec._transicionar('en_preparacion', 'preparado')
             rec._registrar_evento('preparado')
         return True
+
+    def action_marcar_preparado_lote(self):
+        """Acción de la lista: marca preparadas las seleccionadas que estén en preparación e ignora las demás."""
+        listas = self.filtered(lambda e: e.state == 'en_preparacion')
+        listas.action_marcar_preparado()
+        return {
+            'type': 'ir.actions.client', 'tag': 'display_notification',
+            'params': {
+                'title': _('Entregas preparadas'),
+                'message': _('%(n)d marcadas como preparadas; %(o)d no estaban en preparación.') % {
+                    'n': len(listas), 'o': len(self) - len(listas)},
+                'type': 'success' if listas else 'warning', 'sticky': False,
+                'next': {'type': 'ir.actions.act_window_close'},
+            },
+        }
+
+    def reprogramar_si_corresponde(self, motivo=None):
+        """Tras un fallo: vuelve sola a «Por despachar» mientras no supere los intentos configurados.
+
+        «Dirección incorrecta» (o intentos agotados) la deja en «Requiere atención» para el administrador.
+        Devuelve las entregas reprogramadas."""
+        maximo = self.env['logistica.configuracion'].sudo().get_config().max_delivery_attempts
+        reprogramadas = self.browse()
+        for rec in self:
+            if rec.state != 'pendiente_reprogramacion':
+                continue
+            if motivo == 'wrong_address' or not maximo or rec.intentos >= maximo:
+                continue
+            rec._transicionar('pendiente_reprogramacion', 'preparado')
+            rec.sudo().write({'route_id': 0})
+            rec._registrar_evento('reprogramado', notes=_(
+                'Reprogramada automáticamente para el siguiente despacho (intento %(i)d de %(m)d).') % {
+                'i': rec.intentos + 1, 'm': maximo})
+            reprogramadas |= rec
+        return reprogramadas
 
     def action_marcar_asignado(self, route_id=None):
         """Uso del despacho (Tarea 8): ruta aprobada."""

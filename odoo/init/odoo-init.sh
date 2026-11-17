@@ -31,6 +31,24 @@ instalada() {
 
 if instalada; then
     echo "odoo-init: la base $ODOO_DB ya tiene los modulos instalados; no se reinstala."
+    # Solo se actualizan (-u) los modulos propios cuya version de codigo cambio. Se reintenta porque, en un
+    # redespliegue, el Odoo anterior puede seguir corriendo sus crons unos segundos.
+    pendientes=$(python3 /opt/logistica-init/modulos_pendientes.py)
+    if [ -n "$pendientes" ]; then
+        echo "odoo-init: actualizando modulos con version nueva: $pendientes"
+        for intento in 1 2 3; do
+            if odoo --db_host=db --db_port=5432 --db_user=odoo --db_password "$PASSWORD" \
+                    -d "$ODOO_DB" -u "$pendientes" --stop-after-init --max-cron-threads=0; then
+                break
+            fi
+            if [ "$intento" = 3 ]; then
+                echo "odoo-init: ERROR: no se pudieron actualizar los modulos ($pendientes)." >&2
+                exit 1
+            fi
+            echo "odoo-init: la actualizacion fallo (intento $intento); se reintenta en 20 s." >&2
+            sleep 20
+        done
+    fi
 else
     echo "odoo-init: instalando modulos en $ODOO_DB"
     odoo --db_host=db --db_port=5432 --db_user=odoo --db_password "$PASSWORD" \

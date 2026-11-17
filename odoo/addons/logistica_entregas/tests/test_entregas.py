@@ -15,6 +15,8 @@ class TestEntregas(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # Estas pruebas cubren el modo «con preparación en bodega» (opción de la configuración).
+        cls.env['logistica.configuracion'].get_config().require_preparation = True
         cls.partner = cls.env['res.partner'].create({
             'name': 'Cliente Prueba', 'phone': '0999999999'})
         cls.product = cls.env['product.product'].create({

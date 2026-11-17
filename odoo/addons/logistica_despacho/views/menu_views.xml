@@ -9,7 +9,7 @@
               sequence="20"/>
 
     <menuitem id="menu_logistica_planificador"
-              name="Planificar despacho"
+              name="Despachar"
               parent="logistica_base.menu_logistica_root"
               action="action_logistica_planificador"
               groups="fleet.fleet_group_manager"

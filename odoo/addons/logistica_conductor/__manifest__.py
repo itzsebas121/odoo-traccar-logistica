@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Logística Conductor - Portal móvil',
-    'version': '16.0.1.0.0',
+    'version': '16.0.1.1.0',
     'category': 'Inventory/Logistics',
     'summary': 'Vista móvil restringida para que el conductor confirme carga, recorra paradas y registre entregas',
     'description': """

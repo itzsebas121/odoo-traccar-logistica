@@ -14,7 +14,7 @@ BASE=logistica_dev
 MODULOS=(contacts fleet sale_management website website_sale payment_custom
          logistica_base logistica_despacho logistica_traccar logistica_entregas logistica_checkout
          logistica_conductor logistica_analitica_ia)
-CLAVES_SECRETAS=(ODOO_DB_PASSWORD ODOO_ADMIN_PASSWORD ODOO_MASTER_PASSWORD TRACCAR_DB_PASSWORD TRACCAR_ADMIN_PASSWORD)
+CLAVES_SECRETAS=(ODOO_DB_PASSWORD ODOO_ADMIN_PASSWORD ODOO_MASTER_PASSWORD TRACCAR_DB_PASSWORD TRACCAR_ADMIN_PASSWORD AGENTE_SESSION_SECRET)
 
 echo "[1/5] Archivo .env"
 if [ -f .env ]; then

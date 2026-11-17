@@ -5,3 +5,4 @@ from . import logistica_bodega
 from . import logistica_configuracion
 from . import logistica_zona
 from . import fleet_vehicle
+from . import account_move

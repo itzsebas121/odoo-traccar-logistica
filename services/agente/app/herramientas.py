@@ -8,7 +8,7 @@ import time
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from .odoo import ErrorOdoo
 
@@ -19,8 +19,6 @@ ESTADOS_ENTREGA = {
     'entregado': 'Entregado', 'no_entregado': 'No entregado',
     'pendiente_reprogramacion': 'Pendiente de reprogramación', 'devuelto_bodega': 'Devuelto a bodega',
 }
-PAGO = {'not_paid': 'sin pagar', 'partial': 'pago parcial', 'paid': 'pagada', 'in_payment': 'en proceso de pago',
-        'reversed': 'revertida', 'invoicing_legacy': 'histórica'}
 GPS_DESACTUALIZADO_MIN = 5
 
 
@@ -63,7 +61,12 @@ async def _totales(odoo, modelo, dominio, sumas, por, minimos=(), maximos=()):
     return total
 
 
-class _Periodo(BaseModel):
+class _Estricto(BaseModel):
+    # Igual que additionalProperties=false del esquema: un parámetro desconocido es un error, no se ignora.
+    model_config = ConfigDict(extra='forbid')
+
+
+class _Periodo(_Estricto):
     desde: Optional[date] = Field(None, description='Fecha inicial (AAAA-MM-DD), incluida.')
     hasta: Optional[date] = Field(None, description='Fecha final (AAAA-MM-DD), incluida.')
 
@@ -91,7 +94,6 @@ class EntradaProductos(_Periodo):
 
 
 class EntradaFacturas(_Periodo):
-    estado: Literal['todas', 'pendientes', 'pagadas', 'vencidas'] = 'todas'
     cliente: Optional[str] = Field(None, max_length=120)
     limite: int = Field(25, ge=1, le=100)
 
@@ -100,7 +102,7 @@ class EntradaVentasPorPeriodo(_Periodo):
     agrupacion: Literal['dia', 'semana', 'mes'] = 'mes'
 
 
-class EntradaOperacion(BaseModel):
+class EntradaOperacion(_Estricto):
     pass
 
 
@@ -159,7 +161,7 @@ async def detalle_cliente(odoo, e: EntradaDetalleCliente):
     f = await _totales(
         odoo, 'account.move', [('partner_id', 'child_of', cliente['id']), ('move_type', 'in', ['out_invoice', 'out_refund']),
                                ('state', '=', 'posted')] + _rango('invoice_date', e.desde, e.hasta, es_fecha_hora=False),
-        ['amount_total_signed', 'amount_residual_signed'], 'move_type')
+        ['amount_total_signed'], 'move_type')
     return {
         'encontrado': True, 'cliente': cliente['name'], 'periodo': _texto_periodo(e),
         'pedidos_confirmados': r['__count'], 'total_comprado': _dinero(r['amount_total']),
@@ -168,7 +170,6 @@ async def detalle_cliente(odoo, e: EntradaDetalleCliente):
         'productos': [{'producto': _nombre(l['product_id']), 'cantidad': round(l.get('product_uom_qty') or 0, 2),
                        'subtotal': _dinero(l.get('price_subtotal'))} for l in lineas],
         'facturas_publicadas': f['__count'], 'facturado_neto': _dinero(f['amount_total_signed']),
-        'por_cobrar': _dinero(f['amount_residual_signed']),
         'ultimos_pedidos': [{'pedido': p['name'], 'fecha': p['date_order'], 'total': _dinero(p['amount_total']),
                              'facturacion': p.get('invoice_status')} for p in pedidos],
     }
@@ -185,34 +186,27 @@ async def productos_mas_vendidos(odoo, e: EntradaProductos):
 
 
 async def facturas(odoo, e: EntradaFacturas):
+    """Venta directa: cada pedido se paga y se factura al hacerlo. Una factura sin pagar es una anomalía."""
     dominio = [('move_type', 'in', ['out_invoice', 'out_refund']), ('state', '=', 'posted')] + \
         _rango('invoice_date', e.desde, e.hasta, es_fecha_hora=False)
-    if e.estado == 'pendientes':
-        dominio.append(('payment_state', 'in', ['not_paid', 'partial']))
-    elif e.estado == 'pagadas':
-        dominio.append(('payment_state', 'in', ['paid', 'in_payment']))
-    elif e.estado == 'vencidas':
-        dominio += [('payment_state', 'in', ['not_paid', 'partial']), ('invoice_date_due', '<', date.today().isoformat())]
     if e.cliente:
         dominio.append(('partner_id.name', 'ilike', e.cliente))
     filas = await odoo.search_read('account.move', dominio, [
-        'name', 'partner_id', 'invoice_date', 'invoice_date_due', 'amount_total', 'amount_residual', 'payment_state',
-        'move_type'], limit=e.limite, order='invoice_date desc, id desc')
-    t = await _totales(odoo, 'account.move', dominio, ['amount_total_signed', 'amount_residual_signed'], 'move_type')
-    borradores = await odoo.search_count('account.move', [('move_type', '=', 'out_invoice'), ('state', '=', 'draft')])
-    hoy = date.today()
+        'name', 'partner_id', 'invoice_date', 'amount_total', 'amount_untaxed', 'payment_state', 'move_type',
+        'invoice_origin'], limit=e.limite, order='invoice_date desc, id desc')
+    t = await _totales(odoo, 'account.move', dominio, ['amount_total_signed', 'amount_untaxed_signed'], 'move_type')
+    anomalias = await odoo.search_count('account.move', dominio + [('payment_state', 'in', ['not_paid', 'partial'])])
     return {
-        'filtro': e.estado, 'periodo': _texto_periodo(e), 'cantidad': t['__count'],
-        'total_facturado_neto': _dinero(t['amount_total_signed']), 'total_por_cobrar': _dinero(t['amount_residual_signed']),
-        'facturas_en_borrador_sin_publicar': borradores,
+        'periodo': _texto_periodo(e), 'cantidad': t['__count'],
+        'total_facturado': _dinero(t['amount_total_signed']),
+        'total_sin_impuestos': _dinero(t['amount_untaxed_signed']),
+        'facturas_sin_pagar_anomalia': anomalias,
         'mostradas': len(filas),
         'facturas': [{
-            'numero': f['name'], 'cliente': _nombre(f['partner_id']), 'fecha': f.get('invoice_date') or None,
-            'vence': f.get('invoice_date_due') or None, 'total': _dinero(f['amount_total']),
-            'saldo': _dinero(f['amount_residual']), 'estado_pago': PAGO.get(f.get('payment_state'), f.get('payment_state')),
+            'numero': f['name'], 'pedido': f.get('invoice_origin') or None, 'cliente': _nombre(f['partner_id']),
+            'fecha': f.get('invoice_date') or None, 'total': _dinero(f['amount_total']),
+            'sin_impuestos': _dinero(f['amount_untaxed']), 'pagada': f.get('payment_state') in ('paid', 'in_payment'),
             'nota_credito': f.get('move_type') == 'out_refund',
-            'dias_vencida': (hoy - date.fromisoformat(f['invoice_date_due'])).days
-            if f.get('invoice_date_due') and f.get('amount_residual') and date.fromisoformat(f['invoice_date_due']) < hoy else 0,
         } for f in filas],
     }
 
@@ -276,7 +270,7 @@ REGISTRO = {
         'etiqueta': 'Ficha del cliente',
         'entrada': EntradaDetalleCliente, 'funcion': detalle_cliente,
         'descripcion': ('Consumo de un cliente: total comprado, ticket promedio, primera y última compra, productos que '
-                        'más compra, facturado y saldo por cobrar, y sus últimos pedidos. ' + _PERIODO),
+                        'más compra, total facturado y sus últimos pedidos. ' + _PERIODO),
     },
     'productos_mas_vendidos': {
         'etiqueta': 'Productos más vendidos',
@@ -286,9 +280,9 @@ REGISTRO = {
     'facturas': {
         'etiqueta': 'Facturas',
         'entrada': EntradaFacturas, 'funcion': facturas,
-        'descripcion': ('Facturas de cliente publicadas (y notas de crédito): total facturado, saldo por cobrar, '
-                        'facturas pendientes, pagadas o vencidas, opcionalmente de un cliente. También informa cuántas '
-                        'facturas hay en borrador sin publicar. ' + _PERIODO),
+        'descripcion': ('Facturas de cliente publicadas (y notas de crédito) con su pedido y total, opcionalmente de '
+                        'un cliente. Es venta directa: toda factura se paga al hacer el pedido; si alguna aparece sin '
+                        'pagar se informa como anomalía. ' + _PERIODO),
     },
     'ventas_por_periodo': {
         'etiqueta': 'Evolución de ventas',
@@ -313,8 +307,10 @@ def definiciones():
         for propiedad in esquema.get('properties', {}).values():
             propiedad.pop('title', None)
         esquema['additionalProperties'] = False
-        salida.append({'name': nombre, 'description': h['descripcion'], 'input_schema': esquema,
-                       'eager_input_streaming': True})
+        # Formato de la Responses API de OpenAI. strict=False: hay parámetros opcionales con valor por defecto;
+        # la validación la hace pydantic en `ejecutar`.
+        salida.append({'type': 'function', 'name': nombre, 'description': h['descripcion'],
+                       'parameters': esquema, 'strict': False})
     return salida
 
 

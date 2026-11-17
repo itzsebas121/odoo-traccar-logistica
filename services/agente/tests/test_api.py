@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 
 from app import main
 
-from .conftest import ClaudeFalso, OdooFalso, bloque_texto, mensaje
+from .conftest import IAFalsa, OdooFalso, bloque_texto, mensaje
 
 CSRF = {'X-Agente': '1'}
 
@@ -39,9 +39,9 @@ def test_api_sin_sesion_401(cliente):
 
 
 def test_chat_transmite_eventos_y_guarda_conversacion(cliente, monkeypatch):
-    monkeypatch.setenv('ANTHROPIC_API_KEY', 'prueba')
-    claude = ClaudeFalso([mensaje([bloque_texto('Hola, soy el asistente.')])])
-    monkeypatch.setattr(main, 'cliente_claude', lambda: claude)
+    monkeypatch.setenv('OPENAI_API_KEY', 'prueba')
+    ia = IAFalsa([mensaje([bloque_texto('Hola, soy el asistente.')])])
+    monkeypatch.setattr(main, 'cliente_ia', lambda: ia)
     _entrar(cliente)
     r = cliente.post('/api/chat', json={'mensaje': 'hola'}, headers=CSRF)
     assert r.status_code == 200
@@ -54,10 +54,10 @@ def test_chat_transmite_eventos_y_guarda_conversacion(cliente, monkeypatch):
 
 
 def test_chat_sin_clave_api_avisa(cliente, monkeypatch):
-    monkeypatch.delenv('ANTHROPIC_API_KEY', raising=False)
+    monkeypatch.delenv('OPENAI_API_KEY', raising=False)
     _entrar(cliente)
     r = cliente.post('/api/chat', json={'mensaje': 'hola'}, headers=CSRF)
-    assert 'ANTHROPIC_API_KEY' in r.text
+    assert 'OPENAI_API_KEY' in r.text
 
 
 def test_conversacion_inexistente_404(cliente):

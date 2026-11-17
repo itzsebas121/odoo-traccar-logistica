@@ -17,8 +17,8 @@ class EsquemaSeedsTest(unittest.TestCase):
         self.assertEqual(['Sebastian Tipan', 'Angelica Martinez', 'Bryan Viteri', 'Daniel Moyolema'],
                          [c['name'] for c in self.odoo['conductores']])
         self.assertEqual(4, len(self.traccar['dispositivos']))
-        self.assertEqual(8, len(self.simulacion['pedidos']))
-        self.assertEqual(5, len(self.odoo['productos']))
+        self.assertEqual(15, len(self.simulacion["pedidos"]))
+        self.assertEqual(49, len(self.odoo["productos"]))
         self.assertEqual(4, len(self.odoo['usuarios_conductor']))
         self.assertEqual(4, len(self.simulacion['rutas']))
 

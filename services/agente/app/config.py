@@ -18,7 +18,7 @@ class Config:
     odoo_user: str
     odoo_password: str
     grupo_admin: str
-    # Claude
+    # OpenAI (GPT)
     modelo: str
     esfuerzo: str
     max_vueltas: int
@@ -41,8 +41,9 @@ def cargar():
         odoo_user=os.environ.get('ODOO_USER') or 'admin',
         odoo_password=clave_odoo,
         grupo_admin=os.environ.get('AGENTE_GRUPO_ADMIN') or 'base.group_system',
-        modelo=os.environ.get('AGENTE_MODELO') or 'claude-opus-5-5',
-        esfuerzo=os.environ.get('AGENTE_ESFUERZO') or 'medium',
+        modelo=os.environ.get('AGENTE_MODELO') or 'gpt-6.1-sol',
+        # none | minimal | low | medium | high | xhigh | max (según el modelo). Vacío = no se envía.
+        esfuerzo=(os.environ.get('AGENTE_ESFUERZO', 'medium') or '').strip(),
         max_vueltas=int(os.environ.get('AGENTE_MAX_VUELTAS') or 8),
         session_secret=secreto,
         cookie_segura=_bool('AGENTE_COOKIE_SEGURA', True),

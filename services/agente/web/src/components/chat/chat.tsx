@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 const SUGERENCIAS = [
   { titulo: '¿Quién es nuestro mejor cliente?', detalle: 'Ranking por monto, frecuencia y última compra' },
   { titulo: '¿Cuánto consumió cada cliente este mes?', detalle: 'Ventas confirmadas del mes en curso' },
-  { titulo: 'Facturas pendientes de cobro', detalle: 'Saldo por cliente y días de atraso' },
+  { titulo: '¿Qué productos se venden más?', detalle: 'Cantidad y monto por producto' },
   { titulo: '¿Cómo va la operación ahora?', detalle: 'Entregas, rutas activas y GPS de la flota' },
 ]
 

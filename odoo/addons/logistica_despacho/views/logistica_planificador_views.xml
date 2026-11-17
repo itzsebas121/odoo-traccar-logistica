@@ -4,17 +4,22 @@
         <field name="name">logistica.planificador.form</field>
         <field name="model">logistica.planificador</field>
         <field name="arch" type="xml">
-            <form string="Planificar despacho">
+            <form string="Despachar">
                 <p class="text-muted">
-                    Se proponen rutas desde la bodega con las entregas preparadas que no están en una ruta activa.
-                    Las rutas quedan en borrador hasta que las apruebe.
+                    Se arman las rutas con todo lo que está listo para salir. Revise el resumen y pulse
+                    «Proponer rutas»; luego apruebe las rutas para avisar a los conductores.
                 </p>
                 <group>
                     <field name="date"/>
-                    <field name="bodega_id"/>
-                    <field name="vehicle_ids" widget="many2many_tags"/>
-                    <field name="time_limit_s"/>
+                    <field name="vehicle_ids" widget="many2many_tags" context="{'logistica_con_conductor': True}"
+                           placeholder="Todos los vehículos con conductor"/>
+                    <field name="entrega_ids" widget="many2many_tags"
+                           domain="[('estado_simple', '=', 'por_despachar'), ('state', '=', 'preparado')]"
+                           placeholder="Todas las entregas listas (o seleccione pedidos específicos)"/>
+                    <field name="bodega_id" groups="base.group_no_one"/>
+                    <field name="time_limit_s" groups="base.group_no_one"/>
                 </group>
+                <field name="resumen" nolabel="1"/>
                 <footer>
                     <button name="action_proponer" string="Proponer rutas" type="object" class="btn-primary"/>
                     <button string="Cerrar" special="cancel"/>
@@ -24,7 +29,7 @@
     </record>
 
     <record id="action_logistica_planificador" model="ir.actions.act_window">
-        <field name="name">Planificar despacho</field>
+        <field name="name">Despachar</field>
         <field name="res_model">logistica.planificador</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
@@ -34,6 +39,7 @@
         <field name="name">Pedidos por despachar</field>
         <field name="res_model">logistica.entrega</field>
         <field name="view_mode">tree,form</field>
-        <field name="domain">[('state', '=', 'preparado')]</field>
+        <!-- Fase A: incluye también las que esperan preparación en bodega (antes no aparecían aquí). -->
+        <field name="domain">[('estado_simple', '=', 'por_despachar')]</field>
     </record>
 </odoo>

@@ -1,4 +1,4 @@
-import { ChatCircleTextIcon, SignOutIcon, SquaresFourIcon } from '@phosphor-icons/react'
+import { ChatCircleTextIcon, DatabaseIcon, SignOutIcon, SquaresFourIcon } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 
 import { Marca } from '@/components/marca'
@@ -6,11 +6,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import type { Usuario } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
-export type Vista = 'chat' | 'tablero'
+export type Vista = 'chat' | 'tablero' | 'basedatos'
 
 const ENTRADAS: { id: Vista; etiqueta: string; icono: Icon }[] = [
   { id: 'chat', etiqueta: 'Asistente', icono: ChatCircleTextIcon },
   { id: 'tablero', etiqueta: 'Tablero', icono: SquaresFourIcon },
+  { id: 'basedatos', etiqueta: 'Base', icono: DatabaseIcon },
 ]
 
 function iniciales(nombre: string) {

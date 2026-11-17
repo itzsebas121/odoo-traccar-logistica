@@ -193,13 +193,16 @@ services:
       INTEGRATION_TRACCAR_EMAIL: ${INTEGRATION_TRACCAR_EMAIL:?Configura INTEGRATION_TRACCAR_EMAIL}
       INTEGRATION_TRACCAR_PASSWORD: ${INTEGRATION_TRACCAR_PASSWORD:?Configura INTEGRATION_TRACCAR_PASSWORD}
       DEMO_CONDUCTOR_PASSWORD: ${DEMO_CONDUCTOR_PASSWORD:?Configura DEMO_CONDUCTOR_PASSWORD}
+      SEED_HISTORIAL: ${SEED_HISTORIAL:-true}
     command: ["python", "seeds/seed.py"]
 
-  # Asistente del administrador (chat con Claude + interfaz React). Lee Odoo con permisos de solo consulta.
+  # Asistente del administrador (chat con GPT de OpenAI + interfaz React). Lee Odoo con permisos de solo consulta.
   agente:
     build: ./services/agente
     restart: unless-stopped
     depends_on:
+      db:
+        condition: service_healthy
       odoo:
         condition: service_healthy
     environment:
@@ -208,14 +211,29 @@ services:
       ODOO_USER: ${ODOO_USER:-admin}
       ODOO_PASSWORD: ${ODOO_PASSWORD:-${ODOO_ADMIN_PASSWORD}}
       # Sin clave el servicio arranca igual y avisa en el chat.
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      AGENTE_MODELO: ${AGENTE_MODELO:-claude-opus-5-5}
-      AGENTE_ESFUERZO: ${AGENTE_ESFUERZO:-medium}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AGENTE_MODELO: ${AGENTE_MODELO:-gpt-6.1-sol}
+      # Vacia = no se envia el nivel de razonamiento (para modelos que no lo admiten)
+      AGENTE_ESFUERZO: ${AGENTE_ESFUERZO-medium}
       AGENTE_SESSION_SECRET: ${AGENTE_SESSION_SECRET:?Configura AGENTE_SESSION_SECRET (openssl rand -hex 32)}
       # true con HTTPS (produccion); false solo en local por http://
       AGENTE_COOKIE_SEGURA: ${AGENTE_COOKIE_SEGURA:-true}
       # IPs del proxy en las que se confia para X-Forwarded-For (Traefik en Dokploy: su red, o "*" si 8000 no se publica)
       FORWARDED_ALLOW_IPS: ${AGENTE_FORWARDED_ALLOW_IPS:-127.0.0.1}
+      # Seccion «Base de datos»: respaldos y restauracion (pg_dump/pg_restore con el usuario odoo de PostgreSQL).
+      PGHOST: db
+      PGUSER: odoo
+      PGPASSWORD: ${ODOO_DB_PASSWORD:?Configura ODOO_DB_PASSWORD}
+      TRACCAR_DB_NAME: traccar
+      TRACCAR_DB_USER: ${TRACCAR_DB_USER:-traccar}
+      # Cada respaldo/restauracion pide la contrasena maestra de Odoo.
+      ODOO_MASTER_PASSWORD: ${ODOO_MASTER_PASSWORD:?Configura ODOO_MASTER_PASSWORD}
+      AGENTE_MAX_SUBIDA_MB: ${AGENTE_MAX_SUBIDA_MB:-2048}
+    volumes:
+      # Filestore de Odoo (adjuntos): va dentro de los respaldos y se reemplaza al restaurar.
+      - odoo_data:/var/lib/odoo
+      # Respaldos guardados en el servidor (sobreviven a los redespliegues).
+      - respaldos:/respaldos
     ports:
       - "127.0.0.1:8003:8000"
     healthcheck:
@@ -248,6 +266,7 @@ services:
       retries: 5
 
 volumes:
+  respaldos:
   postgres_odoo_data:
   odoo_data:
   traccar_data:

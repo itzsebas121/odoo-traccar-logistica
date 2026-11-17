@@ -49,7 +49,8 @@ class _BaseMonitoreo:
             'order_line': [(0, 0, {'product_id': producto.id, 'product_uom_qty': 1})]})
         pedido.action_confirm()
         entrega = pedido.logistica_entrega_id
-        entrega.action_marcar_preparado()
+        if entrega.state == 'en_preparacion':
+            entrega.action_marcar_preparado()
         return entrega
 
     def _ruta_en_recorrido(self):

@@ -44,11 +44,15 @@ def validar_destino(env, lat_raw, lon_raw):
         return None, None, _(MSG_INVALIDA)
     if not (-90 <= lat <= 90 and -180 <= lon <= 180) or (lat == 0 and lon == 0):
         return None, None, _(MSG_INVALIDA)
-    cobertura = env['logistica.configuracion'].sudo().get_config().cobertura()
+    config = env['logistica.configuracion'].sudo().get_config()
+    cobertura = config.cobertura()
     if cobertura:
         lat_min, lat_max, lon_min, lon_max = cobertura
         if not (lat_min <= lat <= lat_max and lon_min <= lon <= lon_max):
             return None, None, _(MSG_FUERA)
+    # Fase A: radio desde la bodega (p. ej. hasta Mocha), además del rectángulo.
+    if config.fuera_de_radio(lat, lon):
+        return None, None, _(MSG_FUERA)
     return lat, lon, None
 
 

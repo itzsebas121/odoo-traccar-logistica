@@ -51,12 +51,25 @@ class LogisticaRuta(models.Model):
     finished_at = fields.Datetime(string='Fin del recorrido', copy=False)
     interrupt_reason = fields.Text(string='Motivo de cancelación o interrupción', copy=False)
     stop_ids = fields.One2many('logistica.ruta.parada', 'route_id', string='Paradas')
+    used_entrega_ids = fields.Many2many(
+        'logistica.entrega', compute='_compute_used_entrega_ids')
 
     total_stops = fields.Integer(string='Paradas', compute='_compute_metricas')
     delivered_stops = fields.Integer(string='Entregadas', compute='_compute_metricas')
     failed_stops = fields.Integer(string='No entregadas', compute='_compute_metricas')
     pending_stops = fields.Integer(string='Pendientes', compute='_compute_metricas')
     progress = fields.Float(string='Avance (%)', compute='_compute_metricas')
+
+    @api.depends('stop_ids.entrega_id')
+    def _compute_used_entrega_ids(self):
+        Parada = self.env['logistica.ruta.parada'].sudo()
+        for ruta in self:
+            en_esta = ruta.stop_ids.mapped('entrega_id').ids
+            dominio = [('route_id.state', 'in', ESTADOS_ACTIVOS)]
+            if ruta._origin.id:
+                dominio.append(('route_id', '!=', ruta._origin.id))
+            en_otras = Parada.search(dominio).mapped('entrega_id').ids
+            ruta.used_entrega_ids = [(6, 0, list(set(en_esta + en_otras)))]
 
     @api.depends('stop_ids.state')
     def _compute_metricas(self):
@@ -164,6 +177,29 @@ class LogisticaRuta(models.Model):
                 entrega.action_marcar_asignado(route_id=ruta.id)
         return True
 
+    def action_aprobar_seleccion(self):
+        """Botón de la lista: aprueba las rutas en borrador seleccionadas y omite las demás."""
+        borradores = self.filtered(lambda r: r.state == 'borrador')
+        borradores.action_aprobar_plan()
+        return {
+            'type': 'ir.actions.client', 'tag': 'display_notification',
+            'params': {
+                'title': _('Rutas aprobadas'),
+                'message': _('%(n)d rutas aprobadas; los conductores ya las ven en su portal.') % {
+                    'n': len(borradores)},
+                'type': 'success' if borradores else 'warning', 'sticky': False,
+                'next': {'type': 'ir.actions.client', 'tag': 'reload'},
+            },
+        }
+
+    def action_salir_a_ruta(self):
+        """Un solo paso para el conductor: confirma la carga (si falta) e inicia el recorrido."""
+        for ruta in self:
+            if ruta.state == 'planificada':
+                ruta.action_confirmar_carga()
+            ruta.action_iniciar_recorrido()
+        return True
+
     def action_confirmar_carga(self):
         """planificada → carga_confirmada (conductor o gestor)."""
         for ruta in self:
@@ -201,7 +237,15 @@ class LogisticaRuta(models.Model):
             ruta._transicionar('en_recorrido', 'cerrada', finished_at=fields.Datetime.now())
             for parada in ruta.stop_ids.filtered(lambda s: s.state == 'no_entregado'):
                 parada.entrega_id._transicionar('no_entregado', 'pendiente_reprogramacion')
+                # Fase A: vuelve sola a «Por despachar» si le quedan intentos; si no, «Requiere atención».
+                parada.entrega_id.reprogramar_si_corresponde(parada.failed_reason)
         return True
+
+    def _cerrar_si_terminada(self):
+        """Cierra la ruta en cuanto no quedan paradas pendientes (antes había que pulsar «Cerrar ruta»)."""
+        for ruta in self:
+            if ruta.state == 'en_recorrido' and not ruta.stop_ids.filtered(lambda s: s.state == 'pendiente'):
+                ruta.action_cerrar()
 
     def action_cancelar(self, motivo=None):
         """borrador, planificada o carga_confirmada → cancelada. Las entregas vuelven a «preparado»."""
@@ -232,6 +276,8 @@ class LogisticaRuta(models.Model):
                 if entrega.state == 'en_recorrido':
                     entrega._transicionar('en_recorrido', 'pendiente_reprogramacion')
                     entrega._registrar_evento('ruta_interrumpida', notes=motivo)
+                    # La interrupción no es culpa de la entrega: vuelve a la cola (no cuenta como intento).
+                    entrega.reprogramar_si_corresponde()
         return True
 
     # ------------------------------------------------------------------
@@ -244,6 +290,7 @@ class LogisticaRuta(models.Model):
             'name': _('Motivo'),
             'res_model': 'logistica.ruta.motivo',
             'view_mode': 'form',
+            'views': [[False, 'form']],
             'target': 'new',
             'context': {'default_ruta_id': self.id, 'default_accion': accion},
         }

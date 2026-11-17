@@ -159,23 +159,16 @@
                 }());
             </script>
 
-            <t t-if="ruta.state == 'planificada'">
-                <form method="post" t-attf-action="/logistica/conductor/ruta/{{ruta.id}}/confirmar-carga">
+            <!-- Fase A: un solo paso para salir (confirma la carga e inicia el recorrido). -->
+            <t t-if="ruta.state in ('planificada', 'carga_confirmada')">
+                <form method="post" t-attf-action="/logistica/conductor/ruta/{{ruta.id}}/salir"
+                      onsubmit="return confirm('¿Ya cargaste todos los pedidos? Al salir no se pueden agregar más.');">
                     <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                    <button type="submit">Confirmar carga</button>
-                </form>
-            </t>
-            <t t-if="ruta.state == 'carga_confirmada'">
-                <form method="post" t-attf-action="/logistica/conductor/ruta/{{ruta.id}}/iniciar">
-                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                    <button type="submit" class="c-ok">Iniciar recorrido</button>
+                    <button type="submit" class="c-ok">Salir a ruta (<t t-esc="ruta.total_stops"/> paradas)</button>
                 </form>
             </t>
             <t t-if="ruta.state == 'en_recorrido'">
-                <form method="post" t-attf-action="/logistica/conductor/ruta/{{ruta.id}}/cerrar">
-                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                    <button type="submit" class="c-gris">Cerrar ruta</button>
-                </form>
+                <p class="c-estado">La ruta se cierra sola al registrar la última parada.</p>
                 <details>
                     <summary>Interrumpir ruta</summary>
                     <form method="post" t-attf-action="/logistica/conductor/ruta/{{ruta.id}}/interrumpir">
@@ -189,7 +182,7 @@
             <h3>Próxima parada</h3>
             <t t-if="siguiente">
                 <div class="c-tarjeta c-siguiente-card">
-                    <div class="c-siguiente-head"><span>◉  Siguiente parada</span><span><t t-esc="siguiente.sequence"/> de <t t-esc="ruta.total_stops"/></span></div>
+                    <div class="c-siguiente-head"><span>◉  Próxima parada</span><span><t t-esc="siguiente.sequence"/> de <t t-esc="ruta.total_stops"/></span></div>
                     <strong t-esc="siguiente.entrega_id.recipient_name"/>
                     <div t-esc="siguiente.entrega_id.destination_address"/>
                     <div t-if="siguiente.entrega_id.phone">Tel. <t t-esc="siguiente.entrega_id.phone"/></div>

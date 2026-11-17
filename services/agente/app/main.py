@@ -2,6 +2,8 @@
 
 La interfaz se sirve desde este mismo servicio: navegador y API comparten origen, así que no hay CORS.
 """
+import asyncio
+import hmac
 import json
 import logging
 import os
@@ -9,14 +11,14 @@ import time
 from collections import defaultdict, deque
 from pathlib import Path
 
-import anthropic
-from fastapi import Depends, FastAPI, HTTPException, Request
+import openai
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import agente
+from . import agente, basedatos
 from .config import cargar
 from .conversaciones import Almacen
 from .odoo import ClienteOdoo, ErrorOdoo
@@ -27,18 +29,22 @@ _logger = logging.getLogger('agente')
 config = cargar()
 odoo = ClienteOdoo(config.odoo_url, config.odoo_db, config.odoo_user, config.odoo_password)
 almacen = Almacen()
-_cliente_claude = None
+_cliente_ia = None
+config_bd = basedatos.ConfigBD.desde_entorno()
+operacion_bd = asyncio.Lock()
+MAX_SUBIDA_BYTES = int(os.environ.get('AGENTE_MAX_SUBIDA_MB') or 2048) * 1024 * 1024
+CONFIRMACION_RESTAURAR = 'RESTAURAR'
 
 STATIC_DIR = Path(os.environ.get('AGENTE_STATIC_DIR') or Path(__file__).resolve().parent.parent / 'static')
 CABECERA_CSRF = 'x-agente'
 
 
-def cliente_claude():
-    """Cliente de la API creado al primer uso: sin ANTHROPIC_API_KEY el servicio arranca igual y lo avisa en el chat."""
-    global _cliente_claude
-    if _cliente_claude is None:
-        _cliente_claude = anthropic.AsyncAnthropic()
-    return _cliente_claude
+def cliente_ia():
+    """Cliente de OpenAI creado al primer uso: sin OPENAI_API_KEY el servicio arranca igual y lo avisa en el chat."""
+    global _cliente_ia
+    if _cliente_ia is None:
+        _cliente_ia = openai.AsyncOpenAI(timeout=600, max_retries=2)
+    return _cliente_ia
 
 
 class Limitador:
@@ -61,6 +67,7 @@ class Limitador:
 
 limite_login = Limitador(10, 300)
 limite_chat = Limitador(30, 600)
+limite_maestra = Limitador(10, 900)
 
 app = FastAPI(title='Asistente del administrador', docs_url=None, redoc_url=None, openapi_url=None)
 app.add_middleware(SessionMiddleware, secret_key=config.session_secret, session_cookie='agente_sesion',
@@ -113,7 +120,7 @@ class EntradaChat(BaseModel):
 
 @app.get('/api/salud')
 async def salud():
-    return {'estado': 'ok', 'modelo': config.modelo, 'claude_configurado': bool(os.environ.get('ANTHROPIC_API_KEY'))}
+    return {'estado': 'ok', 'modelo': config.modelo, 'ia_configurada': bool(os.environ.get('OPENAI_API_KEY'))}
 
 
 @app.post('/api/login', dependencies=[Depends(exigir_csrf)])
@@ -188,16 +195,144 @@ async def chat(datos: EntradaChat, usuario=Depends(usuario_actual)):
         async with conversacion.candado:
             conversacion.vista.append({'rol': 'usuario', 'bloques': [{'tipo': 'texto', 'texto': datos.mensaje}]})
             yield _sse('conversacion', conversacion.resumen())
-            if not os.environ.get('ANTHROPIC_API_KEY'):
-                mensaje = 'Falta configurar ANTHROPIC_API_KEY en el servicio del asistente.'
+            if not os.environ.get('OPENAI_API_KEY'):
+                mensaje = 'Falta configurar OPENAI_API_KEY en el servicio del asistente.'
                 conversacion.vista.append({'rol': 'asistente', 'bloques': [{'tipo': 'error', 'texto': mensaje}]})
                 yield _sse('error', {'mensaje': mensaje})
                 return
-            async for evento in agente.ejecutar_turno(cliente_claude(), odoo, config, conversacion, datos.mensaje):
+            async for evento in agente.ejecutar_turno(cliente_ia(), odoo, config, conversacion, datos.mensaje):
                 yield _sse(evento['evento'], evento['datos'])
 
     return StreamingResponse(flujo(), media_type='text/event-stream',
                              headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+
+# ------------------------------------------------------------------ base de datos (respaldos y restauración)
+def _exigir_bd_disponible():
+    if not config_bd.disponible:
+        raise HTTPException(503, 'La gestión de la base no está configurada en este servicio (falta PGPASSWORD).')
+
+
+def _exigir_clave_maestra(usuario, clave):
+    """Cada operación sobre la base pide la contraseña maestra de Odoo (además de la sesión de administrador)."""
+    esperada = os.environ.get('ODOO_MASTER_PASSWORD') or ''
+    if not esperada:
+        raise HTTPException(503, 'Falta ODOO_MASTER_PASSWORD en el servicio del asistente.')
+    if not limite_maestra.permitir(usuario['uid']):
+        raise HTTPException(429, 'Demasiados intentos con la contraseña maestra. Espere unos minutos.')
+    if not hmac.compare_digest((clave or '').encode(), esperada.encode()):
+        _logger.warning('bd_clave_maestra_incorrecta usuario=%s', usuario['login'])
+        raise HTTPException(403, 'Contraseña maestra incorrecta.')
+
+
+async def _en_exclusiva(funcion, *args):
+    if operacion_bd.locked():
+        raise HTTPException(409, 'Ya hay una operación de base de datos en curso. Espere a que termine.')
+    async with operacion_bd:
+        try:
+            return await asyncio.to_thread(funcion, *args)
+        except basedatos.ErrorBD as exc:
+            raise HTTPException(400, str(exc)) from None
+
+
+class EntradaRespaldo(BaseModel):
+    base: str = Field(pattern='^(odoo|traccar)$')
+    clave_maestra: str = Field(min_length=1, max_length=500)
+
+
+class EntradaClave(BaseModel):
+    clave_maestra: str = Field(min_length=1, max_length=500)
+
+
+@app.get('/api/bd')
+async def bd_estado(_usuario=Depends(usuario_actual)):
+    _exigir_bd_disponible()
+    datos = await asyncio.to_thread(basedatos.estado, config_bd)
+    return {**datos, 'en_curso': operacion_bd.locked(), 'max_subida_mb': MAX_SUBIDA_BYTES // (1024 * 1024)}
+
+
+@app.post('/api/bd/respaldos', dependencies=[Depends(exigir_csrf)])
+async def bd_respaldar(datos: EntradaRespaldo, usuario=Depends(usuario_actual)):
+    _exigir_bd_disponible()
+    _exigir_clave_maestra(usuario, datos.clave_maestra)
+    _logger.info('bd_respaldo base=%s usuario=%s', datos.base, usuario['login'])
+    ruta = await _en_exclusiva(basedatos.respaldar, config_bd, datos.base)
+    return {'nombre': ruta.name, 'tamano_bytes': ruta.stat().st_size}
+
+
+@app.get('/api/bd/respaldos/{nombre}')
+async def bd_descargar(nombre: str, usuario=Depends(usuario_actual)):
+    _exigir_bd_disponible()
+    try:
+        ruta = basedatos.ruta_respaldo(config_bd, nombre)
+    except basedatos.ErrorBD as exc:
+        raise HTTPException(404, str(exc)) from None
+    _logger.info('bd_descarga archivo=%s usuario=%s', nombre, usuario['login'])
+    return FileResponse(ruta, filename=ruta.name, media_type='application/octet-stream')
+
+
+@app.post('/api/bd/respaldos/{nombre}/borrar', dependencies=[Depends(exigir_csrf)])
+async def bd_borrar(nombre: str, datos: EntradaClave, usuario=Depends(usuario_actual)):
+    _exigir_bd_disponible()
+    _exigir_clave_maestra(usuario, datos.clave_maestra)
+    try:
+        basedatos.borrar(config_bd, nombre)
+    except basedatos.ErrorBD as exc:
+        raise HTTPException(404, str(exc)) from None
+    _logger.info('bd_borrado archivo=%s usuario=%s', nombre, usuario['login'])
+    return {'ok': True}
+
+
+@app.post('/api/bd/restaurar', dependencies=[Depends(exigir_csrf)])
+async def bd_restaurar(
+    usuario=Depends(usuario_actual),
+    base: str = Form(pattern='^(odoo|traccar)$'),
+    clave_maestra: str = Form(min_length=1, max_length=500),
+    confirmacion: str = Form(max_length=40),
+    nombre: str | None = Form(None, max_length=200),
+    archivo: UploadFile | None = File(None),
+):
+    """Restaura desde un respaldo guardado (`nombre`) o desde un archivo subido (`archivo`)."""
+    _exigir_bd_disponible()
+    _exigir_clave_maestra(usuario, clave_maestra)
+    if confirmacion.strip().upper() != CONFIRMACION_RESTAURAR:
+        raise HTTPException(400, f'Escriba {CONFIRMACION_RESTAURAR} para confirmar.')
+    if operacion_bd.locked():
+        raise HTTPException(409, 'Ya hay una operación de base de datos en curso. Espere a que termine.')
+    if archivo is not None and archivo.filename:
+        try:
+            destino = config_bd.dir_respaldos / basedatos.nombre_para_subida(base, archivo.filename)
+        except basedatos.ErrorBD as exc:
+            raise HTTPException(400, str(exc)) from None
+        config_bd.dir_respaldos.mkdir(parents=True, exist_ok=True)
+        await _guardar_subida(archivo, destino)
+        ruta = destino
+    elif nombre:
+        try:
+            ruta = basedatos.ruta_respaldo(config_bd, nombre)
+        except basedatos.ErrorBD as exc:
+            raise HTTPException(404, str(exc)) from None
+        if not ruta.name.startswith(f'{base}_'):
+            raise HTTPException(400, f'Ese respaldo no es de {base}.')
+    else:
+        raise HTTPException(400, 'Elija un respaldo guardado o suba un archivo.')
+    return await _en_exclusiva(basedatos.restaurar, config_bd, base, ruta, usuario['login'])
+
+
+async def _guardar_subida(archivo: UploadFile, destino):
+    parcial = destino.with_suffix('.parcial')
+    total = 0
+    try:
+        with open(parcial, 'wb') as salida:
+            while bloque := await archivo.read(1024 * 1024):
+                total += len(bloque)
+                if total > MAX_SUBIDA_BYTES:
+                    raise HTTPException(413, f'El archivo supera {MAX_SUBIDA_BYTES // (1024 * 1024)} MB.')
+                salida.write(bloque)
+        parcial.rename(destino)
+    finally:
+        parcial.unlink(missing_ok=True)
+        await archivo.close()
 
 
 @app.exception_handler(HTTPException)

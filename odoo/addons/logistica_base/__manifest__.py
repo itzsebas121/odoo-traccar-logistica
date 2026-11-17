@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Logística Base - Coordenadas y Zonas',
-    'version': '16.0.1.0.0',
+    'version': '16.0.1.2.0',
     'category': 'Inventory/Logistics',
     'summary': 'Geolocalización de contactos, zonas de entrega y pedidos de venta',
     'description': """
@@ -19,6 +19,7 @@ Módulo Base de Logística
         'base',
         'contacts',
         'sale_management',
+        'account',
         'fleet',
     ],
     'data': [
@@ -29,6 +30,11 @@ Módulo Base de Logística
         'views/res_partner_views.xml',
         'views/sale_order_views.xml',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'logistica_base/static/src/css/shadcn_backend.css',
+        ],
+    },
     'installable': True,
     'application': False,
     'auto_install': False,

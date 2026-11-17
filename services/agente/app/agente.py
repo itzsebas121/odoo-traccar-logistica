@@ -1,8 +1,9 @@
-"""Bucle del asistente: Claude con herramientas de solo lectura sobre Odoo, transmitido como eventos.
+"""Bucle del asistente: GPT (OpenAI, Responses API) con herramientas de solo lectura sobre Odoo.
 
-Cada turno se transmite token a token (texto y resumen del razonamiento) y las herramientas se ejecutan
-en paralelo. El historial que se envía a la API solo crece al final (append-only): los bloques de
-razonamiento y de herramientas vuelven sin tocar, como exige la API.
+Cada turno se transmite en vivo (texto y resumen del razonamiento) y las herramientas se ejecutan en paralelo.
+Se usa la Responses API porque en la familia GPT-6 las herramientas solo funcionan ahí. Sin estado en
+OpenAI (`store=False`): el historial completo vive en el servicio y el razonamiento vuelve cifrado
+(`reasoning.encrypted_content`) para que el modelo no lo pierda entre llamadas.
 """
 import asyncio
 import json
@@ -10,15 +11,13 @@ import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-import anthropic
+import openai
 
 from . import herramientas
 
 _logger = logging.getLogger(__name__)
 
-BETAS = ['server-side-fallback-2026-07-01']
-MAX_TOKENS = 32000
-REINTENTOS_JSON = 2
+MAX_TOKENS_SALIDA = 32000
 
 SISTEMA = """Eres el asistente de análisis del administrador de una empresa de logística y ventas que trabaja \
 con Odoo (ventas, facturación, entregas) y Traccar (GPS de la flota). Respondes en español, de forma clara y directa.
@@ -29,6 +28,9 @@ herramienta no devuelve datos, dilo y explica la causa probable (por ejemplo, qu
 - Para preguntas como "¿quién es el mejor cliente?" no hay un único criterio: indica cuál usas (monto vendido, \
 frecuencia de compra, compra reciente y, si hay facturas, pago a tiempo) y, si cambian el resultado, muestra la \
 comparación. Si el usuario no precisa, ofrece el ranking por monto y menciona los demás criterios.
+- Modelo de negocio: venta directa. Cada pedido se paga y se factura al hacerlo; no hay crédito, plazos ni cuentas \
+por cobrar, así que no hables de saldos pendientes ni vencimientos. Un pedido de hoy aún no entregado es normal. Si una \
+herramienta informa facturas sin pagar, preséntalo como una anomalía para revisar, no como deuda.
 - Las ventas son pedidos confirmados; la facturación son facturas publicadas. Si difieren, explícalo.
 - Usa tablas en Markdown para rankings y listas con números; montos con dos decimales y separador de miles. \
 Termina con una conclusión breve o una recomendación accionable cuando aporte valor.
@@ -40,36 +42,62 @@ hacerlo en Odoo."""
 
 
 def sistema(zona):
-    """Prompt de sistema. La fecha cambia una vez al día: el prefijo cacheable se mantiene durante el día."""
+    """Instrucciones. La fecha cambia una vez al día: el prefijo cacheable se mantiene durante el día."""
     hoy = datetime.now(ZoneInfo(zona)).strftime('%Y-%m-%d (%A)')
     return f'{SISTEMA}\n\nFecha actual: {hoy}. Zona horaria: {zona}. Las fechas y horas de Odoo vienen en UTC.'
 
 
-def sanear_contenido(bloques):
-    """Tras un fallback a mitad de respuesta, la API pide omitir thinking/tool_use anteriores al último bloque
-    `fallback` y dejar ese bloque donde apareció. Sin fallback, el contenido vuelve intacto."""
-    indices = [i for i, b in enumerate(bloques) if getattr(b, 'type', None) == 'fallback']
-    if not indices:
-        return list(bloques)
-    limite = indices[-1]
-    omitir = {'thinking', 'redacted_thinking', 'tool_use', 'server_tool_use'}
-    return [b for i, b in enumerate(bloques) if i >= limite or getattr(b, 'type', None) not in omitir]
+class ErrorTurno(RuntimeError):
+    """El modelo no pudo completar el turno; el mensaje es apto para el usuario."""
 
 
 def _mensaje_error_api(exc):
-    if isinstance(exc, anthropic.AuthenticationError):
-        return 'La clave de la API de Claude no es válida (revise ANTHROPIC_API_KEY).'
-    if isinstance(exc, anthropic.PermissionDeniedError):
-        return 'La clave de la API no tiene permiso para este modelo.'
-    if isinstance(exc, anthropic.RateLimitError):
-        return 'Se alcanzó el límite de uso de la API de Claude. Intente de nuevo en un momento.'
-    if isinstance(exc, anthropic.BadRequestError):
-        return 'La API de Claude rechazó la solicitud.'
-    if isinstance(exc, anthropic.APIStatusError):
-        return 'La API de Claude no está disponible en este momento. Intente de nuevo.'
-    if isinstance(exc, anthropic.APIConnectionError):
-        return 'No hay conexión con la API de Claude.'
+    if isinstance(exc, openai.AuthenticationError):
+        return 'La clave de la API de OpenAI no es válida (revise OPENAI_API_KEY).'
+    if isinstance(exc, openai.PermissionDeniedError):
+        return 'La clave de la API no tiene acceso a este modelo (revise AGENTE_MODELO).'
+    if isinstance(exc, openai.NotFoundError):
+        return 'El modelo configurado no existe o no está disponible (revise AGENTE_MODELO).'
+    if isinstance(exc, openai.RateLimitError):
+        return 'Se alcanzó el límite de uso o de saldo de la API de OpenAI. Intente más tarde.'
+    if isinstance(exc, openai.BadRequestError):
+        return 'La API de OpenAI rechazó la solicitud.'
+    if isinstance(exc, openai.APIConnectionError):
+        return 'No hay conexión con la API de OpenAI.'
+    if isinstance(exc, openai.APIStatusError):
+        return 'La API de OpenAI no está disponible en este momento. Intente de nuevo.'
     return 'Error inesperado del asistente.'
+
+
+def _como_entrada(item):
+    """Elemento de salida → elemento de entrada para la siguiente llamada (se devuelve tal cual)."""
+    return item.model_dump(mode='json', exclude_none=True)
+
+
+def _tiene_rechazo(salida):
+    for item in salida:
+        if getattr(item, 'type', None) == 'message':
+            if any(getattr(parte, 'type', None) == 'refusal' for parte in (item.content or [])):
+                return True
+    return False
+
+
+def _parametros(config, historial):
+    parametros = {
+        'model': config.modelo,
+        'instructions': sistema(config.zona_horaria),
+        'input': historial,
+        'tools': herramientas.definiciones(),
+        'parallel_tool_calls': True,
+        'max_output_tokens': MAX_TOKENS_SALIDA,
+        'store': False,
+        'include': ['reasoning.encrypted_content'],
+        'prompt_cache_key': 'bitacora-asistente',
+        'stream': True,
+    }
+    if config.esfuerzo:
+        parametros['reasoning'] = {'effort': config.esfuerzo, 'summary': 'auto'}
+    return parametros
 
 
 async def ejecutar_turno(cliente, odoo, config, conversacion, texto):
@@ -78,133 +106,114 @@ async def ejecutar_turno(cliente, odoo, config, conversacion, texto):
     inicio_turno = len(historial)
     historial.append({'role': 'user', 'content': texto})
     vista = {'rol': 'asistente', 'bloques': []}
-    uso = {'entrada': 0, 'salida': 0, 'cache_lectura': 0, 'cache_escritura': 0}
-    herramientas_api = herramientas.definiciones()
-    reintentos = 0
+    uso = {'entrada': 0, 'salida': 0, 'cache_lectura': 0, 'razonamiento': 0}
     terminado_bien = False
 
     try:
         for _vuelta in range(config.max_vueltas):
             bloque_texto = None
             bloque_pensamiento = None
-            try:
-                async with cliente.beta.messages.stream(
-                    model=config.modelo,
-                    max_tokens=MAX_TOKENS,
-                    system=sistema(config.zona_horaria),
-                    tools=herramientas_api,
-                    messages=historial,
-                    thinking={'type': 'adaptive', 'display': 'summarized'},
-                    output_config={'effort': config.esfuerzo},
-                    cache_control={'type': 'ephemeral'},
-                    betas=BETAS,
-                    fallbacks='default',
-                ) as stream:
-                    async for evento in stream:
-                        if evento.type == 'thinking' and evento.thinking:
-                            if bloque_pensamiento is None:
-                                bloque_pensamiento = {'tipo': 'pensamiento', 'texto': ''}
-                                vista['bloques'].append(bloque_pensamiento)
-                            bloque_pensamiento['texto'] += evento.thinking
-                            yield {'evento': 'pensamiento', 'datos': {'texto': evento.thinking}}
-                        elif evento.type == 'text' and evento.text:
-                            if bloque_texto is None:
-                                bloque_texto = {'tipo': 'texto', 'texto': ''}
-                                vista['bloques'].append(bloque_texto)
-                            bloque_texto['texto'] += evento.text
-                            yield {'evento': 'texto', 'datos': {'texto': evento.text}}
-                        elif evento.type == 'content_block_start':
-                            tipo = getattr(evento.content_block, 'type', None)
-                            if tipo in ('text', 'thinking'):
-                                # Un bloque nuevo de la API abre un bloque nuevo en pantalla.
-                                bloque_texto = None if tipo == 'text' else bloque_texto
-                                bloque_pensamiento = None if tipo == 'thinking' else bloque_pensamiento
-                    final = await stream.get_final_message()
-                reintentos = 0
-            except ValueError:
-                # JSON de herramienta imposible de interpretar: se repite el turno (acotado).
-                reintentos += 1
-                if reintentos > REINTENTOS_JSON:
-                    raise
-                continue
+            final = None
+            flujo = await cliente.responses.create(**_parametros(config, historial))
+            async for evento in flujo:
+                tipo = evento.type
+                if tipo == 'response.reasoning_summary_text.delta' and evento.delta:
+                    if bloque_pensamiento is None:
+                        bloque_pensamiento = {'tipo': 'pensamiento', 'texto': ''}
+                        vista['bloques'].append(bloque_pensamiento)
+                    bloque_pensamiento['texto'] += evento.delta
+                    yield {'evento': 'pensamiento', 'datos': {'texto': evento.delta}}
+                elif tipo == 'response.output_text.delta' and evento.delta:
+                    if bloque_texto is None:
+                        bloque_texto = {'tipo': 'texto', 'texto': ''}
+                        vista['bloques'].append(bloque_texto)
+                    bloque_texto['texto'] += evento.delta
+                    yield {'evento': 'texto', 'datos': {'texto': evento.delta}}
+                elif tipo == 'response.output_item.added':
+                    # Un elemento nuevo de la respuesta abre un bloque nuevo en pantalla.
+                    clase = getattr(evento.item, 'type', None)
+                    if clase == 'message':
+                        bloque_texto = None
+                    elif clase == 'reasoning':
+                        bloque_pensamiento = None
+                elif tipo in ('response.completed', 'response.incomplete'):
+                    final = evento.response
+                elif tipo == 'response.failed':
+                    detalle = getattr(getattr(evento.response, 'error', None), 'message', '') or 'sin detalle'
+                    _logger.warning('agente_respuesta_fallida detalle=%s', detalle)
+                    raise ErrorTurno('El modelo no pudo completar la respuesta. Intente de nuevo.')
+                elif tipo == 'error':
+                    _logger.warning('agente_error_flujo codigo=%s', getattr(evento, 'code', None))
+                    raise ErrorTurno('El modelo devolvió un error. Intente de nuevo.')
+            if final is None:
+                raise ErrorTurno('La respuesta del modelo se cortó. Intente de nuevo.')
 
-            u = final.usage
-            uso['entrada'] += u.input_tokens or 0
-            uso['salida'] += u.output_tokens or 0
-            uso['cache_lectura'] += getattr(u, 'cache_read_input_tokens', 0) or 0
-            uso['cache_escritura'] += getattr(u, 'cache_creation_input_tokens', 0) or 0
+            u = getattr(final, 'usage', None)
+            if u is not None:
+                uso['entrada'] += u.input_tokens or 0
+                uso['salida'] += u.output_tokens or 0
+                uso['cache_lectura'] += getattr(getattr(u, 'input_tokens_details', None), 'cached_tokens', 0) or 0
+                uso['razonamiento'] += getattr(getattr(u, 'output_tokens_details', None), 'reasoning_tokens', 0) or 0
 
-            if final.stop_reason == 'refusal':
-                # Se descarta el turno completo para no dejar una respuesta parcial en el historial.
-                del historial[inicio_turno:]
-                vista['bloques'] = [b for b in vista['bloques'] if b['tipo'] != 'texto']
-                mensaje = 'No puedo ayudar con esa solicitud. Reformúlela o pregunte otra cosa.'
-                vista['bloques'].append({'tipo': 'error', 'texto': mensaje})
-                yield {'evento': 'error', 'datos': {'mensaje': mensaje}}
-                return
+            salida = list(final.output or [])
+            motivo = getattr(getattr(final, 'incomplete_details', None), 'reason', None)
+            if _tiene_rechazo(salida) or motivo == 'content_filter':
+                raise ErrorTurno('No puedo ayudar con esa solicitud. Reformúlela o pregunte otra cosa.')
 
-            contenido = sanear_contenido(final.content)
-            historial.append({'role': 'assistant', 'content': contenido})
-
-            if final.stop_reason == 'pause_turn':
-                continue
-            usos = [b for b in contenido if getattr(b, 'type', None) == 'tool_use']
-            if not usos:
+            historial.extend(_como_entrada(item) for item in salida)
+            llamadas = [item for item in salida if getattr(item, 'type', None) == 'function_call']
+            if not llamadas:
                 terminado_bien = True
                 break
-            if final.stop_reason == 'max_tokens':
-                raise RuntimeError('respuesta truncada por max_tokens con una herramienta pendiente')
+            if final.status == 'incomplete':
+                raise ErrorTurno('La respuesta se cortó antes de terminar. Intente con una pregunta más concreta.')
 
-            for uso_h in usos:
-                etiqueta = herramientas.REGISTRO.get(uso_h.name, {}).get('etiqueta', uso_h.name)
-                bloque = {'tipo': 'herramienta', 'id': uso_h.id, 'nombre': uso_h.name, 'etiqueta': etiqueta,
-                          'entrada': uso_h.input, 'estado': 'ejecutando'}
+            pendientes = []
+            for llamada in llamadas:
+                etiqueta = herramientas.REGISTRO.get(llamada.name, {}).get('etiqueta', llamada.name)
+                try:
+                    entrada = json.loads(llamada.arguments or '{}')
+                except ValueError:
+                    entrada = None  # JSON inválido: herramientas.ejecutar lo devuelve como error al modelo
+                bloque = {'tipo': 'herramienta', 'id': llamada.call_id, 'nombre': llamada.name, 'etiqueta': etiqueta,
+                          'entrada': entrada if isinstance(entrada, dict) else {}, 'estado': 'ejecutando'}
                 vista['bloques'].append(bloque)
+                pendientes.append((bloque, entrada))
                 yield {'evento': 'herramienta', 'datos': {k: bloque[k] for k in ('id', 'nombre', 'etiqueta', 'entrada')}}
 
-            resultados = await asyncio.gather(*[herramientas.ejecutar(odoo, b.name, b.input) for b in usos])
-            contenido_resultados = []
-            for uso_h, (ok, contenido_json, ms) in zip(usos, resultados):
-                for b in vista['bloques']:
-                    if b.get('id') == uso_h.id:
-                        b.update(estado='ok' if ok else 'error', ms=ms)
-                yield {'evento': 'herramienta_resultado', 'datos': {'id': uso_h.id, 'ok': ok, 'ms': ms,
+            resultados = await asyncio.gather(*[herramientas.ejecutar(odoo, b['nombre'], entrada)
+                                                for b, entrada in pendientes])
+            for (bloque, _entrada), (ok, contenido_json, ms) in zip(pendientes, resultados):
+                bloque.update(estado='ok' if ok else 'error', ms=ms)
+                yield {'evento': 'herramienta_resultado', 'datos': {'id': bloque['id'], 'ok': ok, 'ms': ms,
                                                                     'resumen': _resumen(contenido_json, ok)}}
-                contenido_resultados.append({'type': 'tool_result', 'tool_use_id': uso_h.id,
-                                             'content': contenido_json, 'is_error': not ok})
-            # Todos los resultados en un solo mensaje (mantiene las llamadas en paralelo).
-            historial.append({'role': 'user', 'content': contenido_resultados})
+                historial.append({'type': 'function_call_output', 'call_id': bloque['id'], 'output': contenido_json})
         else:
-            mensaje = 'La consulta necesitó demasiados pasos. Intente con una pregunta más concreta.'
-            vista['bloques'].append({'tipo': 'error', 'texto': mensaje})
-            yield {'evento': 'error', 'datos': {'mensaje': mensaje}}
-    except anthropic.APIError as exc:
+            raise ErrorTurno('La consulta necesitó demasiados pasos. Intente con una pregunta más concreta.')
+    except ErrorTurno as exc:
+        vista['bloques'] = [b for b in vista['bloques'] if b['tipo'] != 'texto' or terminado_bien]
+        vista['bloques'].append({'tipo': 'error', 'texto': str(exc)})
+        yield {'evento': 'error', 'datos': {'mensaje': str(exc)}}
+    except openai.APIError as exc:
         _logger.warning('agente_error_api tipo=%s', type(exc).__name__)
-        _cerrar_turno_fallido(historial, inicio_turno)
         mensaje = _mensaje_error_api(exc)
         vista['bloques'].append({'tipo': 'error', 'texto': mensaje})
         yield {'evento': 'error', 'datos': {'mensaje': mensaje}}
     except Exception:  # noqa: BLE001 - el usuario recibe un mensaje y el detalle queda en el log
         _logger.exception('agente_error_inesperado')
-        _cerrar_turno_fallido(historial, inicio_turno)
         mensaje = 'Error inesperado del asistente. Intente de nuevo.'
         vista['bloques'].append({'tipo': 'error', 'texto': mensaje})
         yield {'evento': 'error', 'datos': {'mensaje': mensaje}}
     finally:
         # Turno no completado (error, rechazo, demasiados pasos o el navegador cortó la conexión): se quita del
-        # historial del modelo para no dejar un tool_use sin resultado, que haría fallar el mensaje siguiente.
+        # historial del modelo para no dejar una llamada a herramienta sin su resultado.
         if not terminado_bien:
-            _cerrar_turno_fallido(historial, inicio_turno)
+            del historial[inicio_turno:]
         conversacion.vista.append(vista)
         conversacion.tocar()
 
     if terminado_bien:
         yield {'evento': 'fin', 'datos': {'uso': uso}}
-
-
-def _cerrar_turno_fallido(historial, inicio):
-    """Quita el turno incompleto: un tool_use sin su tool_result haría fallar el siguiente mensaje."""
-    del historial[inicio:]
 
 
 def _resumen(contenido_json, ok):
