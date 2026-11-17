@@ -82,7 +82,7 @@ join() { local IFS=,; echo "$*"; }
 docker compose stop odoo
 if [ ${#nuevos[@]} -gt 0 ]; then
   echo "      Instalando (-i): ${nuevos[*]}"
-  docker compose run --rm --no-deps -T odoo odoo -d "$BASE" -i "$(join "${nuevos[@]}")" --without-demo=all --stop-after-init
+  docker compose run --rm --no-deps -T odoo odoo -d "$BASE" -i "$(join "${nuevos[@]}")" --load-language=es_EC --without-demo=all --stop-after-init
 fi
 if [ ${#ya[@]} -gt 0 ]; then
   echo "      Actualizando (-u): ${ya[*]}"
