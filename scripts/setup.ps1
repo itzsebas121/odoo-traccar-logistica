@@ -81,7 +81,7 @@ $ya = @($Modulos | Where-Object { $instalados -contains $_ })
 Invoke-Compose @('stop', 'odoo') | Out-Null
 if ($nuevos.Count -gt 0) {
     Write-Host "      Instalando (-i): $($nuevos -join ', ')"
-    Invoke-Compose @('run', '--rm', '--no-deps', '-T', 'odoo', 'odoo', '-d', $Base, '-i', ($nuevos -join ','), '--without-demo=all', '--stop-after-init') | Out-Null
+    Invoke-Compose @('run', '--rm', '--no-deps', '-T', 'odoo', 'odoo', '-d', $Base, '-i', ($nuevos -join ','), '--load-language=es_EC', '--without-demo=all', '--stop-after-init') | Out-Null
 }
 if ($ya.Count -gt 0) {
     Write-Host "      Actualizando (-u): $($ya -join ', ')"

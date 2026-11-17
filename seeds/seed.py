@@ -364,7 +364,13 @@ def _sembrar_mercado(odoo, informe, productos, mercado, simulacion):
     ref_pago = odoo.ejecutar('ir.model.data', 'check_object_reference', ['payment', 'payment_provider_transfer'])
     if ref_pago:
         id_pago = ref_pago[1]
-        prov = odoo.ejecutar('payment.provider', 'read', [[id_pago], ['state', 'is_published', 'journal_id']])[0]
+        msg_es = (
+            '<h3>Utilice los siguientes datos para la transferencia</h3>'
+            '<h4>Referencia de pago</h4>'
+            '<p>Utilice el número de su pedido como concepto o referencia de la transferencia.</p>'
+        )
+        prov = odoo.ejecutar('payment.provider', 'read', [[id_pago], ['state', 'is_published', 'journal_id', 'pending_msg']],
+                             {'context': {'lang': 'es_EC'}})[0]
         cambios_pago = {}
         if prov['state'] != 'enabled':
             cambios_pago['state'] = 'enabled'
@@ -374,9 +380,11 @@ def _sembrar_mercado(odoo, informe, productos, mercado, simulacion):
             diarios = odoo.ejecutar('account.journal', 'search', [[('type', '=', 'bank')]], {'limit': 1})
             if diarios:
                 cambios_pago['journal_id'] = diarios[0]
+        if not prov.get('pending_msg') or 'Please use' in str(prov.get('pending_msg')):
+            cambios_pago['pending_msg'] = msg_es
         if cambios_pago:
-            odoo.ejecutar('payment.provider', 'write', [[id_pago], cambios_pago])
-            informe.actualizados.append('payment.provider Transferencia bancaria (habilitado y publicado)')
+            odoo.ejecutar('payment.provider', 'write', [[id_pago], cambios_pago], {'context': {'lang': 'es_EC'}})
+            informe.actualizados.append('payment.provider Transferencia bancaria (habilitado, publicado y en español)')
 
 
 def _sembrar_usuarios_conductor(odoo, entorno, informe, usuarios, ids_conductor):

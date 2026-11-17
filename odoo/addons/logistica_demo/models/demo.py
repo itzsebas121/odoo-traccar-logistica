@@ -102,7 +102,16 @@ class LogisticaDemo(models.AbstractModel):
             'country_id': pais.id, 'state_id': provincia.id, 'phone': datos.get('phone'),
             'email': datos.get('email'), 'website': datos.get('website'),
         })
-        env['website'].search([]).write({'name': datos['name']})
+        es_ec_ref = env['res.lang']._activate_lang('es_EC')
+        es_ec = env['res.lang'].browse(es_ec_ref) if isinstance(es_ec_ref, int) else es_ec_ref
+        if not es_ec:
+            es_ec = env['res.lang'].with_context(active_test=False).search([('code', '=', 'es_EC')], limit=1)
+        sitio_vals = {'name': datos['name']}
+        if es_ec:
+            sitio_vals.update({'default_lang_id': es_ec.id, 'language_ids': [(6, 0, [es_ec.id])]})
+        env['website'].search([]).write(sitio_vals)
+        env['res.partner'].with_context(active_test=False).search(
+            [('lang', '!=', 'es_EC')]).write({'lang': 'es_EC'})
 
     def _contabilidad(self, env):
         empresa = env.company
@@ -133,13 +142,21 @@ class LogisticaDemo(models.AbstractModel):
         empresa.account_sale_tax_id = impuestos[0]
         transfer = env.ref('payment.payment_provider_transfer', raise_if_not_found=False)
         if transfer:
-            vals = {'state': 'enabled', 'is_published': True}
+            vals = {
+                'state': 'enabled',
+                'is_published': True,
+                'pending_msg': (
+                    '<h3>Utilice los siguientes datos para la transferencia</h3>'
+                    '<h4>Referencia de pago</h4>'
+                    '<p>Utilice el número de su pedido como concepto o referencia de la transferencia.</p>'
+                ),
+            }
             if not transfer.journal_id:
                 banco = env['account.journal'].search(
                     [('type', '=', 'bank'), ('company_id', '=', empresa.id)], limit=1)
                 if banco:
                     vals['journal_id'] = banco.id
-            transfer.write(vals)
+            transfer.with_context(lang='es_EC').write(vals)
         return impuestos
 
     def _categorias(self, env, nombres):
