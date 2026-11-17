@@ -133,11 +133,17 @@ class LogisticaWebsiteSale(WebsiteSale):
         centro = request.env['logistica.zona'].sudo().centroide('centro')
         if centro == (0.0, 0.0) and cobertura:
             centro = ((cobertura[0] + cobertura[1]) / 2, (cobertura[2] + cobertura[3]) / 2)
+        bodega = request.env['logistica.bodega'].sudo().get_bodega_activa()
+        radio = config.coverage_radius_km if bodega else 0.0
+        if radio and centro == (0.0, 0.0):
+            centro = (bodega.latitude, bodega.longitude)
         return {
             'logistica_destino': {
                 'lat': lat, 'lon': lon, 'notas': notas,
                 'centro': centro,
                 'cobertura': ','.join(str(v) for v in cobertura) if cobertura else '',
+                'radio_km': radio or '',
+                'sede': '%s,%s' % (bodega.latitude, bodega.longitude) if radio else '',
             },
         }
 

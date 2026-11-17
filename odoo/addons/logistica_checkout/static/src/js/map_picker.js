@@ -44,7 +44,14 @@
             maxZoom: 19,
             attribution: '&copy; colaboradores de OpenStreetMap',
         }).addTo(mapa);
-        if (cobertura) {
+        // Fase A: la cobertura real es un radio desde la bodega (si está configurado).
+        var radioKm = numero(contenedor.dataset.radioKm);
+        var sede = (contenedor.dataset.sede || '').split(',').map(numero);
+        var circulo = null;
+        if (radioKm && sede.length === 2 && sede[0] !== null && sede[1] !== null) {
+            circulo = L.circle(sede, {radius: radioKm * 1000, color: '#2b7a78', weight: 1, fillOpacity: 0.04,
+                                      dashArray: '4'}).addTo(mapa);
+        } else if (cobertura) {
             L.rectangle(cobertura, {color: '#2b7a78', weight: 1, fill: false, dashArray: '4'}).addTo(mapa);
         }
 
@@ -54,7 +61,8 @@
             campoLat.value = latlng.lat.toFixed(7);
             campoLon.value = latlng.lng.toFixed(7);
             if (estado) {
-                var fuera = cobertura && !cobertura.contains(latlng);
+                var fuera = (cobertura && !cobertura.contains(latlng)) ||
+                    (circulo && mapa.distance(circulo.getLatLng(), latlng) > circulo.getRadius());
                 estado.textContent = fuera
                     ? 'El punto está fuera de la zona de cobertura.'
                     : 'Punto de entrega seleccionado.';

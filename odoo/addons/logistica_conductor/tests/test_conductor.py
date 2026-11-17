@@ -37,7 +37,8 @@ class TestConductor(HttpCase):
             'order_line': [(0, 0, {'product_id': self.producto.id, 'product_uom_qty': 1})]})
         pedido.action_confirm()
         entrega = pedido.logistica_entrega_id
-        entrega.action_marcar_preparado()
+        if entrega.state == 'en_preparacion':
+            entrega.action_marcar_preparado()
         return entrega
 
     def _ruta(self, usuario, placa, n=1, estado='planificada'):
@@ -189,9 +190,10 @@ class TestConductor(HttpCase):
         self.assertEqual(self._post(cerrar).status_code, 400)  # aún hay pendientes
         self._post('/logistica/conductor/parada/%s/entregado' % p1.id)
         self._post('/logistica/conductor/parada/%s/no-entregado' % p2.id, motivo='refused')
-        self.assertEqual(self._post(cerrar).status_code, 303)
+        # Fase A: la ruta se cerró sola con la última parada; cerrar otra vez se informa como ya registrado.
         self._refrescar()
         self.assertEqual(ruta.state, 'cerrada')
+        self.assertEqual(self._post(cerrar).status_code, 409)
         self.assertEqual((ruta.delivered_stops, ruta.failed_stops), (1, 1))
 
     def test_interrumpir_exige_motivo(self):

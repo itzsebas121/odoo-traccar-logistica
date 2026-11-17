@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Logística - Checkout y seguimiento público',
-    'version': '16.0.1.0.0',
+    'version': '16.0.1.1.0',
     'category': 'Website/Website',
     'summary': 'Selector de destino en mapa, confirmación automática de prueba y seguimiento por token',
     'author': 'Equipo Logística Inteligente',
@@ -13,6 +13,11 @@
         'views/confirmation_templates.xml',
         'views/tracking_templates.xml',
     ],
+    'assets': {
+        'web.assets_frontend': [
+            'logistica_checkout/static/src/css/bitacora_shop.css',
+        ],
+    },
     'installable': True,
     'application': False,
     'auto_install': False,

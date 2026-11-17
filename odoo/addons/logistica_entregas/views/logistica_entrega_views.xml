@@ -4,13 +4,22 @@
         <field name="name">logistica.entrega.tree</field>
         <field name="model">logistica.entrega</field>
         <field name="arch" type="xml">
-            <tree string="Entregas" create="false" decoration-success="state == 'entregado'"
-                  decoration-danger="state in ('no_entregado', 'pendiente_reprogramacion')">
+            <tree string="Entregas" create="false" decoration-success="estado_simple == 'entregado'"
+                  decoration-danger="estado_simple == 'atencion'" decoration-info="estado_simple == 'en_ruta'">
+                <header>
+                    <button name="action_marcar_preparado_lote" type="object" string="Marcar preparadas"/>
+                </header>
                 <field name="name"/>
                 <field name="sale_order_id"/>
                 <field name="partner_id"/>
                 <field name="destination_address"/>
-                <field name="state"/>
+                <field name="estado_simple" widget="badge"
+                       decoration-success="estado_simple == 'entregado'"
+                       decoration-danger="estado_simple == 'atencion'"
+                       decoration-info="estado_simple == 'en_ruta'"
+                       decoration-warning="estado_simple == 'por_despachar'"/>
+                <field name="intentos" optional="hide"/>
+                <field name="state" optional="hide"/>
             </tree>
         </field>
     </record>
@@ -37,6 +46,10 @@
                 <sheet>
                     <h1><field name="name"/></h1>
                     <group>
+                        <group string="Estado">
+                            <field name="estado_simple" widget="badge"/>
+                            <field name="intentos"/>
+                        </group>
                         <group string="Destino">
                             <field name="sale_order_id" readonly="1"/>
                             <field name="partner_id"/>
@@ -83,13 +96,19 @@
                 <field name="name"/>
                 <field name="sale_order_id"/>
                 <field name="partner_id"/>
+                <filter name="f_por_despachar" string="Por despachar" domain="[('estado_simple', '=', 'por_despachar')]"/>
+                <filter name="f_en_ruta" string="En ruta" domain="[('estado_simple', '=', 'en_ruta')]"/>
+                <filter name="f_atencion" string="Requiere atención" domain="[('estado_simple', '=', 'atencion')]"/>
+                <filter name="f_entregadas" string="Entregadas" domain="[('estado_simple', '=', 'entregado')]"/>
+                <separator/>
                 <filter name="f_preparacion" string="En preparación" domain="[('state', '=', 'en_preparacion')]"/>
                 <filter name="f_preparado" string="Preparadas" domain="[('state', '=', 'preparado')]"/>
                 <filter name="f_recorrido" string="En recorrido" domain="[('state', '=', 'en_recorrido')]"/>
                 <filter name="f_fallidas" string="Fallidas"
                         domain="[('state', 'in', ('no_entregado', 'pendiente_reprogramacion'))]"/>
                 <group expand="0" string="Agrupar por">
-                    <filter name="g_estado" string="Estado" context="{'group_by': 'state'}"/>
+                    <filter name="g_estado" string="Estado" context="{'group_by': 'estado_simple'}"/>
+                    <filter name="g_estado_detallado" string="Estado detallado" context="{'group_by': 'state'}"/>
                 </group>
             </search>
         </field>

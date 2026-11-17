@@ -10,10 +10,12 @@
                 <script src="/logistica_base/static/lib/leaflet/leaflet.js"
                         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="></script>
                 <script type="text/javascript" src="/logistica_analitica_ia/static/src/js/mapa.js"></script>
+                <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap"/>
                 <style>
-                    html, body { height: 100%; margin: 0; font-family: sans-serif; }
-                    #prediccion-barra { padding: 8px 12px; background: #714b67; color: #fff; }
-                    #prediccion-mapa { height: calc(100% - 60px); }
+                    html, body { height: 100%; margin: 0; font-family: 'IBM Plex Sans', ui-sans-serif, sans-serif; background: #F8F5EE; color: #141D2B; }
+                    #prediccion-barra { padding: 10px 16px; background: #131B29; color: #FDFBF7; border-bottom: 2px solid #E06D2B; font-size: 13px; }
+                    #prediccion-barra strong { font-family: 'JetBrains Mono', monospace; color: #E06D2B; text-transform: uppercase; letter-spacing: 0.04em; margin-right: 6px; }
+                    #prediccion-mapa { height: calc(100% - 44px); }
                 </style>
             </t>
             <div id="prediccion-barra">

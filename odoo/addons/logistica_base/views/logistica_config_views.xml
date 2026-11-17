@@ -49,11 +49,16 @@
         <field name="arch" type="xml">
             <form string="Configuración de Logística">
                 <sheet>
-                    <group>
+                    <group string="Despacho">
+                        <field name="require_preparation"/>
+                        <field name="dispatch_cutoff" widget="float_time"/>
+                        <field name="coverage_radius_km"/>
+                        <field name="max_delivery_attempts"/>
+                    </group>
+                    <group string="GPS">
                         <field name="arrival_radius_m"/>
                         <field name="gps_stale_after_seconds"/>
-                        <field name="dispatch_cutoff" widget="float_time"/>
-                        <field name="route_recalculation_policy"/>
+                        <field name="route_recalculation_policy" groups="base.group_no_one"/>
                     </group>
                 </sheet>
             </form>

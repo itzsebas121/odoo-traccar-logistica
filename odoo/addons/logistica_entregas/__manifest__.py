@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Logística - Entregas',
-    'version': '16.0.1.0.0',
+    'version': '16.0.1.1.0',
     'category': 'Inventory/Logistics',
     'summary': 'Entrega logística por pedido: estados, eventos auditables y seguimiento',
     'author': 'Equipo Logística Inteligente',

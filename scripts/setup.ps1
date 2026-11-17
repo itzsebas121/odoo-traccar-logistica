@@ -10,7 +10,7 @@ $Base = "logistica_dev"
 $Modulos = @("contacts", "fleet", "sale_management", "website", "website_sale", "payment_custom",
              "logistica_base", "logistica_despacho", "logistica_traccar", "logistica_entregas", "logistica_checkout",
              "logistica_conductor", "logistica_analitica_ia")
-$ClavesSecretas = @("ODOO_DB_PASSWORD", "ODOO_ADMIN_PASSWORD", "ODOO_MASTER_PASSWORD", "TRACCAR_DB_PASSWORD", "TRACCAR_ADMIN_PASSWORD")
+$ClavesSecretas = @("ODOO_DB_PASSWORD", "ODOO_ADMIN_PASSWORD", "ODOO_MASTER_PASSWORD", "TRACCAR_DB_PASSWORD", "TRACCAR_ADMIN_PASSWORD", "AGENTE_SESSION_SECRET")
 
 # Ejecuta docker compose; si el comando falla, detiene el script. Devuelve su salida.
 function Invoke-Compose([string[]]$Argumentos) {

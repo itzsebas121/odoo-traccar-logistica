@@ -21,6 +21,10 @@ VARIABLES_ENTORNO = ('ODOO_URL', 'ODOO_DB', 'ODOO_USER', 'ODOO_PASSWORD',
                      'DEMO_CONDUCTOR_PASSWORD')
 # Tipo de autenticacion del traccar.server de Odoo (valor tecnico, no de negocio).
 AUTH_TRACCAR_ODOO = 'basic'
+# Modulo que carga el mercado de demostracion en el servidor y dias de historial por llamada (cada llamada
+# debe terminar antes del limite de tiempo de una peticion de Odoo).
+MODULO_DEMO = 'logistica_demo'
+DIAS_POR_LOTE = 6
 
 
 class ErrorSembrado(RuntimeError):
@@ -254,7 +258,7 @@ def _sembrar_usuario_integracion(traccar, entorno, datos, ids_dispositivo, infor
             informe.creados.append(etiqueta_permiso)
 
 
-def _sembrar_odoo(odoo, entorno, datos, informe, simulacion):
+def _sembrar_odoo(odoo, entorno, datos, informe, simulacion, mercado):
     url_traccar = entorno['TRACCAR_INTERNAL_URL']
     servidor = _asegurar(odoo, informe, 'traccar.server', [('base_url', '=', url_traccar)], {
         'name': datos['traccar_server']['name'],
@@ -307,9 +311,8 @@ def _sembrar_odoo(odoo, entorno, datos, informe, simulacion):
                   f'fleet.vehicle {placa} vinculado a {uid}', crear=False)
 
     _sembrar_bodega_logistica(odoo, informe, datos['bodega_logistica'])
-    ids_productos = _sembrar_productos(odoo, informe, datos['productos'])
     _sembrar_usuarios_conductor(odoo, entorno, informe, datos['usuarios_conductor'], ids_conductor)
-    _sembrar_pedidos(odoo, informe, simulacion['pedidos'], ids_productos)
+    _sembrar_mercado(odoo, informe, datos['productos'], mercado, simulacion)
 
 
 def _sembrar_bodega_logistica(odoo, informe, bodega):
@@ -321,15 +324,59 @@ def _sembrar_bodega_logistica(odoo, informe, bodega):
               f"logistica.bodega {bodega['name']}")
 
 
-def _sembrar_productos(odoo, informe, productos):
-    """Articulos publicados en la tienda. Devuelve los ids de product.product."""
-    ids = []
+def _asegurar_modulo_demo(odoo, informe):
+    """El mercado lo carga el modulo logistica_demo (en el servidor); se instala si aun no lo esta."""
+    modulos = odoo.ejecutar('ir.module.module', 'search_read', [[('name', '=', MODULO_DEMO)]],
+                            {'fields': ['state']})
+    if modulos and modulos[0]['state'] == 'installed':
+        return
+    if not modulos:
+        odoo.ejecutar('ir.module.module', 'update_list', [])
+        modulos = odoo.ejecutar('ir.module.module', 'search_read', [[('name', '=', MODULO_DEMO)]],
+                                {'fields': ['state']})
+        if not modulos:
+            raise ErrorSembrado(f'Odoo no encuentra el modulo {MODULO_DEMO} en odoo/addons')
+    odoo.ejecutar('ir.module.module', 'button_immediate_install', [[modulos[0]['id']]])
+    informe.creados.append(f'modulo {MODULO_DEMO} (instalado)')
+
+
+def _historial_activo():
+    return (os.environ.get('SEED_HISTORIAL') or 'true').strip().lower() not in ('0', 'false', 'no')
+
+
+def _sembrar_mercado(odoo, informe, productos, mercado, simulacion):
+    """Catalogo con fotos, empresa, contabilidad y cobertura (sin clientes ni pedidos demo)."""
+    _asegurar_modulo_demo(odoo, informe)
+    catalogo = [_sin_claves_documentales(p) for p in productos]
+    mercado_sin_clientes = {**mercado, 'clientes': []}
+    resumen = odoo.ejecutar('logistica.demo', 'cargar_mercado', [mercado_sin_clientes, catalogo])
+    informe.actualizados.append(f'mercado: {resumen}')
+    with open(os.path.join(schema.DIRECTORIO_DATOS, mercado['empresa']['logo']), 'rb') as archivo:
+        odoo.ejecutar('logistica.demo', 'poner_logo', [base64.b64encode(archivo.read()).decode('ascii')])
+    sin_foto = odoo.ejecutar('logistica.demo', 'productos_sin_imagen', [[p['default_code'] for p in productos]])
     for producto in productos:
-        plantilla = _asegurar(odoo, informe, 'product.template', [('name', '=', producto['name'])],
-                              _sin_claves_documentales(producto), f"product.template {producto['name']}")
-        variantes = odoo.ejecutar('product.product', 'search', [[('product_tmpl_id', '=', plantilla)]], {'limit': 1})
-        ids.append(variantes[0])
-    return ids
+        if producto['default_code'] not in sin_foto:
+            continue
+        with open(os.path.join(schema.DIRECTORIO_DATOS, producto['imagen']), 'rb') as archivo:
+            imagen = base64.b64encode(archivo.read()).decode('ascii')
+        odoo.ejecutar('logistica.demo', 'poner_imagen', [producto['default_code'], imagen])
+        informe.creados.append(f"foto {producto['default_code']}")
+    ref_pago = odoo.ejecutar('ir.model.data', 'check_object_reference', ['payment', 'payment_provider_transfer'])
+    if ref_pago:
+        id_pago = ref_pago[1]
+        prov = odoo.ejecutar('payment.provider', 'read', [[id_pago], ['state', 'is_published', 'journal_id']])[0]
+        cambios_pago = {}
+        if prov['state'] != 'enabled':
+            cambios_pago['state'] = 'enabled'
+        if not prov['is_published']:
+            cambios_pago['is_published'] = True
+        if not prov['journal_id']:
+            diarios = odoo.ejecutar('account.journal', 'search', [[('type', '=', 'bank')]], {'limit': 1})
+            if diarios:
+                cambios_pago['journal_id'] = diarios[0]
+        if cambios_pago:
+            odoo.ejecutar('payment.provider', 'write', [[id_pago], cambios_pago])
+            informe.actualizados.append('payment.provider Transferencia bancaria (habilitado y publicado)')
 
 
 def _sembrar_usuarios_conductor(odoo, entorno, informe, usuarios, ids_conductor):
@@ -361,31 +408,6 @@ def _sembrar_usuarios_conductor(odoo, entorno, informe, usuarios, ids_conductor)
             informe.actualizados.append(etiqueta)
 
 
-def _sembrar_pedidos(odoo, informe, pedidos, ids_productos):
-    """Pedidos confirmados, con destino. La confirmacion crea la entrega en estado «en preparacion»."""
-    for i, pedido in enumerate(pedidos):
-        ref = pedido['ref']
-        etiqueta = f'sale.order {ref}'
-        existentes = odoo.ejecutar('sale.order', 'search_read', [[('client_order_ref', '=', ref)]],
-                                   {'fields': ['state'], 'limit': 1})
-        if existentes:
-            if existentes[0]['state'] == 'draft':
-                odoo.ejecutar('sale.order', 'action_confirm', [[existentes[0]['id']]])
-                informe.actualizados.append(f'{etiqueta} (confirmado)')
-            else:
-                informe.omitidos.append(etiqueta)
-            continue
-        cliente = _asegurar(odoo, informe, 'res.partner', [('name', '=', pedido['cliente'])],
-                            {'name': pedido['cliente']}, f"res.partner {pedido['cliente']}")
-        orden = odoo.ejecutar('sale.order', 'create', [{
-            'partner_id': cliente, 'client_order_ref': ref,
-            'delivery_latitude': pedido['latitud'], 'delivery_longitude': pedido['longitud'],
-            'order_line': [(0, 0, {'product_id': ids_productos[i % len(ids_productos)], 'product_uom_qty': 1})],
-        }])
-        odoo.ejecutar('sale.order', 'action_confirm', [[orden]])
-        informe.creados.append(etiqueta)
-
-
 def _registrar_administrador_inicial(entorno, informe):
     """Un Traccar recien instalado no tiene usuarios (/api/server: newServer=true). El primer usuario
     registrado queda como administrador; se registra el de TRACCAR_ADMIN_EMAIL para que el resto del sembrado entre."""
@@ -402,6 +424,7 @@ def main():
     informe = Informe()
     try:
         datos_odoo, datos_traccar, datos_simulacion = schema.cargar()
+        datos_mercado = schema.cargar_mercado(datos_odoo, datos_simulacion)
         entorno = _leer_entorno()
         _registrar_administrador_inicial(entorno, informe)
         traccar = ClienteTraccar(entorno['TRACCAR_URL'], entorno['TRACCAR_ADMIN_EMAIL'],
@@ -409,7 +432,7 @@ def main():
         ids_dispositivo = _sembrar_traccar(traccar, datos_traccar, informe)
         _sembrar_usuario_integracion(traccar, entorno, datos_traccar, ids_dispositivo, informe)
         odoo = ClienteOdoo(entorno['ODOO_URL'], entorno['ODOO_DB'], entorno['ODOO_USER'], entorno['ODOO_PASSWORD'])
-        _sembrar_odoo(odoo, entorno, datos_odoo, informe, datos_simulacion)
+        _sembrar_odoo(odoo, entorno, datos_odoo, informe, datos_simulacion, datos_mercado)
     except schema.ErrorEsquema as error:
         print(f'seed: datos invalidos: {error}', file=sys.stderr)
         return 1
