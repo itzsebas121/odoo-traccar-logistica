@@ -1,15 +1,18 @@
 from datetime import date
 
+import pandas as pd
 import pytest
 
 import olap
 
-NOMBRES = {"distancia_vehiculo", "recorridos_dia_hora", "duracion_promedio", "zonas_visitadas",
-           "paradas", "entregas_cliente", "entregas_estado", "cumplimiento"}
+NOMBRES = {"distancia_vehiculo", "recorridos_dia_hora", "duracion_promedio", "zonas_visitadas", "paradas",
+           "entregas_cliente", "entregas_estado", "motivos_no_entrega", "cumplimiento", "plan_real_vehiculo",
+           "rutas_plan_real", "tiempos_parada", "ventas_cliente", "ventas_producto", "ventas_zona",
+           "etl_ejecuciones", "etl_rechazos"}
 
 
 def total(df, clave, col):
-    return float(df[df[clave].isna()][col].iloc[0])
+    return float(olap.total(df, clave, col))
 
 
 def test_olap_ejecuta(conn, monkeypatch):
@@ -20,12 +23,20 @@ def test_olap_ejecuta(conn, monkeypatch):
         assert len(df) > 0, nombre
         if rollup:
             claves = [c for c in df.columns if c.startswith("k_")]
-            assert df[claves].isna().all(axis=1).any(), "sin fila de total en %s" % nombre
+            assert df[claves].isna().all(axis=1).sum() == 1, "debe haber una sola fila de total en %s" % nombre
     assert total(olap.consulta(conn, "distancia_vehiculo"), "k_vehiculo", "distancia_km") == 100.0
     # sin DWH_DB_PASSWORD la aplicacion falla con un mensaje claro
     monkeypatch.delenv("DWH_DB_PASSWORD", raising=False)
     with pytest.raises(olap.ConfigError, match="DWH_DB_PASSWORD"):
-        olap.dsn()
+        olap.params()
+
+
+def test_conexion_por_argumentos(monkeypatch):
+    """La clave no va dentro de una cadena de conexion: puede tener espacios y comillas."""
+    monkeypatch.setenv("DWH_DB_PASSWORD", "con espacio y 'comilla'")
+    monkeypatch.setenv("DWH_HOST", "pghost")
+    p = olap.params()
+    assert p["password"] == "con espacio y 'comilla'" and p["host"] == "pghost" and p["user"] == "dwh_ro"
 
 
 def test_filtro_procedencia(conn):
@@ -37,9 +48,26 @@ def test_filtro_procedencia(conn):
     ent = olap.consulta(conn, "entregas_estado", procedencia=["REAL"])
     assert total(ent, "k_resultado", "entregas") == 2
     assert olap.hay_simulados(["REAL", "SIMULADO"]) and not olap.hay_simulados(["REAL"])
+    assert total(olap.consulta(conn, "plan_real_vehiculo", procedencia=["REAL"]), "k_vehiculo", "rutas") == 1
     # filtro de fechas
     df = olap.consulta(conn, "distancia_vehiculo", desde=date(2026, 11, 4), hasta=date(2026, 11, 4))
     assert total(df, "k_vehiculo", "distancia_km") == 60.0
+
+
+def test_cada_fila_dice_su_procedencia(conn):
+    """Los datos simulados no pueden pasar por reales: cada fila indica de donde sale."""
+    d = olap.consulta(conn, "distancia_vehiculo").set_index("k_vehiculo")["procedencias"].to_dict()
+    assert d["ABC-1234"] == "REAL" and d["DEF-5678"] == "SIMULADO"
+    assert olap.consulta(conn, "distancia_vehiculo")["procedencias"].iloc[-1] == "REAL+SIMULADO"       # fila de total
+
+
+def test_vehiculo_sin_placa_no_se_confunde_con_el_total(conn):
+    with conn.cursor() as cur:
+        cur.execute("UPDATE dim_vehiculo SET placa = NULL WHERE vehiculo_id_odoo = 2")
+    df = olap.consulta(conn, "distancia_vehiculo")
+    assert set(df["k_vehiculo"].dropna()) == {"ABC-1234", "(sin placa)"}
+    assert total(df, "k_vehiculo", "distancia_km") == 100.0
+    conn.rollback()
 
 
 def test_indicadores(conn):
@@ -52,8 +80,60 @@ def test_indicadores(conn):
     est = ind["entregas_estado"].dropna(subset=["k_resultado"])
     assert dict(zip(est["k_resultado"], est["entregas"])) == {"entregado": 2, "no_entregado": 1, "pendiente": 1}
     assert set(ind["entregas_cliente"]["k_cliente"].dropna()) == {"Cliente Uno", "Cliente Dos"}
-    # 2 entregadas: una a las 08:00 (plan 08:15, a tiempo) y otra a 14:30 (plan 14:15, tarde) -> 50 %
+    assert ind["motivos_no_entrega"][["motivo", "entregas"]].values.tolist() == [["absent", 1]]
+    # 2 entregadas evaluables: una antes del limite del plan y otra despues -> 50 %
     assert total(ind["cumplimiento"], "k_vehiculo", "pct_a_tiempo") == 50.0
+    assert total(ind["cumplimiento"], "k_vehiculo", "evaluables") == 2
+
+
+def test_plan_contra_real(conn):
+    ind = olap.indicadores(conn)
+    pr = ind["plan_real_vehiculo"]
+    assert (total(pr, "k_vehiculo", "km_planificado"), total(pr, "k_vehiculo", "km_real")) == (30.0, 12.0)
+    assert (total(pr, "k_vehiculo", "paradas"), total(pr, "k_vehiculo", "entregadas")) == (3, 1)
+    ruta = ind["rutas_plan_real"].set_index("ruta").loc["RUTA/0001"]
+    assert (float(ruta["desviacion_km_pct"]), float(ruta["desviacion_min_pct"]), float(ruta["pct_entregado"])) == (
+        20.0, 20.0, 50.0)
+    assert ruta["vehiculo"] == "ABC-1234" and ruta["conductor"] == "Carlos"
+    sin_gps = ind["rutas_plan_real"].set_index("ruta").loc["RUTA/0002"]
+    assert pd.isna(sin_gps["km_real"]) and pd.isna(sin_gps["desviacion_km_pct"])    # sin GPS no se inventa nada
+    assert ind["rutas_plan_real"]["km_planificado"].dtype == float                   # numeros, no Decimal
+    tp = ind["tiempos_parada"].set_index("k_zona")
+    assert float(tp.loc["Centro", "min_en_parada"]) == 2.0 and tp.loc["Ficoa", "fallidas"] == 1
+    assert total(ind["tiempos_parada"], "k_zona", "paradas") == 3
+
+
+def test_ventas(conn):
+    ind = olap.indicadores(conn)
+    assert total(ind["ventas_cliente"], "k_cliente", "importe") == 62.5
+    assert total(ind["ventas_cliente"], "k_cliente", "pedidos") == 2
+    prod = ind["ventas_producto"].dropna(subset=["k_producto"]).set_index("k_producto")
+    assert (float(prod.loc["Producto Uno", "importe"]), float(prod.loc["Producto Uno", "unidades"])) == (50.0, 5.0)
+    zona = ind["ventas_zona"].dropna(subset=["k_zona"]).set_index("k_zona")
+    assert float(zona.loc["Ficoa", "importe"]) == 30.0
+    un_dia = olap.consulta(conn, "ventas_cliente", desde=date(2026, 11, 4), hasta=date(2026, 11, 4))
+    assert total(un_dia, "k_cliente", "importe") == 30.0
+
+
+def test_calidad_del_etl(conn):
+    """La bitacora del ETL se lee del DWH (el rol del BI no puede abrir la base de staging)."""
+    ej = olap.consulta(conn, "etl_ejecuciones", procedencia=["REAL"])     # la procedencia no le aplica
+    assert ej["lote_id"].tolist() == [2, 1]
+    assert ej["estado"].tolist() == ["error", "ok"] and ej["error"].tolist() == ["Traccar no responde", None]
+    assert [float(x) for x in ej["filas_cargadas"]] == [0.0, 6.0]
+    assert [float(x) for x in ej["segundos"]] == [120.0, 60.0]
+    rech = olap.consulta(conn, "etl_rechazos").set_index("motivo")
+    assert float(rech.loc["coordenadas_invalidas", "filas"]) == 3.0 and rech.loc["coordenadas_invalidas", "corridas"] == 2
+    assert float(rech.loc["velocidad_anomala", "filas"]) == 1.0
+
+
+def test_total_devuelve_numeros_de_python():
+    import pandas as pd
+    from decimal import Decimal
+    df = pd.DataFrame({"k": ["a", None], "v": [Decimal("1.50"), Decimal("3.00")], "w": [None, None]})
+    assert olap.total(df, "k", "v") == 3 and isinstance(olap.total(df, "k", "v"), int)
+    assert olap.total(df, "k", "w") == 0
+    assert olap.total(df[df["k"].notna()], "k", "v") == 0
 
 
 def test_rango_fecha_unica():

@@ -1,6 +1,6 @@
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from urllib.parse import urlsplit, urlunsplit
 
 import psycopg2
@@ -20,6 +20,86 @@ def _ts(d, h, m=0):
 
 def _tsk(t):
     return int(t.strftime("%Y%m%d%H"))
+
+
+def _tiempo(cur, t):
+    cur.execute("INSERT INTO dim_tiempo (sk, fecha, anio, mes, dia, dia_semana, hora) VALUES (%s,%s,%s,%s,%s,%s,%s) "
+                "ON CONFLICT DO NOTHING", (_tsk(t), t.date(), t.year, t.month, t.day, t.isoweekday(), t.hour))
+    return _tsk(t)
+
+
+def _poblar(cur):
+    cur.execute("INSERT INTO dim_zona (codigo, nombre, latitud, longitud, zona_id_odoo) VALUES "
+                "('centro','Centro',-1.2417,-78.6197,1),('ficoa','Ficoa',-1.2230,-78.6330,2),"
+                "('huachi','Huachi',-1.2750,-78.6300,3),('izamba','Izamba',-1.2050,-78.5900,4)")
+    cur.execute("SELECT codigo, sk FROM dim_zona")
+    z = dict(cur.fetchall())
+    cur.execute("INSERT INTO dim_vehiculo (vehiculo_id_odoo, placa, procedencia) VALUES "
+                "(1,'ABC-1234','REAL'),(2,'DEF-5678','SIMULADO')")
+    cur.execute("INSERT INTO dim_conductor (conductor_id_odoo, nombre) VALUES (1,'Carlos')")
+    cur.execute("INSERT INTO dim_cliente (cliente_id_odoo, nombre, zona_sk) VALUES "
+                "(1,'Cliente Uno',%s),(2,'Cliente Dos',%s)", (z["centro"], z["ficoa"]))
+    cur.execute("INSERT INTO dim_producto (producto_id_odoo, nombre, referencia) VALUES "
+                "(1,'Producto Uno','P1'),(2,'Producto Dos','P2')")
+
+    # (vehiculo, dia, hora, origen, destino, km, min, paradas, procedencia)
+    rec = [(1, 3, 8, "centro", "ficoa", 10, 30, 1, "REAL"),
+           (1, 4, 9, "ficoa", "huachi", 20, 45, 2, "REAL"),
+           (2, 3, 14, "centro", "izamba", 30, 60, 3, "SIMULADO"),
+           (2, 4, 15, "izamba", "centro", 40, 90, 0, "SIMULADO")]
+    for i, (v, d, h, o, de, km, mn, p, pr) in enumerate(rec):
+        t = _ts(d, h)
+        cur.execute("""INSERT INTO fact_recorridos (vehiculo_sk, conductor_sk, tiempo_inicio_sk,
+            zona_origen_sk, zona_destino_sk, inicio_utc, fin_utc, distancia_km, duracion_min, num_paradas,
+            fuente_id, procedencia) VALUES (%s,1,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                    (v, _tiempo(cur, t), z[o], z[de], t, t, km, mn, p, "t%d" % i, pr))
+
+    # (cliente, vehiculo, dia, hora, resultado, minuto de cierre, a_tiempo, motivo, procedencia); limite = hora:15
+    ent = [(1, 1, 3, 8, "entregado", 0, True, None, "REAL"),
+           (2, 1, 4, 9, "no_entregado", 20, None, "absent", "REAL"),
+           (1, 2, 3, 14, "entregado", 30, False, None, "SIMULADO"),
+           (2, 2, 4, 15, "pendiente", None, None, None, "SIMULADO")]
+    for i, (c, v, d, h, res, minuto, a_tiempo, motivo, pr) in enumerate(ent):
+        t = _ts(d, h)
+        comp = None if minuto is None else _ts(d, h, minuto)
+        cur.execute("""INSERT INTO fact_entregas (cliente_sk, vehiculo_sk, tiempo_sk, zona_sk, entrega_id_odoo,
+            resultado, motivo, planificado_utc, completado_utc, limite_plan_utc, a_tiempo, procedencia)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                    (c, v, _tiempo(cur, t), z["centro"], i + 1, res, motivo, t, comp, _ts(d, h, 15), a_tiempo, pr))
+
+    # (ruta, vehiculo, dia, km plan, km real, min plan, min real, paradas, entregadas, fallidas, procedencia)
+    rutas = [(1, 1, 3, 10, 12, 30, 36, 2, 1, 1, "REAL"), (2, 2, 4, 20, None, 40, None, 1, 0, 0, "SIMULADO")]
+    for rid, v, d, kp, kr, mp, mr, par, ok, mal, pr in rutas:
+        t = _ts(d, 8)
+        cur.execute("""INSERT INTO fact_rutas (ruta_id_odoo, codigo, vehiculo_sk, conductor_sk, tiempo_sk, fecha,
+            estado, inicio_utc, km_planificado, km_real, min_planificado, min_real, posiciones_gps, paradas_total,
+            paradas_entregadas, paradas_fallidas, paradas_pendientes, procedencia)
+            VALUES (%s,%s,%s,1,%s,%s,'cerrada',%s,%s,%s,%s,%s,5,%s,%s,%s,%s,%s)""",
+                    (rid, "RUTA/%04d" % rid, v, _tiempo(cur, t), date(2026, 11, d), t, kp, kr, mp, mr, par, ok, mal,
+                     par - ok - mal, pr))
+
+    # (parada, ruta, dia, zona, estado, min en parada, min desde inicio, procedencia)
+    paradas = [(1, 1, 3, "centro", "entregado", 2, 20, "REAL"), (2, 1, 3, "ficoa", "no_entregado", 4, 30, "REAL"),
+               (3, 2, 4, "centro", "pendiente", None, None, "SIMULADO")]
+    for pid, rid, d, zona, estado, m1, m2, pr in paradas:
+        cur.execute("""INSERT INTO fact_paradas (parada_id_odoo, ruta_id_odoo, zona_sk, tiempo_sk, orden, estado,
+            min_en_parada, min_desde_inicio_ruta, procedencia) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                    (pid, rid, z[zona], _tiempo(cur, _ts(d, 8)), pid, estado, m1, m2, pr))
+
+    # (linea, pedido, cliente, producto, zona, dia, cantidad, subtotal)
+    ventas = [(1, 1, 1, 1, "centro", 3, 2, 20), (2, 1, 1, 2, "centro", 3, 1, 12.5), (3, 2, 2, 1, "ficoa", 4, 3, 30)]
+    for lid, ped, c, p, zona, d, cant, sub in ventas:
+        t = _ts(d, 7)
+        cur.execute("""INSERT INTO fact_ventas (linea_id_odoo, pedido_id_odoo, pedido_ref, cliente_sk, producto_sk,
+            zona_sk, tiempo_sk, fecha_pedido_utc, estado_pedido, cantidad, precio_unitario, subtotal, total)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'sale',%s,10,%s,%s)""",
+                    (lid, ped, "S%04d" % ped, c, p, z[zona], _tiempo(cur, t), t, cant, sub, sub))
+
+    cur.execute("""INSERT INTO etl_ejecucion (lote_id, modo, inicio_utc, fin_utc, estado, cargados, rechazados,
+                                              omitidos, error) VALUES
+        (1,'full',%s,%s,'ok','{"fact_entregas": 4, "fact_rutas": 2}','{"coordenadas_invalidas": 2}','[]',NULL),
+        (2,'incremental',%s,%s,'error','{}','{"coordenadas_invalidas": 1, "velocidad_anomala": 1}','["traccar"]',
+         'Traccar no responde')""", (_ts(4, 16), _ts(4, 16, 1), _ts(4, 17), _ts(4, 17, 2)))
 
 
 @pytest.fixture
@@ -42,36 +122,7 @@ def dwh_env():
             for f in ("dwh_schema.sql", "dwh_views.sql"):
                 with open(os.path.join(HERE, f), encoding="utf-8") as fh:
                     cur.execute(fh.read())
-            cur.execute("INSERT INTO dim_vehiculo (vehiculo_id_odoo, placa, procedencia) VALUES "
-                        "(1,'ABC-1234','REAL'),(2,'DEF-5678','SIMULADO')")
-            cur.execute("INSERT INTO dim_conductor (conductor_id_odoo, nombre) VALUES (1,'Carlos')")
-            cur.execute("SELECT codigo, sk FROM dim_zona")
-            z = dict(cur.fetchall())
-            cur.execute("INSERT INTO dim_cliente (cliente_id_odoo, nombre, zona_sk) VALUES "
-                        "(1,'Cliente Uno',%s),(2,'Cliente Dos',%s)", (z["centro"], z["ficoa"]))
-            # (vehiculo, dia, hora, origen, destino, km, min, paradas, procedencia)
-            rec = [(1, 3, 8, "centro", "ficoa", 10, 30, 1, "REAL"),
-                   (1, 4, 9, "ficoa", "huachi", 20, 45, 2, "REAL"),
-                   (2, 3, 14, "centro", "izamba", 30, 60, 3, "SIMULADO"),
-                   (2, 4, 15, "izamba", "centro", 40, 90, 0, "SIMULADO")]
-            for i, (v, d, h, o, de, km, mn, p, pr) in enumerate(rec):
-                t = _ts(d, h)
-                cur.execute("INSERT INTO dim_tiempo VALUES (%s,%s,2026,11,%s,%s,%s) ON CONFLICT DO NOTHING",
-                            (_tsk(t), t.date(), d, t.weekday(), h))
-                cur.execute("""INSERT INTO fact_recorridos (vehiculo_sk, conductor_sk, tiempo_inicio_sk,
-                    zona_origen_sk, zona_destino_sk, inicio_utc, fin_utc, distancia_km, duracion_min, num_paradas,
-                    fuente_id, procedencia) VALUES (%s,1,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                            (v, _tsk(t), z[o], z[de], t, t, km, mn, p, "t%d" % i, pr))
-            # (cliente, vehiculo, dia, hora, resultado, minuto de cierre, procedencia); plan = hora:15
-            ent = [(1, 1, 3, 8, "entregado", 0, "REAL"), (2, 1, 4, 9, "no_entregado", None, "REAL"),
-                   (1, 2, 3, 14, "entregado", 30, "SIMULADO"), (2, 2, 4, 15, "pendiente", None, "SIMULADO")]
-            for i, (c, v, d, h, res, minuto, pr) in enumerate(ent):
-                t = _ts(d, h)
-                comp = None if minuto is None else _ts(d, h, minuto)
-                cur.execute("""INSERT INTO fact_entregas (cliente_sk, vehiculo_sk, tiempo_sk, zona_sk,
-                    entrega_id_odoo, resultado, planificado_utc, completado_utc, procedencia)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                            (c, v, _tsk(t), z["centro"], i + 1, res, _ts(d, h, 15), comp, pr))
+            _poblar(cur)
         conn.close()
         yield {"admin": admin, "dsn": dsn, "name": name}
     finally:
