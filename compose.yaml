@@ -195,6 +195,35 @@ services:
       DEMO_CONDUCTOR_PASSWORD: ${DEMO_CONDUCTOR_PASSWORD:?Configura DEMO_CONDUCTOR_PASSWORD}
     command: ["python", "seeds/seed.py"]
 
+  # Asistente del administrador (chat con Claude + interfaz React). Lee Odoo con permisos de solo consulta.
+  agente:
+    build: ./services/agente
+    restart: unless-stopped
+    depends_on:
+      odoo:
+        condition: service_healthy
+    environment:
+      ODOO_URL: http://odoo:8069
+      ODOO_DB: ${ODOO_DB:-logistica_dev}
+      ODOO_USER: ${ODOO_USER:-admin}
+      ODOO_PASSWORD: ${ODOO_PASSWORD:-${ODOO_ADMIN_PASSWORD}}
+      # Sin clave el servicio arranca igual y avisa en el chat.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AGENTE_MODELO: ${AGENTE_MODELO:-claude-opus-5-5}
+      AGENTE_ESFUERZO: ${AGENTE_ESFUERZO:-medium}
+      AGENTE_SESSION_SECRET: ${AGENTE_SESSION_SECRET:?Configura AGENTE_SESSION_SECRET (openssl rand -hex 32)}
+      # true con HTTPS (produccion); false solo en local por http://
+      AGENTE_COOKIE_SEGURA: ${AGENTE_COOKIE_SEGURA:-true}
+      # IPs del proxy en las que se confia para X-Forwarded-For (Traefik en Dokploy: su red, o "*" si 8000 no se publica)
+      FORWARDED_ALLOW_IPS: ${AGENTE_FORWARDED_ALLOW_IPS:-127.0.0.1}
+    ports:
+      - "127.0.0.1:8003:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/api/salud',timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
   bi:
     build: ./services/bi
     profiles: ["analitica"]

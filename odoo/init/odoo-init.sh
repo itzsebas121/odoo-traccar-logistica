@@ -11,6 +11,19 @@ MODULOS="contacts,fleet,sale_management,website,website_sale,payment_custom,logi
 PGPASSWORD=$PASSWORD
 export PGPASSWORD
 
+# Antes de nada: ¿la clave de .env abre PostgreSQL? POSTGRES_PASSWORD solo se aplica cuando el volumen
+# de datos se crea por primera vez; cambiar ODOO_DB_PASSWORD despues NO cambia la clave guardada.
+if ! salida=$(psql -h db -U odoo -d postgres -tAc "SELECT 1" 2>&1); then
+    echo "odoo-init: ERROR: no se pudo entrar a PostgreSQL como 'odoo'." >&2
+    echo "  Detalle: $(echo "$salida" | tail -n 1)" >&2
+    if echo "$salida" | grep -q "password authentication failed"; then
+        echo "  Causa: ODOO_DB_PASSWORD no coincide con la clave con la que se creo el volumen de la base." >&2
+        echo "  Solucion: vuelva a poner la clave anterior, o cambie la clave dentro de PostgreSQL:" >&2
+        echo "    docker compose exec db psql -U odoo -d postgres -c \"ALTER USER odoo PASSWORD '<nueva>'\"" >&2
+    fi
+    exit 1
+fi
+
 instalada() {
     psql -h db -U odoo -d "$ODOO_DB" -tAc \
         "SELECT 1 FROM ir_module_module WHERE name='logistica_analitica_ia' AND state='installed'" 2>/dev/null | grep -q 1

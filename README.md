@@ -233,3 +233,27 @@ El servicio `odoo` genera su configuración al arrancar ([odoo/init/odoo-entrypo
 - Leaflet se sirve desde Odoo (`logistica_base/static/lib/leaflet`), sin depender de unpkg.
 - `ROUTING_OSRM_URL` apunta por defecto al servidor **de demostración** de OSRM, que limita a ~1 petición/s y no admite uso en producción. El servicio de rutas guarda 10 min las rutas y usa una sola llamada por mapa, pero en producción conviene un OSRM propio o un proveedor contratado; si falla, se dibuja la línea recta.
 - Los mosaicos de `tile.openstreetmap.org` tampoco admiten uso comercial intensivo: para producción use un proveedor de mosaicos propio o contratado. Mantener persistentes los volúmenes de PostgreSQL, Odoo y Traccar. Cuando exista dominio, configurar HTTPS y actualizar las URLs públicas.
+
+## Asistente del administrador (`services/agente`)
+
+Chat con Claude para el administrador: consulta ventas, clientes, facturas y la operación en Odoo (solo lectura). Interfaz React + shadcn/ui servida por el mismo servicio FastAPI, así que navegador y API comparten origen (sin CORS).
+
+- **Acceso:** usuario y contraseña de Odoo; solo entran miembros del grupo *Administración / Ajustes* (`base.group_system`). Sesión en cookie firmada, `HttpOnly`, `SameSite=Lax`.
+- **Herramientas:** `ventas_por_cliente`, `detalle_cliente`, `productos_mas_vendidos`, `facturas`, `ventas_por_periodo`, `estado_operacion`. Parámetros validados; el modelo no escribe SQL ni elige modelos o campos.
+- **Modelo:** `claude-opus-5-5` con razonamiento adaptativo, streaming, caché de prompts y *fallback* del servidor ante rechazos.
+- **Conversaciones:** en memoria del servicio (24 h, se pierden al reiniciar). Un solo proceso de uvicorn.
+- **Tablero:** pestaña reservada, vacía por ahora.
+
+Variables: `ANTHROPIC_API_KEY`, `AGENTE_SESSION_SECRET` (obligatoria, `openssl rand -hex 32`), `AGENTE_COOKIE_SEGURA` (`true` con HTTPS), `AGENTE_MODELO`, `AGENTE_ESFUERZO`, `AGENTE_FORWARDED_ALLOW_IPS`.
+
+Local: `docker compose up -d agente` y abrir http://127.0.0.1:8003 (con `AGENTE_COOKIE_SEGURA=false`).
+
+Desarrollo de la interfaz con recarga en caliente:
+
+```bash
+cd services/agente/web && npm install && npm run dev   # http://localhost:5173, la API va por proxy a :8003
+```
+
+Pruebas del backend: `cd services/agente && pip install -r requirements-dev.txt && pytest`.
+
+En Dokploy: dominio (por ejemplo `asistente.sebasdev.shop`) hacia el servicio `agente`, puerto `8000`, con HTTPS; `AGENTE_COOKIE_SEGURA=true` y `AGENTE_FORWARDED_ALLOW_IPS=*` (el puerto solo se publica en `127.0.0.1`, así que solo Traefik llega al contenedor).
