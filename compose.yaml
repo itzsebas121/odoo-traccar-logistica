@@ -84,6 +84,8 @@ services:
     entrypoint: ["/bin/sh", "/entrypoint-custom.sh"]
     ports:
       - "8082:8082"
+      # OsmAnd (Traccar Client). En local el teléfono usa http://<IP-del-PC>:5055. En producción, detrás de Cloudflare,
+      # este puerto no pasa: los teléfonos entran por el dominio HTTPS «gps» (Traefik → traccar:5055). Ver README.
       - "5055:5055"
     environment:
       TRACCAR_DB_HOST: db

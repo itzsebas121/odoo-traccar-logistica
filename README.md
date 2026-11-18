@@ -249,13 +249,26 @@ docker compose run --rm --no-deps routing python -m pytest -q
    | `odoo.sebasdev.shop` | `/` | `odoo` | 8069 |
    | `odoo.sebasdev.shop` | `/websocket` | `odoo` | 8072 |
    | `traccar.sebasdev.shop` | `/` | `traccar` | 8082 |
+   | `gps.sebasdev.shop` | `/` | `traccar` | **5055** |
    | `asistente.sebasdev.shop` (ejemplo) | `/` | `agente` | 8000 |
 
    Si no puede crear la regla de `/websocket`, use `ODOO_WORKERS=0`.
 
-4. **Puertos y firewall:** abra solo 80/443 (Traefik) y **5055/TCP** (GPS). No publique 5432 (PostgreSQL) ni 8069 directamente. Si el dominio de Traccar está detrás del proxy de Cloudflare, el 5055 no pasa: use un registro «DNS only» para los dispositivos.
+   `gps.sebasdev.shop` recibe las posiciones de Traccar Client (protocolo OsmAnd, que es HTTP) por HTTPS en el 443.
+   Así funciona aunque el dominio esté detrás del proxy de Cloudflare, que **no reenvía el puerto 5055**
+   (solo 80, 443 y unos pocos puertos HTTP más). Además, la ubicación de los conductores viaja cifrada.
+   En Cloudflare basta un registro `gps` igual al de `traccar` (puede ir con el proxy activado).
+
+4. **Puertos y firewall:** abra solo 80/443 (Traefik). No publique 5432 (PostgreSQL) ni 8069 directamente. Con el
+   dominio `gps` no hace falta abrir el 5055; ábralo solo si algún rastreador GPS físico no admite HTTPS, y en ese caso
+   use un registro «DNS only» (nube gris), porque por el proxy de Cloudflare el 5055 no pasa.
 5. **Deploy.** El primer despliegue instala los módulos (varios minutos). Los siguientes no reinstalan nada.
-6. **GPS:** en la app Traccar Client, servidor `http://traccar.sebasdev.shop:5055` e identificador igual al `uniqueId` del vehículo en `seeds/data/odoo.json`.
+6. **GPS:** en la app Traccar Client, *Server URL* `https://gps.sebasdev.shop` (sin puerto) e *Device identifier*
+   igual al «ID Rastreo GPS» del vehículo que conduce (Odoo → Flota → vehículo).
+   **No** use `http://traccar.sebasdev.shop:5055`: ese dominio pasa por Cloudflare y el teléfono no llega al servidor.
+   Para comprobar el dominio sin teléfono (registra una posición de prueba):
+   `curl -i "https://gps.sebasdev.shop/?id=<uniqueId>&lat=-1.2491&lon=-78.6168"` debe responder `200`
+   (`400` = identificador desconocido; sin respuesta = el dominio `gps` no apunta a `traccar:5055`).
 
 ### Problemas comunes
 
@@ -268,6 +281,28 @@ docker compose run --rm --no-deps routing python -m pytest -q
 
 - **`Temporary failure in name resolution` hacia `traccar` en los registros de Odoo:** Traccar no está corriendo; revise los registros del contenedor `traccar` (casi siempre es el punto anterior).
 - **Falta una variable obligatoria** (`Configura ...`): el despliegue se detiene a propósito; agréguela en *Environment*.
+- **Traccar no registra la ubicación del conductor:** siga el camino de la posición, de la app hacia Odoo:
+  1. *¿Llega al servidor?* En el log de Traccar (`/opt/traccar/logs/tracker-server.log` del contenedor `traccar`)
+     cada envío deja una línea `osmand <`. Si no hay ninguna, el teléfono no llega: revise el *Server URL* (punto 6),
+     el dominio `gps` y, en local, el firewall de Windows.
+  2. *¿El dispositivo existe?* `Unknown device - <id>` en ese log significa que el *Device identifier* de la app no es
+     igual a ningún `uniqueId` de Traccar; corríjalo en la app (distingue mayúsculas).
+  3. *¿Lo sincroniza Odoo?* El cron «Logística: sincronizar Traccar» corre cada minuto y deja `traccar_sync ... posiciones=N`
+     en el log de Odoo. Las posiciones se asocian a la ruta solo si el vehículo tiene una ruta **en recorrido**.
+  4. En iOS: ubicación **Siempre** y **Ubicación exacta** para Traccar Client, y el interruptor de servicio encendido.
+
+### Probar Traccar Client en local (teléfono en la misma Wi-Fi)
+
+1. IP del PC en la Wi-Fi: `ipconfig` (algo como `192.168.x.x`). El teléfono debe estar en esa misma red.
+2. Permita el puerto en Windows (PowerShell como administrador; la red Wi-Fi debe ser «Privada»):
+   `New-NetFirewallRule -DisplayName "Traccar OsmAnd 5055" -Direction Inbound -Protocol TCP -LocalPort 5055 -Action Allow -Profile Private`
+3. Desde Safari del teléfono abra `http://<IP-del-PC>:5055/?id=<uniqueId>&lat=-1.2491&lon=-78.6168`: una página en
+   blanco (HTTP 200) confirma la conexión; un error de conexión es red o firewall. Esa posición es **ficticia** (las
+   coordenadas de la URL) y queda en el mapa hasta que llegue la primera real del GPS.
+4. En Traccar Client: *Server URL* `http://<IP-del-PC>:5055` y *Device identifier* el `uniqueId` del vehículo.
+   Debe ser **`http://`**: el 5055 no tiene TLS, y con `https://` la app falla con
+   «A TLS error caused the secure connection to fail» (-1200). Si el registro de la app dice
+   «Local network prohibited», active Ajustes → Privacidad y seguridad → Red local → Traccar Client.
 
 ## Configuración de Odoo en producción
 
