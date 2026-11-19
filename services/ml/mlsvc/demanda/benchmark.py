@@ -25,6 +25,7 @@ Regla de eleccion (por unidad espacial y procedencia):
 """
 import argparse
 import json
+import math
 import os
 import pathlib
 import time
@@ -289,6 +290,18 @@ def informe_md(res):
     return "\n".join(lineas)
 
 
+def _sin_nan(obj):
+    """Copia de obj con NaN e infinitos como null: JSON estricto (FastAPI y otros lectores no aceptan NaN)."""
+    if isinstance(obj, dict):
+        return {k: _sin_nan(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sin_nan(v) for v in obj]
+    v = _nulo(obj)
+    if isinstance(v, float) and not math.isfinite(v):
+        return None
+    return v
+
+
 def guardar_archivos(res, carpeta):
     carpeta = pathlib.Path(carpeta)
     carpeta.mkdir(parents=True, exist_ok=True)
@@ -296,8 +309,8 @@ def guardar_archivos(res, carpeta):
     t.to_csv(carpeta / "comparativa_modelos.csv", index=False)
     doc = {"corrida_id": res["corrida_id"], "elegido": res["elegido"], "motivo": res.get("motivo"),
            "filas": json.loads(t.to_json(orient="records", force_ascii=False))}
-    (carpeta / "comparativa_modelos.json").write_text(json.dumps(doc, indent=2, ensure_ascii=False, default=str),
-                                                      encoding="utf-8")
+    (carpeta / "comparativa_modelos.json").write_text(
+        json.dumps(_sin_nan(doc), indent=2, ensure_ascii=False, default=str, allow_nan=False), encoding="utf-8")
     (carpeta / "comparativa_modelos.md").write_text(informe_md(res), encoding="utf-8")
     return carpeta
 

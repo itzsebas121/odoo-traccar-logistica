@@ -8,7 +8,7 @@
     "unidad_espacial": "dbscan",
     "procedencia": "REAL",
     "estado": "ok",
-    "detalle": NaN,
+    "detalle": null,
     "cortes": 3,
     "horizonte_dias": 7,
     "series": 298,
