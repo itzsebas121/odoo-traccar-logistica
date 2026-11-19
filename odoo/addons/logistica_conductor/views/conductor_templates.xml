@@ -100,12 +100,26 @@
                   integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="/>
             <script src="/logistica_base/static/lib/leaflet/leaflet.js"
                     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="></script>
+            <style>
+                /* Teselas en blanco en Chrome móvil por mix-blend-mode: plus-lighter (Leaflet 1.9.4). */
+                #c-mapa { isolation: isolate; }
+                #c-mapa img.leaflet-tile { mix-blend-mode: normal !important; }
+            </style>
             <script type="text/javascript">
                 (function () {
+                    // El CSS móvil del website de Odoo fuerza `img { transform: none !important }`
+                    // y rompe el translate3d de Leaflet: posicionar con left/top.
+                    L.Browser.any3d = false;
                     var mapa = L.map('c-mapa').setView([-1.2676963, -78.6241805], 12);
                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                         maxZoom: 19, attribution: '&amp;copy; OpenStreetMap'
                     }).addTo(mapa);
+                    // Recalcular tamaño en móvil (rotación, teclado, carga tardía del layout).
+                    if (window.ResizeObserver) {
+                        new ResizeObserver(function () { mapa.invalidateSize({pan: false}); })
+                            .observe(document.getElementById('c-mapa'));
+                    }
+                    setTimeout(function () { mapa.invalidateSize({pan: false}); }, 300);
                     var capas = L.layerGroup().addTo(mapa);
                     function dibujar(d) {
                                 capas.clearLayers(); var puntos = [];

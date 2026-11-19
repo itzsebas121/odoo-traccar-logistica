@@ -25,6 +25,11 @@
         }
         contenedor.dataset.iniciado = '1';
         var L = window.L;
+        // En móvil (<768px) el CSS del website de Odoo aplica
+        // `img:not(.o_animate) { transform: none !important; }`, lo que anula el
+        // translate3d con que Leaflet coloca teselas y pines (todas quedan
+        // apiladas en la esquina). Sin any3d, Leaflet posiciona con left/top.
+        L.Browser.any3d = false;
 
         var cobertura = null;
         if (contenedor.dataset.cobertura) {
@@ -40,10 +45,15 @@
         var tienePin = lat !== null && lon !== null && !(lat === 0 && lon === 0);
 
         var mapa = L.map(contenedor).setView(tienePin ? [lat, lon] : centro, 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        var teselas = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; colaboradores de OpenStreetMap',
         }).addTo(mapa);
+        teselas.on('tileerror', function (ev) {
+            if (window.console) {
+                console.warn('[mapa entrega] no se pudo cargar la tesela', ev.coords);
+            }
+        });
         // Fase A: la cobertura real es un radio desde la bodega (si está configurado).
         var radioKm = numero(contenedor.dataset.radioKm);
         var sede = (contenedor.dataset.sede || '').split(',').map(numero);
@@ -86,8 +96,25 @@
             estado.textContent = 'Aún no ha seleccionado el punto de entrega.';
         }
         mapa.on('click', function (ev) { colocar(ev.latlng); });
-        // El contenedor puede cambiar de tamaño al cargar el formulario.
-        setTimeout(function () { mapa.invalidateSize(); }, 300);
+        // El contenedor cambia de tamaño al cargar el formulario, al rotar el
+        // móvil o al abrir/cerrar el teclado: Leaflet debe recalcular su tamaño
+        // o solo pinta las teselas del tamaño inicial (resto en gris).
+        var pendiente = null;
+        function reajustar() {
+            if (pendiente) {
+                cancelAnimationFrame(pendiente);
+            }
+            pendiente = requestAnimationFrame(function () {
+                pendiente = null;
+                mapa.invalidateSize({pan: false});
+            });
+        }
+        if (typeof window.ResizeObserver !== 'undefined') {
+            new ResizeObserver(reajustar).observe(contenedor);
+        }
+        window.addEventListener('resize', reajustar);
+        window.addEventListener('orientationchange', reajustar);
+        [100, 300, 1000].forEach(function (ms) { setTimeout(reajustar, ms); });
     }
 
     if (document.readyState === 'complete') {
