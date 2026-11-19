@@ -18,10 +18,37 @@ SOLAPE_POSICIONES = timedelta(minutes=10)
 MARCA_POSICIONES = "traccar:posiciones"
 MARCA_RECORRIDOS = "traccar:recorridos"
 MAX_ERROR = 2000
+# Parametros de Odoo que, si cambian, obligan a una corrida completa. logistica_demo reescribe create_date/write_date
+# al pasado (_fechar) y anota hasta que dia cargo el historial: lo sembrado queda por detras de la marca de agua.
+PARAMETROS_FULL = ("logistica_demo.historial_hasta",)
 
 
 def _max(a, b):
     return b if a is None or (b is not None and b > a) else a
+
+
+def parametros_odoo(odoo_src):
+    """{clave: valor} de PARAMETROS_FULL; {} si la fuente no esta o no sabe leer parametros."""
+    leer = getattr(odoo_src, "parametro", None)
+    if leer is None:
+        return {}
+    valores = {}
+    for clave in PARAMETROS_FULL:
+        try:
+            valores[clave] = leer(clave)
+        except Exception:   # sin acceso o error transitorio: no decide nada
+            continue
+    return valores
+
+
+def motivo_full(scur, parametros):
+    """Texto con los parametros que cambiaron desde la ultima corrida correcta, o None."""
+    cambios = []
+    for clave, valor in parametros.items():
+        existe, antes = staging.get_estado(scur, "odoo:" + clave)
+        if valor is not None and (not existe or antes != valor):
+            cambios.append("%s: %s -> %s" % (clave, antes, valor))
+    return "; ".join(cambios) or None
 
 
 def extract_to_staging(scur, lote, modo, odoo_src, traccar_src, now, dias, extraidos, omitidos):
@@ -115,6 +142,12 @@ def run_etl(stg_conn, dwh_conn, modo, odoo_src, traccar_src, now=None, dias=None
     db.tomar_candado(stg_conn)
     try:
         scur = stg_conn.cursor()
+        parametros = parametros_odoo(odoo_src)
+        if modo == "incremental":
+            motivo = motivo_full(scur, parametros)
+            if motivo:
+                modo = "full"
+                conteos["motivo_full"] = motivo
         lote, inicio = staging.new_lote(scur, modo)
         stg_conn.commit()  # el lote existe aunque la corrida falle
         try:
@@ -135,6 +168,8 @@ def run_etl(stg_conn, dwh_conn, modo, odoo_src, traccar_src, now=None, dias=None
 
             for fuente, valor in marks.items():
                 staging.advance_watermark(scur, fuente, valor)
+            for clave, valor in parametros.items():
+                staging.set_estado(scur, "odoo:" + clave, valor)
             staging.resolver_rechazos(scur, lote)
             staging.purge(scur, retencion)
             stg_conn.commit()

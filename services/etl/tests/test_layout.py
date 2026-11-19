@@ -9,14 +9,14 @@ from conftest import correr, q1, qall
 from etl import db
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-TABLAS_STAGING = {"schema_version", "odoo_raw", "traccar_raw", "lote", "watermark", "rechazados"}
+TABLAS_STAGING = {"schema_version", "odoo_raw", "traccar_raw", "lote", "watermark", "etl_estado", "rechazados"}
 TABLAS_DWH = {"schema_version", "dim_vehiculo", "dim_conductor", "dim_tiempo", "dim_zona", "dim_cliente",
               "dim_producto", "fact_recorridos", "fact_posicion_gps", "fact_rutas", "fact_paradas", "fact_entregas",
               "fact_ventas", "etl_ejecucion", "ml_evaluacion_modelos", "ml_unidad_espacial", "ml_pronostico_demanda"}
 VISTAS_ML = {"v_viajes_entrenamiento", "v_ruta_plan_vs_real", "v_ml_viajes", "v_ml_transiciones_paradas",
              "v_ml_ventas_geo", "v_ml_demanda_diaria_zona"}
 VISTAS_BI = {"v_bi_dim_fecha", "v_bi_dim_producto", "v_bi_dim_cliente", "v_bi_dim_zona", "v_bi_dim_vehiculo",
-             "v_bi_ventas_diarias", "v_bi_pedidos", "v_bi_ventas_mapa", "v_bi_top_productos_zona",
+             "v_bi_ventas_diarias", "v_bi_lineas_venta", "v_bi_pedidos", "v_bi_ventas_mapa", "v_bi_top_productos_zona",
              "v_bi_comparativa_modelos", "v_bi_corridas_modelo", "v_bi_unidades_espaciales",
              "v_bi_demanda_real_vs_pronostico", "v_bi_recorridos", "v_bi_od_viajes", "v_bi_conductor_resumen",
              "v_bi_entregas", "v_bi_vinculo_gps", "v_bi_ruta_plan_vs_real", "v_bi_paradas", "v_bi_posiciones_ruta",

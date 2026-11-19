@@ -66,6 +66,14 @@ LEFT JOIN dim_zona z ON z.codigo = g.zona
 WHERE g.fecha_local IS NOT NULL
 GROUP BY g.fecha_local, g.producto_sk, g.producto, g.categoria, g.grupo, z.sk, g.zona, g.procedencia;
 
+-- Una fila por linea de pedido, con su zona y categoria: base de los filtros del tablero (zona, categoria). Los pedidos
+-- se cuentan con COUNT(DISTINCT pedido_id_odoo) (un pedido tiene varias lineas).
+CREATE OR REPLACE VIEW v_bi_lineas_venta AS
+SELECT g.fecha_local AS fecha, g.pedido_id_odoo, g.producto_sk, g.producto, g.categoria, g.grupo,
+       COALESCE(g.zona, '(sin zona)') AS zona, g.procedencia, g.cantidad AS unidades, g.subtotal AS importe
+FROM v_ml_ventas_geo g
+WHERE g.fecha_local IS NOT NULL;
+
 -- Pedidos (cabecera): ticket promedio, pedidos por cliente, por hora y por dia.
 CREATE OR REPLACE VIEW v_bi_pedidos AS
 SELECT s.pedido_id_odoo, MIN(s.pedido_ref) AS pedido_ref, MIN(t.fecha_local) AS fecha, MIN(t.hora_local) AS hora,
@@ -110,7 +118,7 @@ SELECT corrida_id, MIN(corrida_utc) AS corrida_utc, COUNT(*) AS modelos_evaluado
        COUNT(*) FILTER (WHERE estado = 'ok') AS modelos_ok,
        MAX(modelo) FILTER (WHERE elegido) AS modelo_elegido,
        MAX(unidad_espacial) FILTER (WHERE elegido) AS unidad_elegida,
-       MIN(wape) FILTER (WHERE elegido) AS wape_elegido
+       MIN(wape_7d) FILTER (WHERE elegido) AS wape_elegido
 FROM ml_evaluacion_modelos
 GROUP BY corrida_id;
 
@@ -119,29 +127,45 @@ SELECT u.tipo, u.unidad_id, u.centro_lat AS latitud, u.centro_lon AS longitud, u
 FROM ml_unidad_espacial u;
 
 -- Pronostico frente a lo real. 'backtest': ultimo corte de prueba (las dos columnas); 'pronostico': dias futuros
--- (unidades_real NULL). Solo el ultimo model_version de cada tipo de registro.
+-- (unidades_real NULL). Solo el ultimo model_version de cada tipo de registro (calculado una vez, no por fila: la
+-- tabla crece con cada `ml-predecir`).
 CREATE OR REPLACE VIEW v_bi_demanda_real_vs_pronostico AS
+WITH ultima AS (
+    SELECT DISTINCT ON (tipo_registro) tipo_registro, model_version
+    FROM ml_pronostico_demanda
+    ORDER BY tipo_registro, generado_utc DESC, sk DESC
+)
 SELECT f.tipo_registro, f.fecha_objetivo AS fecha, f.producto_sk, p.nombre AS producto,
        COALESCE(NULLIF(btrim(regexp_replace(p.categoria, '^.*/', '')), ''), '(sin categoria)') AS categoria,
        f.tipo_unidad, f.unidad_id, u.centro_lat AS latitud, u.centro_lon AS longitud,
        f.unidades_pred, f.unidades_real, f.p10, f.p90,
        f.unidades_pred - f.unidades_real AS error, ABS(f.unidades_pred - f.unidades_real) AS error_abs,
-       f.modelo, f.model_version, f.generado_utc
+       f.modelo, f.model_version, f.generado_utc,
+       za.codigo AS zona_aprox   -- zona cuyo centro queda mas cerca del centro de la unidad (para filtrar por zona)
 FROM ml_pronostico_demanda f
 LEFT JOIN dim_producto p ON p.sk = f.producto_sk
 LEFT JOIN ml_unidad_espacial u ON u.tipo = f.tipo_unidad AND u.unidad_id = f.unidad_id
-WHERE f.model_version = (SELECT m.model_version FROM ml_pronostico_demanda m
-                         WHERE m.tipo_registro = f.tipo_registro ORDER BY m.generado_utc DESC, m.sk DESC LIMIT 1);
+JOIN ultima ON ultima.tipo_registro = f.tipo_registro AND ultima.model_version = f.model_version
+LEFT JOIN LATERAL (
+    SELECT z.codigo FROM dim_zona z
+    WHERE z.activa AND z.latitud IS NOT NULL AND z.longitud IS NOT NULL AND u.centro_lat IS NOT NULL
+    ORDER BY power(z.latitud - u.centro_lat, 2) + power(z.longitud - u.centro_lon, 2)
+    LIMIT 1
+) za ON true;
 
 -- ================================================================= operacion: recorridos, rutas y entregas
 -- Un recorrido GPS por fila, con dia y hora LOCAL (corrige el agrupado por hora UTC de la guia BI, punto 3.1).
+-- procedencia: la del recorrido, salvo que su ruta sea del historial sintetico del demo (entonces SIMULADO: el GPS
+-- de esas rutas lo manda seeds/gps_historico.py a Traccar).
 CREATE OR REPLACE VIEW v_bi_recorridos AS
 SELECT r.sk AS recorrido_sk, t.fecha_local AS fecha, t.hora_local AS hora, t.dia_semana_local AS dia_semana,
        t.franja, t.fin_de_semana, r.vehiculo_sk, v.placa, c.nombre AS conductor,
        zo.codigo AS zona_origen, zd.codigo AS zona_destino, r.distancia_km, r.duracion_min, r.num_paradas,
        r.velocidad_media_kmh, r.velocidad_max_kmh, r.ruta_id_odoo, (r.ruta_id_odoo IS NOT NULL) AS en_ruta,
-       r.inicio_utc, r.fin_utc, r.procedencia
+       r.inicio_utc, r.fin_utc,
+       CASE WHEN w.procedencia = 'SIMULADO' THEN 'SIMULADO' ELSE r.procedencia END AS procedencia
 FROM fact_recorridos r
+LEFT JOIN fact_rutas w ON w.ruta_id_odoo = r.ruta_id_odoo
 LEFT JOIN dim_vehiculo v ON v.sk = r.vehiculo_sk
 LEFT JOIN dim_conductor c ON c.sk = r.conductor_sk
 LEFT JOIN dim_tiempo t ON t.sk = r.tiempo_inicio_sk
@@ -162,10 +186,12 @@ GROUP BY 1, 2, 3, 4, 5, 6, 7, 8;
 
 -- Actividad por conductor y dia: recorridos, km y rutas (conductor de la ruta o, fuera de ruta, el del vehiculo).
 CREATE OR REPLACE VIEW v_bi_conductor_resumen AS
-SELECT t.fecha_local AS fecha, COALESCE(c.nombre, '(sin conductor)') AS conductor, r.procedencia,
+SELECT t.fecha_local AS fecha, COALESCE(c.nombre, '(sin conductor)') AS conductor,
+       CASE WHEN w.procedencia = 'SIMULADO' THEN 'SIMULADO' ELSE r.procedencia END AS procedencia,
        COUNT(*) AS recorridos, ROUND(SUM(r.distancia_km), 1) AS km, ROUND(SUM(r.duracion_min), 1) AS minutos,
        COUNT(DISTINCT r.ruta_id_odoo) AS rutas
 FROM fact_recorridos r
+LEFT JOIN fact_rutas w ON w.ruta_id_odoo = r.ruta_id_odoo
 LEFT JOIN dim_conductor c ON c.sk = r.conductor_sk
 LEFT JOIN dim_tiempo t ON t.sk = r.tiempo_inicio_sk
 GROUP BY 1, 2, 3;

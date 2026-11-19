@@ -267,3 +267,117 @@ def test_simulado_sustituye_el_formato_anterior_sin_tocar_lo_real(stg_con, dwh_c
     assert q1(dwh_con, "select count(*) from fact_recorridos where fuente_id='sim:SIM-001:20261101T0700'") == 0
     assert q1(dwh_con, "select count(*) from fact_recorridos where procedencia='REAL'") == 2
     assert q1(dwh_con, "select count(*) from fact_entregas where recorrido_sk is not null") == 1
+
+
+# ---------------------------------------------------------------- historial de demostracion fechado al pasado
+def _pedido_al_pasado(odoo, pid=90, ref="H-20261020-01"):
+    """Como logistica_demo._fechar: un pedido sembrado despues de la ultima corrida, pero con write_date viejo."""
+    odoo.data["sale.order"].append({
+        "id": pid, "name": "S%04d" % pid, "client_order_ref": ref, "partner_id": [200, "Cliente A"],
+        "date_order": "2026-10-20 15:00:00", "state": "sale", "amount_total": 10.0, "delivery_latitude": -1.2417,
+        "delivery_longitude": -78.6197, "write_date": "2026-10-20 15:00:00"})
+    odoo.data["sale.order.line"].append({
+        "id": 9000 + pid, "order_id": [pid, "S%04d" % pid], "product_id": [30, "[P1] Producto Uno"],
+        "product_uom_qty": 1.0, "price_unit": 10.0, "price_subtotal": 10.0, "price_total": 10.0,
+        "display_type": False, "write_date": "2026-10-20 15:00:00"})
+
+
+def test_historial_fechado_al_pasado_no_entra_en_incremental_sin_aviso(stg_con, dwh_con, odoo, traccar):
+    """El problema: la marca de agua ya es posterior al write_date reescrito, el incremental no lo ve."""
+    correr(stg_con, dwh_con, "full", odoo, traccar)
+    _pedido_al_pasado(odoo)
+    correr(stg_con, dwh_con, "incremental", odoo, traccar)
+    assert q1(dwh_con, "select count(*) from fact_ventas where pedido_id_odoo = 90") == 0
+
+
+def test_cambio_de_historial_hasta_fuerza_corrida_completa(stg_con, dwh_con, odoo, traccar):
+    odoo.parametros["logistica_demo.historial_hasta"] = "2026-11-04"
+    correr(stg_con, dwh_con, "full", odoo, traccar)
+    _pedido_al_pasado(odoo)
+    odoo.parametros["logistica_demo.historial_hasta"] = "2026-11-05"
+    conteos = correr(stg_con, dwh_con, "incremental", odoo, traccar)
+    assert q1(dwh_con, "select count(*) from fact_ventas where pedido_id_odoo = 90") == 1
+    assert "historial_hasta" in conteos["motivo_full"]
+    assert qall(stg_con, "select modo from lote order by id") == [("full",), ("full",)]
+    # sin otro cambio, la siguiente vuelve a ser incremental
+    correr(stg_con, dwh_con, "incremental", odoo, traccar)
+    assert q1(stg_con, "select modo from lote order by id desc limit 1") == "incremental"
+
+
+def test_primer_valor_de_historial_hasta_tambien_fuerza_completa(stg_con, dwh_con, odoo, traccar):
+    """Una base cuyo ETL ya corria antes de sembrar el historial: el primer valor visto cuenta como cambio."""
+    correr(stg_con, dwh_con, "full", odoo, traccar)
+    _pedido_al_pasado(odoo)
+    odoo.parametros["logistica_demo.historial_hasta"] = "2026-11-05"
+    correr(stg_con, dwh_con, "incremental", odoo, traccar)
+    assert q1(dwh_con, "select count(*) from fact_ventas where pedido_id_odoo = 90") == 1
+
+
+def test_historial_del_demo_se_marca_simulado(stg_con, dwh_con, odoo, traccar):
+    """Pedidos H-/HOY- y rutas 'historial-demo' son sinteticos aunque lleguen por Odoo: SIMULADO en ventas, entregas,
+    rutas y paradas; lo demas sigue REAL. Las rutas simuladas se siguen midiendo y vinculando con el GPS."""
+    correr(stg_con, dwh_con, "full", odoo, traccar)
+    base = dict(qall(dwh_con, "select entrega_id_odoo, recorrido_sk is not null from fact_entregas"))
+    km = q1(dwh_con, "select km_real from fact_rutas where ruta_id_odoo = 1")
+    for o in odoo.data["sale.order"]:
+        if o["id"] == 11:
+            o["client_order_ref"] = "H-20261105-01"
+            o["write_date"] = "2026-11-05 14:00:00"
+    for r in odoo.data["logistica.ruta"]:
+        if r["id"] == 1:
+            r["optimization_version"] = "historial-demo"
+            r["write_date"] = "2026-11-05 14:00:00"
+    correr(stg_con, dwh_con, "full", odoo, traccar)
+    assert set(qall(dwh_con, "select distinct procedencia from fact_ventas where pedido_id_odoo = 11")) == {
+        ("SIMULADO",)}
+    assert q1(dwh_con, "select count(*) from fact_ventas where pedido_id_odoo <> 11 and procedencia = 'SIMULADO'") == 0
+    assert q1(dwh_con, "select procedencia from fact_entregas where pedido_id_odoo = 11") == "SIMULADO"
+    assert q1(dwh_con, "select procedencia from fact_rutas where ruta_id_odoo = 1") == "SIMULADO"
+    assert set(qall(dwh_con, "select distinct procedencia from fact_paradas where ruta_id_odoo = 1")) == {
+        ("SIMULADO",)}
+    assert q1(dwh_con, "select km_real from fact_rutas where ruta_id_odoo = 1") == km
+    assert dict(qall(dwh_con, "select entrega_id_odoo, recorrido_sk is not null from fact_entregas")) == base
+    # los recorridos de esa ruta se ven SIMULADO en el BI, sin cambiar su clave en fact_recorridos
+    assert q1(dwh_con, "select count(*) from fact_recorridos where procedencia = 'SIMULADO'") == 0
+    assert set(qall(dwh_con, "select distinct procedencia from v_bi_recorridos where ruta_id_odoo = 1")) <= {
+        ("SIMULADO",)}
+
+
+def test_procedencia_por_prefijo():
+    from etl.load.facts import procedencia_pedido
+    assert procedencia_pedido({"client_order_ref": "H-20261020-01"}, ("H-", "HOY-")) == "SIMULADO"
+    assert procedencia_pedido({"client_order_ref": "HOY-3"}, ("H-", "HOY-")) == "SIMULADO"
+    assert procedencia_pedido({"client_order_ref": "OC-55"}, ("H-", "HOY-")) == "REAL"
+    assert procedencia_pedido({"client_order_ref": False}, ("H-",)) == "REAL"
+    assert procedencia_pedido(None, ("H-",)) == "REAL"
+
+
+def test_conteos_de_calidad(stg_con, dwh_con, odoo, traccar):
+    from etl import calidad
+    correr(stg_con, dwh_con, "full", odoo, traccar)
+    with dwh_con.cursor() as cur:
+        dwh = calidad.conteos_dwh(cur)
+    assert dwh["entregas"] == q1(dwh_con, "select count(*) from fact_entregas")
+    assert dwh["entregas_con_gps"] <= dwh["entregas_cerradas"]
+    texto = "\n".join(calidad.lineas(dwh, {"pedidos": dwh["pedidos"], "entregas": dwh["entregas"] + 1}))
+    assert "pedidos" in texto and "ok" in texto and "DIFERENTE (-1)" in texto
+    assert "Vinculo entrega-GPS" in texto
+
+
+def test_conteos_odoo_usa_search_count():
+    from etl import calidad
+
+    class Contador:
+        def __init__(self):
+            self.dominios = {}
+
+        def contar(self, modelo, dominio):
+            self.dominios.setdefault(modelo, []).append(dominio)
+            if modelo == "logistica.ruta" and dominio:
+                raise RuntimeError("campo inexistente")
+            return 7
+    c = Contador()
+    out = calidad.conteos_odoo(c)
+    assert out == {"pedidos": 7, "pedidos_simulados": 7, "entregas": 7, "rutas": 7}
+    simulados = c.dominios["sale.order"][1]
+    assert simulados[1:] == ["|", ("client_order_ref", "=like", "H-%"), ("client_order_ref", "=like", "HOY-%")]

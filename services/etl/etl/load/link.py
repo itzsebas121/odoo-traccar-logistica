@@ -72,4 +72,4 @@ def link_entregas_recorridos(cur, now, tolerancia_min=VINCULO_TOLERANCIA_MIN):
                 AND r.fin_utc <= f.completado_utc AND r.fin_utc >= f.completado_utc - %(tol)s
                 AND r.inicio_utc <= {FIN_W} AND r.fin_utc >= w.inicio_utc
               ORDER BY r.fin_utc DESC LIMIT 1))
-           WHERE f.procedencia = 'REAL'""".replace("{FIN_W}", fin_ventana("w")), {"now": now, "tol": timedelta(minutes=tolerancia_min)})
+           """.replace("{FIN_W}", fin_ventana("w")), {"now": now, "tol": timedelta(minutes=tolerancia_min)})

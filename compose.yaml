@@ -308,10 +308,11 @@ services:
       timeout: 5s
       retries: 5
 
-  # Historico de demostracion (Ambato): pedidos, entregas y rutas de `dias_ventas` dias en Odoo y el GPS de los
-  # ultimos `dias_gps` dias en Traccar (seeds/data/historico.json). Necesita antes `seed`. Bajo demanda:
-  #   docker compose --profile historico run --rm seed-historico [--dias N] [--sin-gps]
-  seed-historico:
+  # GPS del historial de demostracion en Traccar: toma de Odoo las rutas cerradas del historial que carga `seed`
+  # (modulo logistica_demo, SEED_HISTORIAL=true) y manda sus posiciones por OsmAnd con la hora de cada ruta.
+  # Necesita antes `seed`. Bajo demanda (despues, `etl run --mode full`):
+  #   docker compose --profile historico run --rm gps-historico [--dias N] [--forzar] [--plan]
+  gps-historico:
     image: python:3.12-slim
     profiles: ["historico"]
     depends_on:
@@ -329,7 +330,7 @@ services:
       ODOO_PASSWORD: ${ODOO_PASSWORD:-${ODOO_ADMIN_PASSWORD}}
       TRACCAR_OSMAND_URL: http://traccar:5055
       PYTHONDONTWRITEBYTECODE: "1"
-    entrypoint: ["python", "seeds/historico.py"]
+    entrypoint: ["python", "seeds/gps_historico.py"]
 
   bi:
     build: ./services/bi
