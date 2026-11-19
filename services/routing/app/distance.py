@@ -1,5 +1,7 @@
 """Proveedores de distancia: OSRM con caida a estimacion haversine."""
 import math
+import threading
+import time
 
 import httpx
 
@@ -10,6 +12,48 @@ SOURCE_OSRM = "osrm"
 # Tope de espera por llamada a OSRM (lectura; la conexion se limita a 2 s). main.py descuenta
 # lo que tarde del presupuesto de 30 s de la peticion, asi que OSRM nunca la alarga.
 OSRM_TIMEOUT_S = 5.0
+# Las rutas de OSRM se guardan un rato: el portal del conductor refresca su mapa cada 30 s y el servidor
+# publico de OSRM limita a ~1 peticion/s. Solo se guardan respuestas de OSRM, nunca la estimacion.
+ROUTE_CACHE_TTL_S = 600
+ROUTE_CACHE_MAX = 2000
+
+
+class _TtlCache:
+    def __init__(self, ttl_s, maximo):
+        self.ttl = ttl_s
+        self.maximo = maximo
+        self._datos = {}
+        self._lock = threading.Lock()
+
+    def get(self, clave):
+        ahora = time.monotonic()
+        with self._lock:
+            item = self._datos.get(clave)
+            if item and item[0] > ahora:
+                return item[1]
+            self._datos.pop(clave, None)
+        return None
+
+    def put(self, clave, valor):
+        ahora = time.monotonic()
+        with self._lock:
+            if len(self._datos) >= self.maximo:
+                self._datos = {c: v for c, v in self._datos.items() if v[0] > ahora}
+                if len(self._datos) >= self.maximo:
+                    self._datos.clear()
+            self._datos[clave] = (ahora + self.ttl, valor)
+
+    def clear(self):
+        with self._lock:
+            self._datos.clear()
+
+
+ROUTE_CACHE = _TtlCache(ROUTE_CACHE_TTL_S, ROUTE_CACHE_MAX)
+
+
+def _clave_puntos(points):
+    # ~1 m de precision: posiciones GPS casi iguales comparten la misma ruta guardada.
+    return tuple((round(lat, 5), round(lon, 5)) for lat, lon in points)
 
 
 def haversine_m(a, b):
@@ -35,8 +79,11 @@ class HaversineProvider:
         return dist, dur, SOURCE_EST
 
     def route(self, a, b):
-        d = haversine_m(a, b) * FACTOR
-        return [list(a), list(b)], d / 1000.0, d / SPEED_MS / 60.0, SOURCE_EST
+        return self.route_multi([a, b])
+
+    def route_multi(self, points):
+        d = sum(haversine_m(a, b) for a, b in zip(points, points[1:])) * FACTOR
+        return [list(p) for p in points], d / 1000.0, d / SPEED_MS / 60.0, SOURCE_EST
 
 
 def _checked_matrix(raw, n, name):
@@ -77,11 +124,21 @@ class OsrmProvider:
         return dist, dur, SOURCE_OSRM
 
     def route(self, a, b):
-        coords = f"{a[1]},{a[0]};{b[1]},{b[0]}"
+        return self.route_multi([a, b])
+
+    def route_multi(self, points):
+        """Una sola peticion a OSRM para toda la secuencia de puntos (no una por tramo)."""
+        clave = (self.base, _clave_puntos(points))
+        guardada = ROUTE_CACHE.get(clave)
+        if guardada is not None:
+            return guardada
+        coords = ";".join(f"{lon},{lat}" for lat, lon in points)
         data = self._get(f"/route/v1/driving/{coords}", {"overview": "full", "geometries": "geojson"})
         rt = data["routes"][0]
         geom = [[lat, lon] for lon, lat in rt["geometry"]["coordinates"]]
-        return geom, rt["distance"] / 1000.0, rt["duration"] / 60.0, SOURCE_OSRM
+        resultado = (geom, rt["distance"] / 1000.0, rt["duration"] / 60.0, SOURCE_OSRM)
+        ROUTE_CACHE.put(clave, resultado)
+        return resultado
 
 
 class DistanceProvider:
@@ -105,9 +162,12 @@ class DistanceProvider:
         return self.fallback.matrix(points)
 
     def route(self, a, b):
+        return self.route_multi([a, b])
+
+    def route_multi(self, points):
         if self.osrm:
             try:
-                return self.osrm.route(a, b)
+                return self.osrm.route_multi(points)
             except Exception:
                 pass
-        return self.fallback.route(a, b)
+        return self.fallback.route_multi(points)

@@ -1,0 +1,394 @@
+{
+ "manzana": {
+  "archivo": "productos/manzana.jpg",
+  "titulo": "File:Apples in basket 2018 G1.jpg",
+  "autor": "George Chernilevsky",
+  "licencia": "Public domain",
+  "licencia_url": null,
+  "fuente": "https://commons.wikimedia.org/wiki/File:Apples_in_basket_2018_G1.jpg"
+ },
+ "fresa": {
+  "archivo": "productos/fresa.jpg",
+  "titulo": "File:Strawberries in basket 2018 G1.jpg",
+  "autor": "George Chernilevsky",
+  "licencia": "Public domain",
+  "licencia_url": null,
+  "fuente": "https://commons.wikimedia.org/wiki/File:Strawberries_in_basket_2018_G1.jpg"
+ },
+ "mora": {
+  "archivo": "productos/mora.jpg",
+  "titulo": "File:Blackberries (Rubus fruticosus).jpg",
+  "autor": "Ivar Leidus",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Blackberries_(Rubus_fruticosus).jpg"
+ },
+ "tomate_arbol": {
+  "archivo": "productos/tomate_arbol.jpg",
+  "titulo": "File:Tamarillos - whole and halved.jpg",
+  "autor": "Ivar Leidus",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Tamarillos_-_whole_and_halved.jpg"
+ },
+ "papa": {
+  "archivo": "productos/papa.jpg",
+  "titulo": "File:Solanum tuberosum Red Scarlett20170523 7825.jpg",
+  "autor": "Bff",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Solanum_tuberosum_Red_Scarlett20170523_7825.jpg"
+ },
+ "tomate": {
+  "archivo": "productos/tomate.jpg",
+  "titulo": "File:Tomato je.jpg",
+  "autor": "Softeis",
+  "licencia": "CC BY-SA 3.0",
+  "licencia_url": "http://creativecommons.org/licenses/by-sa/3.0/",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Tomato_je.jpg"
+ },
+ "cebolla": {
+  "archivo": "productos/cebolla.jpg",
+  "titulo": "File:Three whole red onions.jpg",
+  "autor": "Anja",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Three_whole_red_onions.jpg"
+ },
+ "pan": {
+  "archivo": "productos/pan.jpg",
+  "titulo": "File:Bread-rolls.jpg",
+  "autor": "Kerstin Riemer",
+  "licencia": "CC0",
+  "licencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Bread-rolls.jpg"
+ },
+ "queso": {
+  "archivo": "productos/queso.jpg",
+  "titulo": "File:Queso fresco.JPG",
+  "autor": "Geoff",
+  "licencia": "CC BY-SA 3.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/3.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Queso_fresco.JPG"
+ },
+ "huevos": {
+  "archivo": "productos/huevos.jpg",
+  "titulo": "File:Brown-eggs.jpg",
+  "autor": "Photos public domain.com",
+  "licencia": "Public domain",
+  "licencia_url": null,
+  "fuente": "https://commons.wikimedia.org/wiki/File:Brown-eggs.jpg"
+ },
+ "miel": {
+  "archivo": "productos/miel.jpg",
+  "titulo": "File:Antiguan honey products at an exhibition in Saint Lucia.jpg",
+  "autor": "Government of Antigua and Barbuda",
+  "licencia": "Public domain",
+  "licencia_url": null,
+  "fuente": "https://commons.wikimedia.org/wiki/File:Antiguan_honey_products_at_an_exhibition_in_Saint_Lucia.jpg"
+ },
+ "canasta_frutas": {
+  "archivo": "productos/canasta_frutas.jpg",
+  "titulo": "File:A basket of fruits.jpg",
+  "autor": "Suyash Dwivedi",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:A_basket_of_fruits.jpg"
+ },
+ "agua": {
+  "archivo": "productos/agua.jpg",
+  "titulo": "File:Water Bottles Image.png",
+  "autor": "Thad Zajdowicz",
+  "licencia": "CC0",
+  "licencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Water_Bottles_Image.png"
+ },
+ "gaseosa": {
+  "archivo": "productos/gaseosa.jpg",
+  "titulo": "File:Vita cola flasche.jpg",
+  "autor": "Eichis",
+  "licencia": "Public domain",
+  "licencia_url": null,
+  "fuente": "https://commons.wikimedia.org/wiki/File:Vita_cola_flasche.jpg"
+ },
+ "jugo": {
+  "archivo": "productos/jugo.jpg",
+  "titulo": "File:A person pouring an orange juice in a childs glass.jpg",
+  "autor": "Shixart1985",
+  "licencia": "CC BY 2.0",
+  "licencia_url": "https://creativecommons.org/licenses/by/2.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:A_person_pouring_an_orange_juice_in_a_childs_glass.jpg"
+ },
+ "cafe": {
+  "archivo": "productos/cafe.jpg",
+  "titulo": "File:Roasted coffee beans in white bowl.png",
+  "autor": "Alorin",
+  "licencia": "CC BY 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Roasted_coffee_beans_in_white_bowl.png"
+ },
+ "cerveza": {
+  "archivo": "productos/cerveza.jpg",
+  "titulo": "File:Beer bottles 2018 G1.jpg",
+  "autor": "George Chernilevsky",
+  "licencia": "Public domain",
+  "licencia_url": null,
+  "fuente": "https://commons.wikimedia.org/wiki/File:Beer_bottles_2018_G1.jpg"
+ },
+ "vino": {
+  "archivo": "productos/vino.jpg",
+  "titulo": "File:St. Magdalener Classico Bottle Glass Wine Tasting Maretsch.jpg",
+  "autor": "ChrisCrea",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:St._Magdalener_Classico_Bottle_Glass_Wine_Tasting_Maretsch.jpg"
+ },
+ "ron": {
+  "archivo": "productos/ron.jpg",
+  "titulo": "File:Appleton Estate V-X Jamaica Rum-with glass.jpg",
+  "autor": "Nebrot",
+  "licencia": "CC BY-SA 3.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/3.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Appleton_Estate_V-X_Jamaica_Rum-with_glass.jpg"
+ },
+ "laptop": {
+  "archivo": "productos/laptop.jpg",
+  "titulo": "File:Compaq Presario F700.jpg",
+  "autor": "JCRules",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Compaq_Presario_F700.jpg"
+ },
+ "audifonos": {
+  "archivo": "productos/audifonos.jpg",
+  "titulo": "File:Bose QuietComfort 25 Acoustic Noise Cancelling Headphones with Carry Case.jpg",
+  "autor": "Florian Fuchs",
+  "licencia": "CC BY-SA 3.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/3.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Bose_QuietComfort_25_Acoustic_Noise_Cancelling_Headphones_with_Carry_Case.jpg"
+ },
+ "parlante": {
+  "archivo": "productos/parlante.jpg",
+  "titulo": "File:Beats By Dr. Dre Pill Portable Bluetooth Speaker Black N2.jpg",
+  "autor": "Beats",
+  "licencia": "CC0",
+  "licencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Beats_By_Dr._Dre_Pill_Portable_Bluetooth_Speaker_Black_N2.jpg"
+ },
+ "mouse": {
+  "archivo": "productos/mouse.jpg",
+  "titulo": "File:A wireless computer mouse.jpg",
+  "autor": "Pixloom",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:A_wireless_computer_mouse.jpg"
+ },
+ "teclado": {
+  "archivo": "productos/teclado.jpg",
+  "titulo": "File:Razer Ornata Chroma keyboard-top PNr°0463.jpg",
+  "autor": "D-Kuru",
+  "licencia": "CC BY-SA 3.0 at",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/3.0/at/deed.en",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Razer_Ornata_Chroma_keyboard-top_PNr%C2%B00463.jpg"
+ },
+ "smartwatch": {
+  "archivo": "productos/smartwatch.jpg",
+  "titulo": "File:Huawei Smartwatch Fit 2 (1).jpg",
+  "autor": "D Eaketts",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Huawei_Smartwatch_Fit_2_(1).jpg"
+ },
+ "monitor": {
+  "archivo": "productos/monitor.jpg",
+  "titulo": "File:EIZO Foris FG2421 VGA computer monitor displaying test pattern.png",
+  "autor": "Lucasbosch",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:EIZO_Foris_FG2421_VGA_computer_monitor_displaying_test_pattern.png"
+ },
+ "celular": {
+  "archivo": "productos/celular.jpg",
+  "titulo": "File:Nexus 4.png",
+  "autor": "developer.android.com",
+  "licencia": "CC BY 2.5",
+  "licencia_url": "https://creativecommons.org/licenses/by/2.5",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Nexus_4.png"
+ },
+ "celular_pro": {
+  "archivo": "productos/celular_pro.jpg",
+  "titulo": "File:Xiaomi Redmi Note 10 Pro.jpg",
+  "autor": "Petar Milošević",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Xiaomi_Redmi_Note_10_Pro.jpg"
+ },
+ "celular_basico": {
+  "archivo": "productos/celular_basico.jpg",
+  "titulo": "File:Nokia 130.jpg",
+  "autor": "Nikhilb239",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Nokia_130.jpg"
+ },
+ "tablet": {
+  "archivo": "productos/tablet.jpg",
+  "titulo": "File:Alcatel Pixi 3 (7) Tablet with LTE 9007X.jpg",
+  "autor": "Multicherry",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Alcatel_Pixi_3_(7)_Tablet_with_LTE_9007X.jpg"
+ },
+ "funda": {
+  "archivo": "productos/funda.jpg",
+  "titulo": "File:Protective phone case for OnePlus Nord.jpg",
+  "autor": "Gannu03",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Protective_phone_case_for_OnePlus_Nord.jpg"
+ },
+ "funda_transparente": {
+  "archivo": "productos/funda_transparente.jpg",
+  "titulo": "File:Motorola G62 cover case (2022).jpg",
+  "autor": "Gpkp",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Motorola_G62_cover_case_(2022).jpg"
+ },
+ "cargador": {
+  "archivo": "productos/cargador.jpg",
+  "titulo": "File:USA phone charger at airport 03.jpg",
+  "autor": "Grandmaster Huon",
+  "licencia": "CC0",
+  "licencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "fuente": "https://commons.wikimedia.org/wiki/File:USA_phone_charger_at_airport_03.jpg"
+ },
+ "cable": {
+  "archivo": "productos/cable.jpg",
+  "titulo": "File:USB-C cable 2017 A.jpg",
+  "autor": "Fructibus",
+  "licencia": "CC0",
+  "licencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "fuente": "https://commons.wikimedia.org/wiki/File:USB-C_cable_2017_A.jpg"
+ },
+ "powerbank": {
+  "archivo": "productos/powerbank.jpg",
+  "titulo": "File:Charging smartphone with powerbank 20180312.jpg",
+  "autor": "Santeri Viinamäki",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Charging_smartphone_with_powerbank_20180312.jpg"
+ },
+ "soporte": {
+  "archivo": "productos/soporte.jpg",
+  "titulo": "File:Car universal holder for smartphones and phablets, Oude Pekela (2018) 04.jpg",
+  "autor": "Donald Trung Quoc Don",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Car_universal_holder_for_smartphones_and_phablets,_Oude_Pekela_(2018)_04.jpg"
+ },
+ "mochila": {
+  "archivo": "productos/mochila.jpg",
+  "titulo": "File:Laptop backpacks from Mr. DIY at Ayala Center Cebu (2025-02-24).jpg",
+  "autor": "Wide Awake!",
+  "licencia": "CC BY 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Laptop_backpacks_from_Mr._DIY_at_Ayala_Center_Cebu_(2025-02-24).jpg"
+ },
+ "licuadora": {
+  "archivo": "productos/licuadora.jpg",
+  "titulo": "File:Old blender on shelf in New Orleans kitchen.jpg",
+  "autor": "Infrogmation of New Orleans",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Old_blender_on_shelf_in_New_Orleans_kitchen.jpg"
+ },
+ "ollas": {
+  "archivo": "productos/ollas.jpg",
+  "titulo": "File:Pot with no background.png",
+  "autor": "Lightsnap",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Pot_with_no_background.png"
+ },
+ "sarten": {
+  "archivo": "productos/sarten.jpg",
+  "titulo": "File:Frying pan pan.jpg",
+  "autor": "Superspidey33",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Frying_pan_pan.jpg"
+ },
+ "foco": {
+  "archivo": "productos/foco.jpg",
+  "titulo": "File:LED-E27-Light-Bulb-1134.jpg",
+  "autor": "Loadmaster (David R. Tribble)",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:LED-E27-Light-Bulb-1134.jpg"
+ },
+ "sabanas": {
+  "archivo": "productos/sabanas.jpg",
+  "titulo": "File:Bed in Seattle hotel.jpg",
+  "autor": "Liz Lawley",
+  "licencia": "CC BY-SA 2.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/2.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Bed_in_Seattle_hotel.jpg"
+ },
+ "toalla": {
+  "archivo": "productos/toalla.jpg",
+  "titulo": "File:Zusammengelegte Handtücher.jpg",
+  "autor": "Mattes",
+  "licencia": "Public domain",
+  "licencia_url": null,
+  "fuente": "https://commons.wikimedia.org/wiki/File:Zusammengelegte_Handt%C3%BCcher.jpg"
+ },
+ "plancha": {
+  "archivo": "productos/plancha.jpg",
+  "titulo": "File:Teal and white electric steam iron - side view.jpg",
+  "autor": "Sokolikmawwer0",
+  "licencia": "CC BY-SA 3.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/3.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Teal_and_white_electric_steam_iron_-_side_view.jpg"
+ },
+ "shampoo": {
+  "archivo": "productos/shampoo.jpg",
+  "titulo": "File:Dove shampoo bottle.jpg",
+  "autor": "Ranjima np",
+  "licencia": "CC0",
+  "licencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Dove_shampoo_bottle.jpg"
+ },
+ "jabon": {
+  "archivo": "productos/jabon.jpg",
+  "titulo": "File:Bars of pure Marseille and Aleppo soap, 2024.jpg",
+  "autor": "DimiTalen",
+  "licencia": "CC0",
+  "licencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Bars_of_pure_Marseille_and_Aleppo_soap,_2024.jpg"
+ },
+ "pasta": {
+  "archivo": "productos/pasta.jpg",
+  "titulo": "File:舒客 Shuke cherry blossom enzyme toothpaste in a tube.jpg",
+  "autor": "Nord794ub",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:%E8%88%92%E5%AE%A2_Shuke_cherry_blossom_enzyme_toothpaste_in_a_tube.jpg"
+ },
+ "papel": {
+  "archivo": "productos/papel.jpg",
+  "titulo": "File:Toilet paper roll.jpg",
+  "autor": "Cmann999",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Toilet_paper_roll.jpg"
+ },
+ "desodorante": {
+  "archivo": "productos/desodorante.jpg",
+  "titulo": "File:Deodorant stick (front label).jpg",
+  "autor": "Notional Target",
+  "licencia": "CC BY-SA 4.0",
+  "licencia_url": "https://creativecommons.org/licenses/by-sa/4.0",
+  "fuente": "https://commons.wikimedia.org/wiki/File:Deodorant_stick_(front_label).jpg"
+ }
+}

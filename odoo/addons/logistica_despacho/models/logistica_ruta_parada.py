@@ -97,12 +97,14 @@ class LogisticaRutaParada(models.Model):
         self.ensure_one()
         ruta = self.route_id
         ruta._exigir_actor()
-        if ruta.state != 'en_recorrido':
-            raise UserError(_('La ruta %s no está en recorrido.') % ruta.name)
         self._bloquear()
+        # Primero la idempotencia: un doble envío sobre una parada ya registrada (aunque la ruta ya se haya
+        # cerrado sola con esa parada) se informa como «ya registrado», no como error.
         if self.state != 'pendiente':
             raise UserError(_('Evento ya registrado: la parada ya fue marcada como «%s».') % dict(
                 self._fields['state'].selection)[self.state])
+        if ruta.state != 'en_recorrido':
+            raise UserError(_('La ruta %s no está en recorrido.') % ruta.name)
 
     def action_marcar_llegada(self):
         """Llegada registrada por una persona. No cambia el estado de la entrega."""
@@ -120,6 +122,7 @@ class LogisticaRutaParada(models.Model):
             parada.entrega_id.action_marcar_entregado()
             parada.sudo().write({
                 'state': 'entregado', 'completed_at': fields.Datetime.now(), 'failed_reason': False})
+            parada.route_id._cerrar_si_terminada()
         return True
 
     def action_marcar_no_entregado(self, motivo, notas=None):
@@ -131,6 +134,7 @@ class LogisticaRutaParada(models.Model):
             parada.sudo().write({
                 'state': 'no_entregado', 'completed_at': fields.Datetime.now(),
                 'failed_reason': motivo, 'notes': notas or False})
+            parada.route_id._cerrar_si_terminada()
         return True
 
     # Botones de la vista: leen el motivo escrito en la propia fila.

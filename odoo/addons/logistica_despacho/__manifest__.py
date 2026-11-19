@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Logística Despacho - Planificación de Rutas',
-    'version': '16.0.2.0.0',
+    'version': '16.0.2.2.0',
     'category': 'Inventory/Logistics',
     'summary': 'Planificación, aprobación, carga y ejecución de rutas de despacho',
     'description': """

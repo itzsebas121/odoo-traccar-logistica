@@ -29,14 +29,13 @@ services:
       PORT: "5432"
       USER: odoo
       PASSWORD: ${ODOO_DB_PASSWORD:?Configura ODOO_DB_PASSWORD}
+      ODOO_DB: ${ODOO_DB:-logistica_dev}
+      ODOO_ADMIN_PASSWORD: ${ODOO_ADMIN_PASSWORD:?Configura ODOO_ADMIN_PASSWORD}
     volumes:
       - ./odoo/addons:/mnt/extra-addons
-    command: >-
-      odoo --db_host=db --db_port=5432 --db_user=odoo --db_password=${ODOO_DB_PASSWORD}
-      -d ${ODOO_DB:-logistica_dev}
-      -i contacts,fleet,sale_management,website,website_sale,payment_custom,logistica_base,logistica_despacho,logistica_traccar,logistica_entregas,logistica_checkout,logistica_conductor,logistica_analitica_ia
-      --load-language=es_EC
-      --without-demo=all --stop-after-init
+      - ./odoo/init:/opt/logistica-init:ro
+    # Instala los modulos solo en una base nueva y aplica ODOO_ADMIN_PASSWORD (ver odoo/init/odoo-init.sh).
+    entrypoint: ["/bin/bash", "/opt/logistica-init/odoo-init.sh"]
 
   odoo:
     image: odoo:16.0
@@ -49,14 +48,26 @@ services:
     ports:
       # Acceso desde otros dispositivos de la red local (por ejemplo, el celular).
       - "8069:8069"
+    # 8072 (websocket / bus de Odoo con workers > 0): el proxy debe enviar /websocket a este puerto.
+    expose:
+      - "8072"
     environment:
       HOST: db
       PORT: "5432"
       USER: odoo
       PASSWORD: ${ODOO_DB_PASSWORD:?Configura ODOO_DB_PASSWORD}
+      ODOO_DB: ${ODOO_DB:-logistica_dev}
+      ODOO_RC: /tmp/odoo.conf
+      ODOO_MASTER_PASSWORD: ${ODOO_MASTER_PASSWORD:?Configura ODOO_MASTER_PASSWORD}
+      ODOO_PROXY_MODE: ${ODOO_PROXY_MODE:-False}
+      ODOO_WORKERS: ${ODOO_WORKERS:-2}
     volumes:
       - odoo_data:/var/lib/odoo
       - ./odoo/addons:/mnt/extra-addons
+      - ./odoo/init:/opt/logistica-init:ro
+    # Genera /tmp/odoo.conf (sin gestor de bases publico, contrasena maestra, workers, limites, proxy_mode).
+    entrypoint: ["/bin/bash", "/opt/logistica-init/odoo-entrypoint.sh"]
+    command: ["odoo"]
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8069/web/login', timeout=3).status == 200 else 1)"]
       interval: 10s
@@ -65,7 +76,7 @@ services:
       start_period: 60s
 
   traccar:
-    image: traccar/traccar:latest
+    image: traccar/traccar:6.17  # version fija: una nueva puede cambiar esquema o API sin aviso
     restart: unless-stopped
     depends_on:
       db:
@@ -73,6 +84,8 @@ services:
     entrypoint: ["/bin/sh", "/entrypoint-custom.sh"]
     ports:
       - "8082:8082"
+      # OsmAnd (Traccar Client). En local el teléfono usa http://<IP-del-PC>:5055. En producción, detrás de Cloudflare,
+      # este puerto no pasa: los teléfonos entran por el dominio HTTPS «gps» (Traefik → traccar:5055). Ver README.
       - "5055:5055"
     environment:
       TRACCAR_DB_HOST: db
@@ -237,7 +250,8 @@ services:
       ODOO_URL: http://odoo:8069
       ODOO_DB: ${ODOO_DB:-logistica_dev}
       ODOO_USER: ${ODOO_USER:-admin}
-      ODOO_PASSWORD:
+      # Vacia = la misma que ODOO_ADMIN_PASSWORD (la que odoo-init aplica al usuario admin).
+      ODOO_PASSWORD: ${ODOO_PASSWORD:-${ODOO_ADMIN_PASSWORD}}
       TRACCAR_URL: http://traccar:8082
       TRACCAR_INTERNAL_URL: http://traccar:8082
       TRACCAR_ADMIN_EMAIL: ${TRACCAR_ADMIN_EMAIL:?Configura TRACCAR_ADMIN_EMAIL}
@@ -245,7 +259,54 @@ services:
       INTEGRATION_TRACCAR_EMAIL: ${INTEGRATION_TRACCAR_EMAIL:?Configura INTEGRATION_TRACCAR_EMAIL}
       INTEGRATION_TRACCAR_PASSWORD: ${INTEGRATION_TRACCAR_PASSWORD:?Configura INTEGRATION_TRACCAR_PASSWORD}
       DEMO_CONDUCTOR_PASSWORD: ${DEMO_CONDUCTOR_PASSWORD:?Configura DEMO_CONDUCTOR_PASSWORD}
+      SEED_HISTORIAL: ${SEED_HISTORIAL:-true}
     command: ["python", "seeds/seed.py"]
+
+  # Asistente del administrador (chat con GPT de OpenAI + interfaz React). Lee Odoo con permisos de solo consulta.
+  agente:
+    build: ./services/agente
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      odoo:
+        condition: service_healthy
+    environment:
+      ODOO_URL: http://odoo:8069
+      ODOO_DB: ${ODOO_DB:-logistica_dev}
+      ODOO_USER: ${ODOO_USER:-admin}
+      ODOO_PASSWORD: ${ODOO_PASSWORD:-${ODOO_ADMIN_PASSWORD}}
+      # Sin clave el servicio arranca igual y avisa en el chat.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AGENTE_MODELO: ${AGENTE_MODELO:-gpt-6.1-sol}
+      # Vacia = no se envia el nivel de razonamiento (para modelos que no lo admiten)
+      AGENTE_ESFUERZO: ${AGENTE_ESFUERZO-medium}
+      AGENTE_SESSION_SECRET: ${AGENTE_SESSION_SECRET:?Configura AGENTE_SESSION_SECRET (openssl rand -hex 32)}
+      # true con HTTPS (produccion); false solo en local por http://
+      AGENTE_COOKIE_SEGURA: ${AGENTE_COOKIE_SEGURA:-true}
+      # IPs del proxy en las que se confia para X-Forwarded-For (Traefik en Dokploy: su red, o "*" si 8000 no se publica)
+      FORWARDED_ALLOW_IPS: ${AGENTE_FORWARDED_ALLOW_IPS:-127.0.0.1}
+      # Seccion «Base de datos»: respaldos y restauracion (pg_dump/pg_restore con el usuario odoo de PostgreSQL).
+      PGHOST: db
+      PGUSER: odoo
+      PGPASSWORD: ${ODOO_DB_PASSWORD:?Configura ODOO_DB_PASSWORD}
+      TRACCAR_DB_NAME: traccar
+      TRACCAR_DB_USER: ${TRACCAR_DB_USER:-traccar}
+      # Cada respaldo/restauracion pide la contrasena maestra de Odoo.
+      ODOO_MASTER_PASSWORD: ${ODOO_MASTER_PASSWORD:?Configura ODOO_MASTER_PASSWORD}
+      AGENTE_MAX_SUBIDA_MB: ${AGENTE_MAX_SUBIDA_MB:-2048}
+    volumes:
+      # Filestore de Odoo (adjuntos): va dentro de los respaldos y se reemplaza al restaurar.
+      - odoo_data:/var/lib/odoo
+      # Respaldos guardados en el servidor (sobreviven a los redespliegues).
+      - respaldos:/respaldos
+    ports:
+      - "127.0.0.1:8003:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/api/salud',timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   # Historico de demostracion (Ambato): pedidos, entregas y rutas de `dias_ventas` dias en Odoo y el GPS de los
   # ultimos `dias_gps` dias en Traccar (seeds/data/historico.json). Necesita antes `seed`. Bajo demanda:
@@ -265,7 +326,7 @@ services:
       ODOO_URL: http://odoo:8069
       ODOO_DB: ${ODOO_DB:-logistica_dev}
       ODOO_USER: ${ODOO_USER:-admin}
-      ODOO_PASSWORD: ${ODOO_PASSWORD:-${ODOO_ADMIN_PASSWORD:-}}
+      ODOO_PASSWORD: ${ODOO_PASSWORD:-${ODOO_ADMIN_PASSWORD}}
       TRACCAR_OSMAND_URL: http://traccar:5055
       PYTHONDONTWRITEBYTECODE: "1"
     entrypoint: ["python", "seeds/historico.py"]
@@ -294,6 +355,7 @@ services:
       retries: 5
 
 volumes:
+  respaldos:
   postgres_odoo_data:
   odoo_data:
   traccar_data:

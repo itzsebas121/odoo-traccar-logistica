@@ -165,6 +165,18 @@ class TestConectorTraccar(TransactionCase):
         self.assertEqual(espera.call_args_list, [mock.call(1), mock.call(2)])
         self.assertEqual(get.call_args.kwargs['headers']['Accept'], 'application/json')
 
+    def test_interactivo_un_intento_sin_estado(self):
+        """Las páginas web (mapas) no reintentan, no esperan ni escriben el estado del servidor."""
+        espera = self._sin_esperas()
+        get = self._traccar(caidos=(4,))
+        estado = self.servidor.state
+        with self.assertLogs(modulo._logger.name, 'WARNING'), self.assertRaises(UserError):
+            self.servidor._request('/api/positions', {'deviceId': 4}, interactivo=True)
+        self.assertEqual(get.call_count, 1)
+        self.assertEqual(get.call_args.kwargs['timeout'], modulo._TIMEOUT_INTERACTIVO)
+        espera.assert_not_called()
+        self.assertEqual(self.servidor.state, estado)
+
     def test_aislamiento_por_dispositivo(self):
         self._sin_esperas()
         otro_vehiculo = self._vehiculo('SYN-0002')

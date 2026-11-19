@@ -170,3 +170,40 @@ def test_matrix_200_puntos_ok(monkeypatch):
     r = client.post("/matrix", json={"points": puntos(200)})
     assert r.status_code == 200
     assert len(r.json()["distance_m"]) == 200
+
+
+# --- ruta de varios puntos (portal del conductor) ---
+
+def test_route_multi_una_sola_llamada_y_cache(osrm_stub):
+    server = osrm_stub(lambda path: {"code": "Ok", "routes": [{
+        "geometry": {"coordinates": [[-78.61, -1.24], [-78.62, -1.25], [-78.64, -1.27]]},
+        "distance": 7000.0, "duration": 900.0}]})
+    cuerpo = {"points": [A, {"lat": -1.25, "lon": -78.62}, B]}
+    r = client.post("/route/multi", json=cuerpo)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["source"] == "osrm"
+    assert body["distance_km"] == 7.0
+    assert len(server.hits) == 1
+    assert server.hits[0].startswith("/route/v1/driving/-78.61,-1.24;-78.62,-1.25;-78.64,-1.27")
+    # la segunda peticion igual sale de la cache: no vuelve a OSRM
+    assert client.post("/route/multi", json=cuerpo).json() == body
+    assert len(server.hits) == 1
+
+
+def test_route_multi_fallback_y_limites(monkeypatch):
+    monkeypatch.delenv("ROUTING_OSRM_URL", raising=False)
+    r = client.post("/route/multi", json={"points": [A, B, A]})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["source"] == "estimado_haversine"
+    assert len(body["geometry"]) == 3
+    assert client.post("/route/multi", json={"points": [A]}).status_code == 422
+    assert client.post("/route/multi", json={"points": puntos(101)}).status_code == 422
+
+
+def test_route_osrm_fallido_no_se_guarda(osrm_stub):
+    server = osrm_stub(lambda path: {"code": "NoRoute"})
+    client.get("/route", params=route_params())
+    client.get("/route", params=route_params())
+    assert len(server.hits) == 2

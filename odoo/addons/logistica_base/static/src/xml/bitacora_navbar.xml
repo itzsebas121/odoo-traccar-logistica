@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<templates xml:space="preserve">
+
+  <t t-name="logistica_base.BitacoraNavBar" t-inherit="web.NavBar" t-inherit-mode="extension" owl="1">
+    <xpath expr="//nav[hasclass('o_main_navbar')]/t[@t-call='web.NavBar.AppsMenu']" position="before">
+      <div class="o_bitacora_brand_header d-none d-md-flex">
+        <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true" class="o_bitacora_logo_svg">
+          <rect x="3" y="21" width="8" height="8" rx="1" fill="#E06D2B"/>
+          <path d="M7 21 C 7 13, 15 15, 16 10 S 24 5, 27 6" fill="none" stroke="#F5EFE6" stroke-width="2" stroke-linecap="round" stroke-dasharray="3 3.2" opacity="0.78"/>
+          <circle cx="16" cy="10.5" r="2.4" fill="#F5EFE6"/>
+          <circle cx="27" cy="6" r="2.4" fill="#F5EFE6"/>
+        </svg>
+        <div class="o_bitacora_brand_text">
+          <span class="o_bitacora_brand_name">Bitácora</span>
+          <span class="o_bitacora_brand_sub">Operaciones</span>
+        </div>
+      </div>
+    </xpath>
+    <xpath expr="//nav[hasclass('o_main_navbar')]/t[@t-call='web.NavBar.AppsMenu']" position="after">
+      <div class="o_bitacora_apps_group d-none d-md-flex">
+        <div class="o_bitacora_section_label">Módulos</div>
+        <div class="o_bitacora_apps_list">
+          <t t-foreach="menuService.getApps()" t-as="app" t-key="app.id">
+            <a
+              t-att-href="getMenuItemHref(app)"
+              t-attf-class="o_bitacora_app_link {{ currentApp and currentApp.id === app.id ? 'is-active' : '' }}"
+              t-on-click.prevent="() => this.onNavBarDropdownItemSelection(app)"
+            >
+              <span class="o_bitacora_dot"/>
+              <span class="o_bitacora_app_name" t-esc="app.name"/>
+            </a>
+          </t>
+        </div>
+      </div>
+      <div t-if="currentAppSections.length" class="o_bitacora_section_label o_bitacora_section_label_sub d-none d-md-block">
+        Secciones · <t t-esc="currentApp ? currentApp.name : ''"/>
+      </div>
+    </xpath>
+  </t>
+
+</templates>

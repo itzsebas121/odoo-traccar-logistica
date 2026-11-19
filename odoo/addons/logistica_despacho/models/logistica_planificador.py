@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import math
 
+from markupsafe import Markup, escape
+
 from odoo import api, fields, models, _
 from odoo.exceptions import AccessError, UserError
 
@@ -28,16 +30,46 @@ class LogisticaPlanificador(models.TransientModel):
         default=lambda self: self.env['logistica.bodega'].get_bodega_activa().id)
     vehicle_ids = fields.Many2many(
         'fleet.vehicle', 'logistica_planificador_vehicle_rel', 'planificador_id', 'vehicle_id',
-        string='Vehículos', help='Vacío = todos los vehículos con conductor.')
+        string='Vehículos', help='Vacío = todos los vehículos con conductor que no tengan ya una ruta ese día.')
+    entrega_ids = fields.Many2many(
+        'logistica.entrega', 'logistica_planificador_entrega_rel', 'planificador_id', 'entrega_id',
+        string='Pedidos / Entregas',
+        help='Vacío = todas las entregas listas para salir. Seleccione solo si desea limitar la ruta a pedidos específicos.')
     time_limit_s = fields.Integer(string='Tiempo máximo del optimizador (s)', default=5)
+    resumen = fields.Html(string='Resumen', compute='_compute_resumen', sanitize=False)
 
-    def _entregas_candidatas(self):
-        """Entregas preparadas, con destino válido y sin ruta activa (§1.1 reglas 5 a 7)."""
+    # ------------------------------------------------------------------ evaluación
+    def _evaluar(self):
+        """Clasifica las entregas por despachar: (listas, [(entrega, motivo), ...]) — nada queda fuera en silencio."""
+        self.ensure_one()
+        config = self.env['logistica.configuracion'].sudo().get_config()
         en_ruta = self.env['logistica.ruta.parada'].sudo().search([
             ('route_id.state', 'in', ESTADOS_ACTIVOS)]).mapped('entrega_id').ids
-        entregas = self.env['logistica.entrega'].search([
-            ('state', '=', 'preparado'), ('id', 'not in', en_ruta)], order='id')
-        return entregas.filtered(lambda e: _coordenadas_validas(e.latitude, e.longitude))
+        candidatas = self.env['logistica.entrega'].search([
+            ('estado_simple', '=', 'por_despachar'), ('id', 'not in', en_ruta)], order='id')
+        if self.entrega_ids:
+            candidatas &= self.entrega_ids
+        corte = None
+        if self.date == config.hoy_local():
+            corte = config.inicio_corte_utc(self.date)
+        listas = self.env['logistica.entrega']
+        excluidas = []
+        for entrega in candidatas:
+            if entrega.state != 'preparado':
+                excluidas.append((entrega, _('esperando preparación en bodega')))
+            elif not _coordenadas_validas(entrega.latitude, entrega.longitude):
+                excluidas.append((entrega, _('sin ubicación válida en el mapa')))
+            elif config.fuera_de_radio(entrega.latitude, entrega.longitude):
+                excluidas.append((entrega, _('fuera de la cobertura')))
+            elif corte and entrega.sale_order_id.date_order and entrega.sale_order_id.date_order > corte:
+                excluidas.append((entrega, _('confirmado después de la hora de corte: sale mañana')))
+            else:
+                listas |= entrega
+        return listas, excluidas
+
+    def _entregas_candidatas(self):
+        """Entregas preparadas, con destino válido, en cobertura y sin ruta activa (§1.1 reglas 5 a 7)."""
+        return self._evaluar()[0]
 
     def _vehiculos_disponibles(self):
         vehiculos = self.vehicle_ids or self.env['fleet.vehicle'].search([('driver_id', '!=', False)])
@@ -45,6 +77,32 @@ class LogisticaPlanificador(models.TransientModel):
             ('date', '=', self.date), ('state', 'in', ESTADOS_ACTIVOS)]).mapped('vehicle_id').ids
         return vehiculos.filtered(lambda v: v.driver_id and v.id not in ocupados)
 
+    @api.depends('date', 'vehicle_ids', 'entrega_ids')
+    def _compute_resumen(self):
+        for wiz in self:
+            listas, excluidas = wiz._evaluar()
+            vehiculos = wiz._vehiculos_disponibles()
+            capacidad = sum(max(v.logistica_capacidad, 0) for v in vehiculos)
+            partes = [Markup('<div class="o_logistica_resumen">'),
+                      Markup('<p><b>%s</b> entregas listas para salir · <b>%s</b> vehículos con conductor '
+                             '(capacidad %s)</p>') % (len(listas), len(vehiculos), capacidad)]
+            if listas and capacidad < len(listas):
+                partes.append(Markup('<p class="text-warning">%s</p>') % _(
+                    'La capacidad no alcanza para todas: las que sobren quedarán para el siguiente despacho.'))
+            if excluidas:
+                partes.append(Markup('<p class="text-danger mb-1"><b>%s</b></p>') % _(
+                    'No saldrán en este despacho:'))
+                partes.append(Markup('<ul class="mb-0">'))
+                for entrega, motivo in excluidas[:30]:
+                    partes.append(Markup('<li>%s — %s</li>') % (
+                        escape(entrega.sale_order_id.name or entrega.name), escape(motivo)))
+                if len(excluidas) > 30:
+                    partes.append(Markup('<li>… %s más</li>') % (len(excluidas) - 30))
+                partes.append(Markup('</ul>'))
+            partes.append(Markup('</div>'))
+            wiz.resumen = Markup('').join(partes)
+
+    # ------------------------------------------------------------------ propuesta
     def action_proponer(self):
         self.ensure_one()
         if not (self.env.su or self.env.user.has_group('fleet.fleet_group_manager')):
@@ -56,9 +114,10 @@ class LogisticaPlanificador(models.TransientModel):
         if not vehiculos:
             raise UserError(_(
                 'No hay vehículos con conductor disponibles para el %s.') % self.date)
-        entregas = self._entregas_candidatas()
+        entregas, excluidas = self._evaluar()
         if not entregas:
-            raise UserError(_('No hay entregas preparadas para despachar.'))
+            detalle = ''.join('\n• %s: %s' % (e.sale_order_id.name or e.name, m) for e, m in excluidas[:15])
+            raise UserError(_('No hay entregas listas para despachar.') + detalle)
 
         payload = {
             'depot': {'lat': bodega.latitude, 'lon': bodega.longitude},
@@ -92,14 +151,36 @@ class LogisticaPlanificador(models.TransientModel):
                 'stop_ids': [(0, 0, {'entrega_id': p['id'], 'sequence': p.get('sequence') or 0})
                              for p in paradas],
             })
+        sin_ruta = []
         for item in resultado.get('unassigned') or []:
             entrega = entregas_por_id.get(item.get('id'))
             if entrega:
                 entrega._registrar_evento('no_asignado', notes=item.get('reason') or 'sin_ruta')
-        return {
+                sin_ruta.append(entrega.sale_order_id.name or entrega.name)
+
+        accion_rutas = {
             'type': 'ir.actions.act_window',
             'name': _('Rutas propuestas'),
             'res_model': 'logistica.ruta',
             'view_mode': 'tree,form',
+            'views': [[False, 'tree'], [False, 'form']],
             'domain': [('id', 'in', creadas.ids)],
+            'context': {'logistica_rutas_propuestas': True},
+        }
+        avisos = []
+        if sin_ruta:
+            avisos.append(_('%(n)d sin lugar en los vehículos (quedan para el siguiente despacho): %(l)s') % {
+                'n': len(sin_ruta), 'l': ', '.join(sin_ruta[:8])})
+        if excluidas:
+            avisos.append(_('%d no salen hoy; revise el resumen del planificador.') % len(excluidas))
+        if not avisos:
+            return accion_rutas
+        return {
+            'type': 'ir.actions.client', 'tag': 'display_notification',
+            'params': {
+                'title': _('%(r)d rutas propuestas con %(e)d entregas') % {
+                    'r': len(creadas), 'e': len(entregas) - len(sin_ruta)},
+                'message': ' '.join(avisos), 'type': 'warning', 'sticky': True,
+                'next': accion_rutas,
+            },
         }

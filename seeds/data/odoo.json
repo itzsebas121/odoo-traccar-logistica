@@ -55,45 +55,451 @@
   ],
   "bodega_logistica": {
     "name": "Sede UTA",
-    "address": "Universidad Técnica de Ambato, Ambato",
-    "latitude": -1.2491,
-    "longitude": -78.6267
+    "address": "Facultad de Ingeniería en Sistemas, Electrónica e Industrial (FISEI), Universidad Técnica de Ambato, campus Huachi, Ambato",
+    "latitude": -1.2676963,
+    "longitude": -78.6241805
   },
   "productos": [
     {
-      "name": "Producto demo 1",
-      "list_price": 10.0,
-      "type": "consu",
-      "sale_ok": true,
-      "website_published": true
+      "default_code": "COM-MAN-1K",
+      "name": "Manzana Emilia (1 kg)",
+      "categoria": "Comida",
+      "list_price": 2.25,
+      "iva": 0,
+      "imagen": "imagenes/productos/manzana.jpg",
+      "description_sale": "Manzana Emilia de huertos de Ambato y Píllaro, crocante y de sabor ácido-dulce. Funda de 1 kg."
     },
     {
-      "name": "Producto demo 2",
+      "default_code": "COM-FRU-500",
+      "name": "Frutilla (500 g)",
+      "categoria": "Comida",
+      "list_price": 2.0,
+      "iva": 0,
+      "imagen": "imagenes/productos/fresa.jpg",
+      "description_sale": "Frutilla fresca de cultivos de Tungurahua. Tarrina de 500 g."
+    },
+    {
+      "default_code": "COM-MOR-500",
+      "name": "Mora de Castilla (500 g)",
+      "categoria": "Comida",
+      "list_price": 1.75,
+      "iva": 0,
+      "imagen": "imagenes/productos/mora.jpg",
+      "description_sale": "Mora de Castilla para jugos y postres. Tarrina de 500 g."
+    },
+    {
+      "default_code": "COM-TAR-1K",
+      "name": "Tomate de árbol (1 kg)",
+      "categoria": "Comida",
+      "list_price": 1.8,
+      "iva": 0,
+      "imagen": "imagenes/productos/tomate_arbol.jpg",
+      "description_sale": "Tomate de árbol maduro para jugo y ají. Funda de 1 kg."
+    },
+    {
+      "default_code": "COM-PAP-5K",
+      "name": "Papa chola (5 kg)",
+      "categoria": "Comida",
+      "list_price": 3.5,
+      "iva": 0,
+      "imagen": "imagenes/productos/papa.jpg",
+      "description_sale": "Papa chola de la sierra central, ideal para locro. Saco de 5 kg."
+    },
+    {
+      "default_code": "COM-TOM-1K",
+      "name": "Tomate riñón (1 kg)",
+      "categoria": "Comida",
+      "list_price": 1.4,
+      "iva": 0,
+      "imagen": "imagenes/productos/tomate.jpg",
+      "description_sale": "Tomate riñón firme de invernadero. Funda de 1 kg."
+    },
+    {
+      "default_code": "COM-CEB-1K",
+      "name": "Cebolla paiteña (1 kg)",
+      "categoria": "Comida",
+      "list_price": 1.3,
+      "iva": 0,
+      "imagen": "imagenes/productos/cebolla.jpg",
+      "description_sale": "Cebolla paiteña (roja) de bulbo firme. Funda de 1 kg."
+    },
+    {
+      "default_code": "COM-PAN-12U",
+      "name": "Pan de Pinllo (docena)",
+      "categoria": "Comida",
+      "list_price": 2.4,
+      "iva": 0,
+      "imagen": "imagenes/productos/pan.jpg",
+      "description_sale": "Pan tradicional de Pinllo horneado en leña. Docena."
+    },
+    {
+      "default_code": "COM-QUE-500",
+      "name": "Queso fresco de mesa (500 g)",
+      "categoria": "Comida",
+      "list_price": 2.75,
+      "iva": 0,
+      "imagen": "imagenes/productos/queso.jpg",
+      "description_sale": "Queso fresco de productores de la provincia. 500 g."
+    },
+    {
+      "default_code": "COM-HUE-30U",
+      "name": "Huevos de campo (cubeta de 30)",
+      "categoria": "Comida",
+      "list_price": 5.25,
+      "iva": 0,
+      "imagen": "imagenes/productos/huevos.jpg",
+      "description_sale": "Huevos de gallinas de campo, medianos. 30 unidades."
+    },
+    {
+      "default_code": "COM-MIE-500",
+      "name": "Miel de abeja (500 g)",
+      "categoria": "Comida",
+      "list_price": 7.0,
+      "iva": 15,
+      "imagen": "imagenes/productos/miel.jpg",
+      "description_sale": "Miel pura de apicultores de Tungurahua. Frasco de 500 g."
+    },
+    {
+      "default_code": "COM-CAN-FRU",
+      "name": "Canasta frutal ambateña",
+      "categoria": "Comida",
       "list_price": 12.5,
-      "type": "consu",
-      "sale_ok": true,
-      "website_published": true
+      "iva": 0,
+      "imagen": "imagenes/productos/canasta_frutas.jpg",
+      "description_sale": "Selección de frutas de temporada de Tungurahua para la semana (unos 4,5 kg)."
     },
     {
-      "name": "Producto demo 3",
-      "list_price": 15.0,
-      "type": "consu",
-      "sale_ok": true,
-      "website_published": true
+      "default_code": "BEB-AGU-6L",
+      "name": "Agua sin gas (6 × 1 L)",
+      "categoria": "Bebidas",
+      "list_price": 3.6,
+      "iva": 15,
+      "imagen": "imagenes/productos/agua.jpg",
+      "description_sale": "Paquete de 6 botellas de agua purificada de 1 litro."
     },
     {
-      "name": "Producto demo 4",
+      "default_code": "BEB-COL-3L",
+      "name": "Gaseosa sabor cola (3 L)",
+      "categoria": "Bebidas",
+      "list_price": 2.75,
+      "iva": 15,
+      "imagen": "imagenes/productos/gaseosa.jpg",
+      "description_sale": "Bebida gaseosa sabor cola, botella retornable de 3 litros."
+    },
+    {
+      "default_code": "BEB-JUG-1L",
+      "name": "Jugo de naranja (1 L)",
+      "categoria": "Bebidas",
+      "list_price": 2.4,
+      "iva": 15,
+      "imagen": "imagenes/productos/jugo.jpg",
+      "description_sale": "Jugo de naranja listo para servir. Botella de 1 litro."
+    },
+    {
+      "default_code": "BEB-CAF-500",
+      "name": "Café molido de altura (500 g)",
+      "categoria": "Bebidas",
+      "list_price": 7.8,
+      "iva": 15,
+      "imagen": "imagenes/productos/cafe.jpg",
+      "description_sale": "Café arábigo de altura, tostado medio y molido para cafetera. Funda de 500 g."
+    },
+    {
+      "default_code": "BEB-CER-6U",
+      "name": "Cerveza nacional (6 × 355 ml)",
+      "categoria": "Bebidas",
+      "list_price": 7.5,
+      "iva": 15,
+      "imagen": "imagenes/productos/cerveza.jpg",
+      "description_sale": "Six pack de cerveza rubia nacional en botella de 355 ml. Venta solo a mayores de 18 años."
+    },
+    {
+      "default_code": "BEB-VIN-750",
+      "name": "Vino tinto (750 ml)",
+      "categoria": "Bebidas",
+      "list_price": 11.9,
+      "iva": 15,
+      "imagen": "imagenes/productos/vino.jpg",
+      "description_sale": "Vino tinto chileno Cabernet Sauvignon, botella de 750 ml. Venta solo a mayores de 18 años."
+    },
+    {
+      "default_code": "BEB-RON-750",
+      "name": "Ron añejo (750 ml)",
+      "categoria": "Bebidas",
       "list_price": 17.5,
-      "type": "consu",
-      "sale_ok": true,
-      "website_published": true
+      "iva": 15,
+      "imagen": "imagenes/productos/ron.jpg",
+      "description_sale": "Ron añejo de 5 años, botella de 750 ml. Venta solo a mayores de 18 años."
     },
     {
-      "name": "Producto demo 5",
-      "list_price": 20.0,
-      "type": "consu",
-      "sale_ok": true,
-      "website_published": true
+      "default_code": "TEC-LAP-156",
+      "name": "Laptop 15,6\" Core i5 · 16 GB · 512 GB SSD",
+      "categoria": "Tecnología",
+      "list_price": 689.0,
+      "iva": 15,
+      "imagen": "imagenes/productos/laptop.jpg",
+      "description_sale": "Laptop de 15,6\" Full HD con procesador Intel Core i5, 16 GB de RAM y 512 GB SSD. Garantía de 1 año."
+    },
+    {
+      "default_code": "TEC-AUD-BT",
+      "name": "Audífonos inalámbricos Bluetooth",
+      "categoria": "Tecnología",
+      "list_price": 34.9,
+      "iva": 15,
+      "imagen": "imagenes/productos/audifonos.jpg",
+      "description_sale": "Audífonos de diadema Bluetooth 5.3 con micrófono y hasta 30 horas de batería."
+    },
+    {
+      "default_code": "TEC-PAR-BT",
+      "name": "Parlante Bluetooth portátil",
+      "categoria": "Tecnología",
+      "list_price": 44.9,
+      "iva": 15,
+      "imagen": "imagenes/productos/parlante.jpg",
+      "description_sale": "Parlante resistente al agua (IPX6) con 12 horas de batería."
+    },
+    {
+      "default_code": "TEC-MOU-INA",
+      "name": "Mouse inalámbrico",
+      "categoria": "Tecnología",
+      "list_price": 12.9,
+      "iva": 15,
+      "imagen": "imagenes/productos/mouse.jpg",
+      "description_sale": "Mouse óptico inalámbrico 2,4 GHz con receptor USB."
+    },
+    {
+      "default_code": "TEC-TEC-ES",
+      "name": "Teclado USB en español",
+      "categoria": "Tecnología",
+      "list_price": 14.9,
+      "iva": 15,
+      "imagen": "imagenes/productos/teclado.jpg",
+      "description_sale": "Teclado de tamaño completo con distribución latinoamericana."
+    },
+    {
+      "default_code": "TEC-SMW",
+      "name": "Reloj inteligente deportivo",
+      "categoria": "Tecnología",
+      "list_price": 59.9,
+      "iva": 15,
+      "imagen": "imagenes/productos/smartwatch.jpg",
+      "description_sale": "Smartwatch con pulsómetro, conteo de pasos y notificaciones del celular."
+    },
+    {
+      "default_code": "TEC-MON-24",
+      "name": "Monitor 24\" Full HD",
+      "categoria": "Tecnología",
+      "list_price": 139.0,
+      "iva": 15,
+      "imagen": "imagenes/productos/monitor.jpg",
+      "description_sale": "Monitor IPS de 24\" Full HD con entradas HDMI y VGA."
+    },
+    {
+      "default_code": "CEL-AND-128",
+      "name": "Celular Android 6,7\" · 128 GB · 4 GB RAM",
+      "categoria": "Celulares",
+      "list_price": 189.0,
+      "iva": 15,
+      "imagen": "imagenes/productos/celular.jpg",
+      "description_sale": "Smartphone Android de gama media de entrada, doble SIM, cámara de 50 MP. Liberado, con garantía de 1 año."
+    },
+    {
+      "default_code": "CEL-AND-256",
+      "name": "Celular Android 6,6\" · 256 GB · 8 GB RAM",
+      "categoria": "Celulares",
+      "list_price": 329.0,
+      "iva": 15,
+      "imagen": "imagenes/productos/celular_pro.jpg",
+      "description_sale": "Smartphone Android de gama media con pantalla AMOLED y cámara de 108 MP. Liberado, garantía de 1 año."
+    },
+    {
+      "default_code": "CEL-BAS",
+      "name": "Celular básico con teclas · doble SIM",
+      "categoria": "Celulares",
+      "list_price": 29.9,
+      "iva": 15,
+      "imagen": "imagenes/productos/celular_basico.jpg",
+      "description_sale": "Teléfono sencillo con teclado, radio FM, linterna y batería de larga duración."
+    },
+    {
+      "default_code": "CEL-TAB-10",
+      "name": "Tablet 10\" · 64 GB · Wi-Fi",
+      "categoria": "Celulares",
+      "list_price": 179.0,
+      "iva": 15,
+      "imagen": "imagenes/productos/tablet.jpg",
+      "description_sale": "Tablet Android de 10\" para estudio y entretenimiento, 64 GB ampliables."
+    },
+    {
+      "default_code": "ACC-FUN",
+      "name": "Funda de silicona para celular",
+      "categoria": "Accesorios",
+      "list_price": 7.5,
+      "iva": 15,
+      "imagen": "imagenes/productos/funda.jpg",
+      "description_sale": "Funda flexible antigolpes; indique el modelo al pedir."
+    },
+    {
+      "default_code": "ACC-FUT",
+      "name": "Funda transparente reforzada",
+      "categoria": "Accesorios",
+      "list_price": 6.5,
+      "iva": 15,
+      "imagen": "imagenes/productos/funda_transparente.jpg",
+      "description_sale": "Funda transparente con esquinas reforzadas; indique el modelo de su celular al pedir."
+    },
+    {
+      "default_code": "ACC-CAR-25W",
+      "name": "Cargador rápido USB-C 25 W",
+      "categoria": "Accesorios",
+      "list_price": 14.9,
+      "iva": 15,
+      "imagen": "imagenes/productos/cargador.jpg",
+      "description_sale": "Cargador de pared USB-C de carga rápida."
+    },
+    {
+      "default_code": "ACC-CAB-C",
+      "name": "Cable USB-C de 1 m",
+      "categoria": "Accesorios",
+      "list_price": 5.9,
+      "iva": 15,
+      "imagen": "imagenes/productos/cable.jpg",
+      "description_sale": "Cable USB-C a USB-C trenzado, carga y datos."
+    },
+    {
+      "default_code": "ACC-PWB-10K",
+      "name": "Batería externa 10 000 mAh",
+      "categoria": "Accesorios",
+      "list_price": 19.9,
+      "iva": 15,
+      "imagen": "imagenes/productos/powerbank.jpg",
+      "description_sale": "Power bank con dos salidas USB y entrada USB-C."
+    },
+    {
+      "default_code": "ACC-SOP",
+      "name": "Soporte de celular para auto",
+      "categoria": "Accesorios",
+      "list_price": 9.9,
+      "iva": 15,
+      "imagen": "imagenes/productos/soporte.jpg",
+      "description_sale": "Soporte para rejilla de ventilación con ajuste de 360°."
+    },
+    {
+      "default_code": "ACC-MOC",
+      "name": "Mochila para laptop 15,6\"",
+      "categoria": "Accesorios",
+      "list_price": 29.9,
+      "iva": 15,
+      "imagen": "imagenes/productos/mochila.jpg",
+      "description_sale": "Mochila acolchada con compartimento para laptop de hasta 15,6\"."
+    },
+    {
+      "default_code": "HOG-LIC",
+      "name": "Licuadora 1,5 L",
+      "categoria": "Hogar",
+      "list_price": 49.9,
+      "iva": 15,
+      "imagen": "imagenes/productos/licuadora.jpg",
+      "description_sale": "Licuadora de 3 velocidades con vaso de vidrio de 1,5 L."
+    },
+    {
+      "default_code": "HOG-OLL",
+      "name": "Juego de ollas de aluminio (5 piezas)",
+      "categoria": "Hogar",
+      "list_price": 59.9,
+      "iva": 15,
+      "imagen": "imagenes/productos/ollas.jpg",
+      "description_sale": "Juego de ollas de aluminio con tapas de vidrio."
+    },
+    {
+      "default_code": "HOG-SAR",
+      "name": "Sartén antiadherente 26 cm",
+      "categoria": "Hogar",
+      "list_price": 18.9,
+      "iva": 15,
+      "imagen": "imagenes/productos/sarten.jpg",
+      "description_sale": "Sartén con recubrimiento antiadherente apto para todo tipo de cocina."
+    },
+    {
+      "default_code": "HOG-FOC",
+      "name": "Foco LED 9 W (pack de 3)",
+      "categoria": "Hogar",
+      "list_price": 6.5,
+      "iva": 15,
+      "imagen": "imagenes/productos/foco.jpg",
+      "description_sale": "Focos LED de luz blanca, equivalentes a 60 W, rosca E27."
+    },
+    {
+      "default_code": "HOG-SAB",
+      "name": "Juego de sábanas 2 plazas",
+      "categoria": "Hogar",
+      "list_price": 24.9,
+      "iva": 15,
+      "imagen": "imagenes/productos/sabanas.jpg",
+      "description_sale": "Juego de sábanas de microfibra: sábana, cubrecama y dos fundas."
+    },
+    {
+      "default_code": "HOG-TOA",
+      "name": "Toalla de baño 70 × 140 cm",
+      "categoria": "Hogar",
+      "list_price": 12.5,
+      "iva": 15,
+      "imagen": "imagenes/productos/toalla.jpg",
+      "description_sale": "Toalla de algodón absorbente."
+    },
+    {
+      "default_code": "HOG-PLA",
+      "name": "Plancha de ropa a vapor",
+      "categoria": "Hogar",
+      "list_price": 29.9,
+      "iva": 15,
+      "imagen": "imagenes/productos/plancha.jpg",
+      "description_sale": "Plancha a vapor con suela antiadherente y control de temperatura."
+    },
+    {
+      "default_code": "CUI-SHA",
+      "name": "Shampoo (750 ml)",
+      "categoria": "Cuidado personal",
+      "list_price": 6.25,
+      "iva": 15,
+      "imagen": "imagenes/productos/shampoo.jpg",
+      "description_sale": "Shampoo para todo tipo de cabello, frasco familiar."
+    },
+    {
+      "default_code": "CUI-JAB",
+      "name": "Jabón de tocador (pack de 3)",
+      "categoria": "Cuidado personal",
+      "list_price": 2.9,
+      "iva": 15,
+      "imagen": "imagenes/productos/jabon.jpg",
+      "description_sale": "Jabones de tocador de 110 g."
+    },
+    {
+      "default_code": "CUI-PAS",
+      "name": "Pasta dental (150 ml)",
+      "categoria": "Cuidado personal",
+      "list_price": 3.1,
+      "iva": 15,
+      "imagen": "imagenes/productos/pasta.jpg",
+      "description_sale": "Crema dental con flúor."
+    },
+    {
+      "default_code": "CUI-PAP",
+      "name": "Papel higiénico (12 rollos)",
+      "categoria": "Cuidado personal",
+      "list_price": 6.8,
+      "iva": 15,
+      "imagen": "imagenes/productos/papel.jpg",
+      "description_sale": "Papel higiénico doble hoja, 12 rollos."
+    },
+    {
+      "default_code": "CUI-DES",
+      "name": "Desodorante roll-on",
+      "categoria": "Cuidado personal",
+      "list_price": 3.75,
+      "iva": 15,
+      "imagen": "imagenes/productos/desodorante.jpg",
+      "description_sale": "Desodorante antitranspirante de 50 ml."
     }
   ],
   "usuarios_conductor": [

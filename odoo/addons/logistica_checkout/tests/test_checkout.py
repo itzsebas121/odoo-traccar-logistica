@@ -187,7 +187,8 @@ class TestCheckout(HttpCase):
         self._pagar(order)
         self.assertEqual(order.state, 'sale')
         self.assertEqual(len(order.logistica_entrega_ids), 1)
-        self.assertEqual(order.logistica_entrega_ids.state, 'en_preparacion')
+        self.assertEqual(order.logistica_entrega_ids.state, 'preparado')
+        self.assertEqual(order.logistica_entrega_ids.estado_simple, 'por_despachar')
         self.assertAlmostEqual(order.logistica_entrega_ids.latitude, LAT, places=6)
 
     def _pedido_listo_para_pagar(self):
@@ -254,7 +255,7 @@ class TestCheckout(HttpCase):
         self.assertEqual(resp.status_code, 200)
         texto = resp.text
         self.assertIn(self.pedido_confirmado.name, texto)
-        self.assertIn('En preparación', texto)
+        self.assertIn('Preparado', texto)  # sin preparación en bodega, el pedido confirmado ya está listo
         bajo = texto.lower()
         self.assertNotIn('latitude', bajo)
         self.assertNotIn('longitude', bajo)

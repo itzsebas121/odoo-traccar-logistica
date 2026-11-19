@@ -45,7 +45,7 @@
                             <field name="progress" widget="progressbar"/>
                         </group>
                         <group string="Asignación">
-                            <field name="vehicle_id" attrs="{'readonly': [('state', '!=', 'borrador')]}"/>
+                            <field name="vehicle_id" attrs="{'readonly': [('state', '!=', 'borrador')]}" context="{'logistica_con_conductor': True}"/>
                             <field name="driver_id" attrs="{'readonly': [('state', '!=', 'borrador')]}"/>
                             <field name="started_at" attrs="{'invisible': [('started_at', '=', False)]}"/>
                             <field name="finished_at" attrs="{'invisible': [('finished_at', '=', False)]}"/>
@@ -62,11 +62,14 @@
                     </group>
                     <notebook>
                         <page string="Paradas" name="stops">
+                            <field name="used_entrega_ids" invisible="1"/>
                             <field name="stop_ids" attrs="{'readonly': [('state', '!=', 'borrador')]}">
                                 <tree editable="bottom" decoration-success="state == 'entregado'"
                                       decoration-danger="state == 'no_entregado'">
                                     <field name="sequence" widget="handle"/>
-                                    <field name="entrega_id" attrs="{'readonly': [('state', '!=', 'pendiente')]}"/>
+                                    <field name="entrega_id"
+                                           domain="[('state', '=', 'preparado'), ('id', 'not in', parent.used_entrega_ids)]"
+                                           attrs="{'readonly': [('state', '!=', 'pendiente')]}"/>
                                     <field name="partner_id"/>
                                     <field name="destination_address"/>
                                     <field name="state" readonly="1"/>
@@ -100,6 +103,10 @@
         <field name="arch" type="xml">
             <tree string="Rutas de despacho" decoration-muted="state in ('cancelada', 'interrumpida')"
                   decoration-success="state == 'cerrada'" decoration-info="state == 'en_recorrido'">
+                <header>
+                    <button name="action_aprobar_seleccion" string="Aprobar rutas" type="object"
+                            groups="fleet.fleet_group_manager"/>
+                </header>
                 <field name="name"/>
                 <field name="date"/>
                 <field name="vehicle_id"/>

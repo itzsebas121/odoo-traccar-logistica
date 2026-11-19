@@ -5,6 +5,16 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
+from app import distance
+
+
+@pytest.fixture(autouse=True)
+def _sin_cache_de_rutas():
+    """Cada prueba empieza sin rutas guardadas."""
+    distance.ROUTE_CACHE.clear()
+    yield
+    distance.ROUTE_CACHE.clear()
+
 
 class _Handler(BaseHTTPRequestHandler):
     def do_GET(self):

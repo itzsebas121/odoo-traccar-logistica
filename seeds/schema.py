@@ -17,6 +17,8 @@ ARCHIVO_SIMULACION = 'simulacion.json'
 ARCHIVO_HISTORICO = 'historico.json'
 # Caja que contiene el canton Ambato (Tungurahua): las coordenadas del historico deben caer dentro.
 CAJA_AMBATO = {'lat': (-1.45, -1.05), 'lon': (-78.95, -78.45)}
+ARCHIVO_MERCADO = 'mercado.json'
+TIPOS_CLIENTE = ('persona', 'empresa')
 
 _AREA_CIRCULO = re.compile(r'^CIRCLE \((-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?), (\d+(?:\.\d+)?)\)$')
 
@@ -106,8 +108,16 @@ def validar_odoo(datos):
         donde_p = f'{donde}: productos[{i}]'
         _objeto(producto, donde_p)
         _texto(producto, 'name', donde_p)
+        _texto(producto, 'default_code', donde_p)
+        _texto(producto, 'categoria', donde_p)
         _numero(producto, 'list_price', donde_p, minimo=0, exclusivo_minimo=True)
+        if _campo(producto, 'iva', donde_p) not in (0, 15):
+            raise ErrorEsquema(f"{donde_p}: 'iva' debe ser 0 o 15 (IVA de Ecuador)")
+        imagen = _texto(producto, 'imagen', donde_p)
+        if not os.path.isfile(os.path.join(DIRECTORIO_DATOS, imagen)):
+            raise ErrorEsquema(f'{donde_p}: no existe la imagen {imagen}')
     _sin_repetidos([p['name'] for p in productos], donde, 'productos.name')
+    _sin_repetidos([p['default_code'] for p in productos], donde, 'productos.default_code')
 
     usuarios = _lista(_campo(raiz, 'usuarios_conductor', donde), f'{donde}: usuarios_conductor')
     for i, usuario in enumerate(usuarios):
@@ -166,14 +176,25 @@ def validar_traccar(datos):
 def validar_simulacion(datos):
     donde = ARCHIVO_SIMULACION
     raiz = _objeto(datos, donde)
-    pedidos = _lista(_campo(raiz, 'pedidos', donde), f'{donde}: pedidos')
+    pedidos = _campo(raiz, 'pedidos', donde)
+    if not isinstance(pedidos, list):
+        raise ErrorEsquema(f'{donde}: se esperaba una lista en pedidos')
     for i, pedido in enumerate(pedidos):
         donde_p = f'{donde}: pedidos[{i}]'
         _objeto(pedido, donde_p)
         _texto(pedido, 'ref', donde_p)
         _texto(pedido, 'cliente', donde_p)
-        _numero(pedido, 'latitud', donde_p, minimo=-90, maximo=90)
-        _numero(pedido, 'longitud', donde_p, minimo=-180, maximo=180)
+        _texto(pedido, 'cliente_ref', donde_p)
+        # Sin coordenadas = pedido telefonico que queda en cotizacion hasta marcar el punto en el mapa.
+        if 'latitud' in pedido or 'longitud' in pedido:
+            _numero(pedido, 'latitud', donde_p, minimo=-90, maximo=90)
+            _numero(pedido, 'longitud', donde_p, minimo=-180, maximo=180)
+        lineas = _lista(_campo(pedido, 'lineas', donde_p), f'{donde_p}: lineas')
+        if not lineas:
+            raise ErrorEsquema(f'{donde_p}: el pedido no tiene lineas')
+        for j, linea in enumerate(lineas):
+            _texto(_objeto(linea, f'{donde_p}: lineas[{j}]'), 'producto', f'{donde_p}: lineas[{j}]')
+            _numero(linea, 'cantidad', f'{donde_p}: lineas[{j}]', minimo=0, exclusivo_minimo=True)
     _sin_repetidos([p['ref'] for p in pedidos], donde, 'pedidos.ref')
 
     rutas = _lista(_campo(raiz, 'rutas', donde), f'{donde}: rutas')
@@ -249,12 +270,80 @@ def validar_rutas(simulacion, traccar):
                 f"{ARCHIVO_TRACCAR} (dispositivos)")
 
 
+def validar_mercado(mercado, odoo, simulacion):
+    """Clientes unicos y dentro de la cobertura; perfiles y pedidos con productos que existen."""
+    donde = ARCHIVO_MERCADO
+    raiz = _objeto(mercado, donde)
+    _objeto(_campo(raiz, 'empresa', donde), f'{donde}: empresa')
+    radio = _numero(raiz, 'cobertura_km', donde, minimo=0, exclusivo_minimo=True)
+    sede = (odoo['bodega_logistica']['latitude'], odoo['bodega_logistica']['longitude'])
+    categorias = set(_lista(_campo(raiz, 'categorias', donde), f'{donde}: categorias'))
+    codigos = {p['default_code'] for p in odoo['productos']}
+    for producto in odoo['productos']:
+        if producto['categoria'] not in categorias:
+            raise ErrorEsquema(f"{ARCHIVO_ODOO}: el producto {producto['default_code']} usa una categoria "
+                               f"que no esta en {donde}: {producto['categoria']}")
+    perfiles = _objeto(raiz.get('perfiles') or {}, f'{donde}: perfiles')
+    for nombre, perfil in perfiles.items():
+        usados = list(_objeto(_campo(perfil, 'productos', f'{donde}: perfiles.{nombre}'), donde))
+        if perfil.get('extras'):
+            usados += list(_objeto(_campo(perfil['extras'], 'productos', f'{donde}: perfiles.{nombre}.extras'), donde))
+        for codigo in usados:
+            if codigo not in codigos:
+                raise ErrorEsquema(f'{donde}: perfiles.{nombre} usa el producto inexistente {codigo}')
+    segmentos = _objeto(raiz.get('segmentos') or {}, f'{donde}: segmentos')
+    clientes = _campo(raiz, 'clientes', donde)
+    if not isinstance(clientes, list):
+        raise ErrorEsquema(f'{donde}: se esperaba una lista en clientes')
+    for i, cliente in enumerate(clientes):
+        donde_c = f'{donde}: clientes[{i}]'
+        _objeto(cliente, donde_c)
+        for campo in ('ref', 'name', 'calle', 'sector', 'ciudad', 'telefono', 'email'):
+            _texto(cliente, campo, donde_c)
+        if cliente.get('tipo') not in TIPOS_CLIENTE:
+            raise ErrorEsquema(f'{donde_c}: tipo debe ser uno de {TIPOS_CLIENTE}')
+        if cliente.get('perfil') not in perfiles:
+            raise ErrorEsquema(f'{donde_c}: perfil inexistente: {cliente.get("perfil")}')
+        if cliente.get('segmento') not in segmentos:
+            raise ErrorEsquema(f'{donde_c}: segmento inexistente: {cliente.get("segmento")}')
+        if cliente.get('latitud') is not None:
+            lat = _numero(cliente, 'latitud', donde_c, minimo=-90, maximo=90)
+            lon = _numero(cliente, 'longitud', donde_c, minimo=-180, maximo=180)
+            distancia = _distancia_m(sede[0], sede[1], lat, lon) / 1000
+            if distancia > radio:
+                raise ErrorEsquema(f'{donde_c}: queda a {distancia:.1f} km de la sede, fuera de la cobertura '
+                                   f'de {radio} km')
+    _sin_repetidos([c['ref'] for c in clientes], donde, 'clientes.ref')
+    refs = {c['ref'] for c in clientes}
+    for i, pedido in enumerate(simulacion['pedidos']):
+        if pedido['cliente_ref'] not in refs:
+            raise ErrorEsquema(f"{ARCHIVO_SIMULACION}: pedidos[{i}]: el cliente {pedido['cliente_ref']} "
+                               f"no esta en {donde}")
+        for linea in pedido['lineas']:
+            if linea['producto'] not in codigos:
+                raise ErrorEsquema(f"{ARCHIVO_SIMULACION}: pedidos[{i}]: producto inexistente {linea['producto']}")
+
+
 def validar_todo(odoo, traccar, simulacion):
     validar_odoo(odoo)
     validar_traccar(traccar)
     validar_simulacion(simulacion)
     validar_referencias(odoo, traccar)
     validar_rutas(simulacion, traccar)
+
+
+def cargar_mercado(odoo, simulacion, directorio=DIRECTORIO_DATOS):
+    """Lee y valida mercado.json (usa los productos de odoo.json y los pedidos de simulacion.json)."""
+    ruta = os.path.join(directorio, ARCHIVO_MERCADO)
+    try:
+        with open(ruta, encoding='utf-8') as fichero:
+            mercado = json.load(fichero)
+    except json.JSONDecodeError as error:
+        raise ErrorEsquema(f'{ARCHIVO_MERCADO}: JSON mal formado (linea {error.lineno}: {error.msg})') from None
+    except OSError as error:
+        raise ErrorEsquema(f'{ARCHIVO_MERCADO}: no se puede leer ({error.strerror})') from None
+    validar_mercado(mercado, odoo, simulacion)
+    return mercado
 
 
 def cargar(directorio=DIRECTORIO_DATOS):

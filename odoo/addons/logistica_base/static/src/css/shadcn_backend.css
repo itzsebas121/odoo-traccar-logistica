@@ -1,0 +1,794 @@
+/* ==========================================================================
+   «Bitácora» Design System + Sidebar Vertical para Odoo 16 Backend
+   Papel cálido de despacho (#F8F5EE), tinta azul noche (#141D2B),
+   naranja de señalización (#E06D2B), IBM Plex Sans & JetBrains Mono.
+   ========================================================================== */
+
+@import url("https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,500,600|JetBrains+Mono:400,500,600,700&display=swap");
+
+:root {
+    --bitacora-bg: #F8F5EE;
+    --bitacora-card: #FDFBF7;
+    --bitacora-muted: #EFEAE0;
+    --bitacora-border: #DDD7CA;
+    --bitacora-border-strong: #C9C1B0;
+    --bitacora-ink: #141D2B;
+    --bitacora-ink-muted: #5C677A;
+    --bitacora-primary: #1B263B;
+    --bitacora-primary-hover: #253451;
+    --bitacora-senal: #E06D2B;
+    --bitacora-senal-hover: #C85C1E;
+    --bitacora-senal-suave: #F9E8D9;
+    --bitacora-ok: #1D8A68;
+    --bitacora-ok-suave: #DCF3EA;
+    --bitacora-trazo: rgba(20, 29, 43, 0.055);
+    --bitacora-sidebar: #131B29;
+    --bitacora-sidebar-fg: #E8E2D5;
+    --bitacora-sidebar-accent: #1F2A3F;
+    --bitacora-sidebar-border: rgba(255, 255, 255, 0.09);
+    --bitacora-radius: 6px;
+    --bitacora-radius-lg: 10px;
+    --bitacora-shadow-sm: 0 1px 2px rgba(20, 29, 43, 0.05);
+    --bitacora-shadow-md: 0 8px 20px -4px rgba(20, 29, 43, 0.14), 0 2px 6px -2px rgba(20, 29, 43, 0.06);
+}
+
+/* Base typography & warm paper canvas */
+body.o_web_client {
+    font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--bitacora-bg);
+    color: var(--bitacora-ink);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Blueprint grid background (.fondo-plano) */
+.o_action_manager,
+.o_form_view .o_form_sheet_bg,
+.o_kanban_view {
+    background-color: var(--bitacora-bg) !important;
+    background-image:
+        linear-gradient(var(--bitacora-trazo) 1px, transparent 1px),
+        linear-gradient(90deg, var(--bitacora-trazo) 1px, transparent 1px) !important;
+    background-size: 28px 28px !important;
+    background-position: -1px -1px !important;
+}
+
+/* ==========================================================================
+   Sidebar Vertical en Escritorio (>= 768px)
+   ========================================================================== */
+.o_main_navbar {
+    background-color: var(--bitacora-sidebar) !important;
+    border-bottom: 1px solid var(--bitacora-sidebar-border) !important;
+    color: var(--bitacora-sidebar-fg) !important;
+}
+
+.o_bitacora_brand_header {
+    align-items: center;
+    gap: 10px;
+    padding: 4px 8px 12px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--bitacora-sidebar-border);
+}
+
+.o_bitacora_logo_svg {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+}
+
+.o_bitacora_brand_text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+}
+
+.o_bitacora_brand_name {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #FDFBF7;
+}
+
+.o_bitacora_brand_sub {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--bitacora-senal);
+    margin-top: 2px;
+}
+
+@media (min-width: 768px) {
+    body.o_web_client {
+        display: flex !important;
+        flex-direction: row !important;
+        height: 100vh !important;
+        width: 100vw !important;
+        overflow: hidden !important;
+    }
+
+    body.o_web_client > .o_navbar {
+        width: 240px !important;
+        min-width: 240px !important;
+        max-width: 240px !important;
+        height: 100vh !important;
+        flex-shrink: 0 !important;
+        z-index: 1030 !important;
+        overflow: visible !important;
+    }
+
+    .o_main_navbar {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 240px !important;
+        height: 100vh !important;
+        padding: 14px 10px !important;
+        background-color: var(--bitacora-sidebar) !important;
+        border-right: 1px solid var(--bitacora-sidebar-border) !important;
+        border-bottom: 0 !important;
+        overflow: visible !important;
+        gap: 6px;
+    }
+
+    /* Hide redundant Apps grid button on desktop (shown via MÓDULOS group) */
+    .o_main_navbar .o_navbar_apps_menu {
+        display: none !important;
+    }
+
+    .o_main_navbar .o-dropdown--menu {
+        z-index: 1060 !important;
+    }
+
+    /* Sidebar Group 1: Módulos */
+    .o_bitacora_apps_group {
+        flex-direction: column;
+        gap: 4px;
+        margin-top: 6px;
+        flex: 0 0 auto;
+    }
+
+    .o_bitacora_apps_list {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        max-height: 36vh;
+        overflow-y: auto;
+        padding-right: 2px;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+    }
+
+    .o_bitacora_section_label {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 9.5px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        color: rgba(232, 226, 213, 0.45);
+        padding: 4px 10px 2px;
+        flex-shrink: 0;
+    }
+
+    .o_bitacora_section_label_sub {
+        margin-top: 8px;
+        padding-top: 10px;
+        border-top: 1px solid var(--bitacora-sidebar-border);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .o_main_navbar .o_bitacora_app_link {
+        display: flex !important;
+        align-items: center !important;
+        gap: 9px;
+        height: 32px !important;
+        min-height: 32px !important;
+        line-height: 1.2 !important;
+        padding: 0 10px !important;
+        border-radius: 6px !important;
+        border-left: 3px solid transparent;
+        font-family: 'IBM Plex Sans', sans-serif !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        color: rgba(232, 226, 213, 0.78) !important;
+        text-decoration: none !important;
+        transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+    }
+
+    .o_bitacora_dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 9999px;
+        background-color: rgba(232, 226, 213, 0.3);
+        flex-shrink: 0;
+        transition: background-color 0.12s ease, transform 0.12s ease;
+    }
+
+    .o_bitacora_app_name {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .o_main_navbar .o_bitacora_app_link:hover {
+        background-color: var(--bitacora-sidebar-accent) !important;
+        color: #FDFBF7 !important;
+    }
+
+    .o_main_navbar .o_bitacora_app_link:hover .o_bitacora_dot {
+        background-color: rgba(232, 226, 213, 0.75);
+    }
+
+    .o_main_navbar .o_bitacora_app_link.is-active {
+        background-color: rgba(224, 109, 43, 0.15) !important;
+        color: #FDFBF7 !important;
+        font-weight: 600 !important;
+        border-left: 3px solid var(--bitacora-senal) !important;
+    }
+
+    .o_main_navbar .o_bitacora_app_link.is-active .o_bitacora_dot {
+        background-color: var(--bitacora-senal);
+        transform: scale(1.15);
+    }
+
+    /* Active App Brand (hidden on desktop; represented in MÓDULOS & SECCIONES) */
+    .o_main_navbar .o_menu_brand {
+        display: none !important;
+    }
+
+    /* Sidebar Group 2: Vertical Sections Menu */
+    .o_main_navbar .o_menu_sections {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        gap: 2px !important;
+        margin: 4px 0 8px !important;
+        padding: 0 2px 0 0 !important;
+        flex: 0 1 auto !important;
+        overflow-y: auto !important;
+        background: transparent !important;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+    }
+
+    .o_main_navbar .o_menu_sections > .o_nav_entry,
+    .o_main_navbar .o_menu_sections > .o-dropdown {
+        width: 100% !important;
+        display: block !important;
+        position: relative !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .o_main_navbar .o_menu_sections > .o_nav_entry,
+    .o_main_navbar .o_menu_sections > .o-dropdown > .dropdown-toggle {
+        width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        text-align: left !important;
+        height: 32px !important;
+        min-height: 32px !important;
+        line-height: 1.2 !important;
+        padding: 0 10px !important;
+        border-radius: 6px !important;
+        border-left: 3px solid transparent !important;
+        color: rgba(232, 226, 213, 0.78) !important;
+        background: transparent !important;
+        font-family: 'IBM Plex Sans', sans-serif !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+        white-space: nowrap !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .o_main_navbar .o_menu_sections > .o_nav_entry:hover,
+    .o_main_navbar .o_menu_sections > .o-dropdown > .dropdown-toggle:hover,
+    .o_main_navbar .o_menu_sections > .o-dropdown.show > .dropdown-toggle {
+        background-color: var(--bitacora-sidebar-accent) !important;
+        color: #FDFBF7 !important;
+        border-left-color: var(--bitacora-senal) !important;
+    }
+
+    /* Hide More '+' button in vertical mode */
+    .o_main_navbar .o_menu_sections > .o_menu_sections_more {
+        display: none !important;
+    }
+
+    /* Systray footer (shadcn user card + compact action bar) */
+    .o_main_navbar .o_menu_systray {
+        margin-top: auto !important;
+        margin-left: 0 !important;
+        width: 100% !important;
+        padding: 10px 0 2px !important;
+        border-top: 1px solid var(--bitacora-sidebar-border) !important;
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 4px !important;
+    }
+
+    .o_main_navbar .o_menu_systray > .o-dropdown,
+    .o_main_navbar .o_menu_systray > div {
+        position: relative !important;
+    }
+
+    .o_main_navbar .o_menu_systray .o_MessagingMenu,
+    .o_main_navbar .o_menu_systray .o_ActivityMenu,
+    .o_main_navbar .o_menu_systray .o_switch_company_menu {
+        order: 1;
+    }
+
+    .o_main_navbar .o_menu_systray .o_user_menu {
+        order: 99 !important;
+        width: 100% !important;
+        margin-top: 4px !important;
+        background: rgba(255, 255, 255, 0.04) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 8px !important;
+    }
+
+    .o_main_navbar .o_menu_systray .o_user_menu > .dropdown-toggle {
+        width: 100% !important;
+        height: 38px !important;
+        line-height: 1.2 !important;
+        padding: 0 10px !important;
+        justify-content: flex-start !important;
+    }
+
+    .o_main_navbar .o_menu_systray .o_user_menu .o_user_avatar {
+        width: 24px !important;
+        height: 24px !important;
+        border-radius: 6px !important;
+        object-fit: cover;
+    }
+
+    .o_main_navbar .o_menu_systray .o_user_menu .oe_topbar_name {
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-family: 'IBM Plex Sans', sans-serif;
+        font-size: 12.5px;
+        font-weight: 500;
+        color: #FDFBF7;
+    }
+
+    .o_main_navbar .o_menu_systray > * > a,
+    .o_main_navbar .o_menu_systray > * > button,
+    .o_main_navbar .o_menu_systray .dropdown-toggle {
+        color: rgba(232, 226, 213, 0.85) !important;
+        height: 32px !important;
+        line-height: 1.2 !important;
+        padding: 0 8px !important;
+        border-radius: 6px !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px;
+    }
+
+    .o_main_navbar .o_menu_systray .badge,
+    .o_main_navbar .o_menu_systray .o_notification_counter {
+        background-color: var(--bitacora-senal) !important;
+        color: #FDFBF7 !important;
+        font-family: 'JetBrains Mono', monospace !important;
+        font-size: 10px !important;
+    }
+
+    .o_main_navbar .o_menu_systray > * > a:hover,
+    .o_main_navbar .o_menu_systray > * > button:hover,
+    .o_main_navbar .o_menu_systray .dropdown-toggle:hover {
+        background-color: var(--bitacora-sidebar-accent) !important;
+        color: #FDFBF7 !important;
+    }
+
+    /* Website Editor buttons inside sidebar systray */
+    .o_main_navbar .o_menu_systray .o_edit_website_container a,
+    .o_main_navbar .o_menu_systray .o_edit_website_container button {
+        background-color: var(--bitacora-senal) !important;
+        border: 1px solid var(--bitacora-senal) !important;
+        color: #FDFBF7 !important;
+        border-radius: 6px !important;
+        font-family: 'JetBrains Mono', ui-monospace, monospace !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
+    }
+
+    .o_main_navbar .o_menu_systray .o_edit_website_container a:hover,
+    .o_main_navbar .o_menu_systray .o_edit_website_container button:hover {
+        background-color: var(--bitacora-senal-hover) !important;
+    }
+
+    .o_main_navbar .o_menu_systray .o_new_content_menu > a {
+        background-color: rgba(255, 255, 255, 0.06) !important;
+        border: 1px solid var(--bitacora-sidebar-border) !important;
+        border-radius: 6px !important;
+    }
+
+    .o_main_navbar .o_menu_systray .o_website_systray_item,
+    .o_main_navbar .o_menu_systray .o_website_switcher_container {
+        background: transparent !important;
+    }
+
+    /* Main Content Workspace */
+    body.o_web_client > .o_action_manager {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        height: 100vh !important;
+        overflow: auto !important;
+    }
+}
+
+/* ==========================================================================
+   Control Panel & Breadcrumbs
+   ========================================================================== */
+.o_control_panel {
+    background-color: rgba(248, 245, 238, 0.92) !important;
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--bitacora-border) !important;
+    padding: 14px 22px !important;
+}
+
+.o_control_panel .breadcrumb {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--bitacora-ink);
+}
+
+.o_control_panel .breadcrumb-item a {
+    color: var(--bitacora-ink-muted);
+    font-weight: 500;
+}
+
+.o_control_panel .breadcrumb-item a:hover {
+    color: var(--bitacora-senal);
+}
+
+/* Search Bar */
+.o_searchview {
+    background-color: var(--bitacora-card) !important;
+    border: 1px solid var(--bitacora-border) !important;
+    border-radius: var(--bitacora-radius) !important;
+    padding: 4px 10px !important;
+    box-shadow: var(--bitacora-shadow-sm);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.o_searchview:focus-within {
+    border-color: var(--bitacora-senal) !important;
+    box-shadow: 0 0 0 2px rgba(224, 109, 43, 0.2) !important;
+}
+
+.o_searchview .o_searchview_facet {
+    border-radius: 4px !important;
+    border: 1px solid var(--bitacora-border) !important;
+    background-color: var(--bitacora-muted) !important;
+    color: var(--bitacora-ink) !important;
+}
+
+.o_searchview .o_searchview_facet .o_searchview_facet_label {
+    background-color: var(--bitacora-primary) !important;
+    color: #FDFBF7 !important;
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+.btn {
+    border-radius: var(--bitacora-radius) !important;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.15s ease;
+}
+
+.btn-primary {
+    background-color: var(--bitacora-primary) !important;
+    border-color: var(--bitacora-primary) !important;
+    color: #FDFBF7 !important;
+    box-shadow: var(--bitacora-shadow-sm);
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+    background-color: var(--bitacora-primary-hover) !important;
+    border-color: var(--bitacora-primary-hover) !important;
+    color: #FFFFFF !important;
+}
+
+.btn-secondary,
+.btn-light {
+    background-color: var(--bitacora-card) !important;
+    border: 1px solid var(--bitacora-border) !important;
+    color: var(--bitacora-ink) !important;
+    box-shadow: var(--bitacora-shadow-sm);
+}
+
+.btn-secondary:hover,
+.btn-light:hover {
+    background-color: var(--bitacora-muted) !important;
+    border-color: var(--bitacora-border-strong) !important;
+    color: var(--bitacora-ink) !important;
+}
+
+.btn-outline-primary {
+    border-color: var(--bitacora-border) !important;
+    color: var(--bitacora-primary) !important;
+    background-color: var(--bitacora-card) !important;
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--bitacora-senal-suave) !important;
+    border-color: var(--bitacora-senal) !important;
+    color: var(--bitacora-ink) !important;
+}
+
+/* ==========================================================================
+   Form View, Sheet & Inputs
+   ========================================================================== */
+.o_form_view {
+    background-color: var(--bitacora-bg) !important;
+}
+
+.o_form_view .o_form_statusbar {
+    background-color: var(--bitacora-card) !important;
+    border-bottom: 1px solid var(--bitacora-border) !important;
+    padding: 9px 22px !important;
+}
+
+.o_form_view .o_form_sheet_bg {
+    padding: 22px !important;
+}
+
+.o_form_view .o_form_sheet {
+    background-color: var(--bitacora-card) !important;
+    border: 1px solid var(--bitacora-border) !important;
+    border-top: 3px solid var(--bitacora-primary) !important;
+    border-radius: var(--bitacora-radius-lg) !important;
+    box-shadow: var(--bitacora-shadow-sm) !important;
+    padding: 26px 30px !important;
+}
+
+.o_form_view .oe_title h1,
+.o_form_view .oe_title h2 {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    color: var(--bitacora-ink);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.o_form_view .o_form_label {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px !important;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--bitacora-ink-muted) !important;
+    font-weight: 600 !important;
+}
+
+.o_form_view .o_horizontal_separator {
+    font-family: 'JetBrains Mono', ui-monospace, monospace !important;
+    color: var(--bitacora-senal) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.16em !important;
+    border-bottom: 1px solid var(--bitacora-border) !important;
+    padding-bottom: 6px;
+    margin-bottom: 12px;
+}
+
+.o_input,
+.form-control,
+.form-select {
+    border-radius: var(--bitacora-radius) !important;
+    border-color: var(--bitacora-border) !important;
+    background-color: var(--bitacora-card);
+    color: var(--bitacora-ink);
+    font-size: 13px;
+}
+
+.o_input:focus,
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--bitacora-senal) !important;
+    box-shadow: 0 0 0 2px rgba(224, 109, 43, 0.2) !important;
+    outline: none !important;
+}
+
+/* Notebook Tabs */
+.o_notebook .nav-tabs {
+    border-bottom: 1px solid var(--bitacora-border) !important;
+    gap: 4px;
+}
+
+.o_notebook .nav-tabs .nav-link {
+    border: none !important;
+    border-bottom: 2px solid transparent !important;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    color: var(--bitacora-ink-muted) !important;
+    font-weight: 500;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 8px 14px;
+    border-radius: var(--bitacora-radius) var(--bitacora-radius) 0 0 !important;
+}
+
+.o_notebook .nav-tabs .nav-link:hover {
+    color: var(--bitacora-ink) !important;
+    background-color: var(--bitacora-muted) !important;
+}
+
+.o_notebook .nav-tabs .nav-link.active {
+    color: var(--bitacora-ink) !important;
+    font-weight: 600;
+    border-bottom: 2px solid var(--bitacora-senal) !important;
+    background-color: transparent !important;
+}
+
+/* ==========================================================================
+   List / Table Views & Tabular Numbers
+   ========================================================================== */
+.o_list_view {
+    background-color: var(--bitacora-bg) !important;
+}
+
+.o_list_view .o_list_table {
+    background-color: var(--bitacora-card) !important;
+    font-variant-numeric: tabular-nums;
+}
+
+.o_list_view .o_list_table thead {
+    background-color: var(--bitacora-muted) !important;
+    border-bottom: 1px solid var(--bitacora-border) !important;
+}
+
+.o_list_view .o_list_table thead th {
+    font-family: 'JetBrains Mono', ui-monospace, monospace !important;
+    color: var(--bitacora-ink-muted) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    padding: 10px 12px !important;
+    border-color: var(--bitacora-border) !important;
+}
+
+.o_list_view .o_list_table tbody tr {
+    border-bottom: 1px solid var(--bitacora-muted) !important;
+    transition: background-color 0.1s ease;
+}
+
+.o_list_view .o_list_table tbody tr:hover {
+    background-color: #F2EDE2 !important;
+}
+
+.o_list_view .o_list_table tbody td {
+    padding: 9px 12px !important;
+    font-size: 13px;
+    color: var(--bitacora-ink);
+}
+
+/* ==========================================================================
+   Kanban Cards
+   ========================================================================== */
+.o_kanban_view .o_kanban_record {
+    background-color: var(--bitacora-card) !important;
+    border: 1px solid var(--bitacora-border) !important;
+    border-radius: var(--bitacora-radius) !important;
+    box-shadow: var(--bitacora-shadow-sm) !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.o_kanban_view .o_kanban_record:hover {
+    border-color: var(--bitacora-senal) !important;
+    box-shadow: var(--bitacora-shadow-md) !important;
+}
+
+/* ==========================================================================
+   Badges, Dropdowns, Modals & Statusbar
+   ========================================================================== */
+.badge,
+.o_tag {
+    border-radius: 9999px !important;
+    font-family: 'JetBrains Mono', ui-monospace, monospace !important;
+    font-weight: 500 !important;
+    font-size: 11px !important;
+    padding: 3px 9px !important;
+}
+
+.badge.bg-success,
+.badge.text-bg-success {
+    background-color: var(--bitacora-ok-suave) !important;
+    color: #0E5E45 !important;
+}
+
+.badge.bg-warning,
+.badge.text-bg-warning {
+    background-color: var(--bitacora-senal-suave) !important;
+    color: #9A4212 !important;
+}
+
+.badge.bg-danger,
+.badge.text-bg-danger {
+    background-color: #FEE2E2 !important;
+    color: #991B1B !important;
+}
+
+.badge.bg-info,
+.badge.text-bg-info {
+    background-color: #E2E8F0 !important;
+    color: var(--bitacora-primary) !important;
+}
+
+.dropdown-menu {
+    background-color: var(--bitacora-card) !important;
+    border: 1px solid var(--bitacora-border) !important;
+    border-radius: var(--bitacora-radius) !important;
+    box-shadow: var(--bitacora-shadow-md) !important;
+    padding: 4px !important;
+}
+
+.dropdown-item {
+    border-radius: 4px !important;
+    font-size: 13px;
+    color: var(--bitacora-ink) !important;
+    padding: 7px 10px !important;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus,
+.dropdown-item.active {
+    background-color: var(--bitacora-senal-suave) !important;
+    color: var(--bitacora-ink) !important;
+}
+
+.modal-content {
+    background-color: var(--bitacora-card) !important;
+    border: 1px solid var(--bitacora-border) !important;
+    border-radius: var(--bitacora-radius-lg) !important;
+    box-shadow: 0 20px 25px -5px rgba(20, 29, 43, 0.16), 0 8px 10px -6px rgba(20, 29, 43, 0.1) !important;
+    overflow: hidden;
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--bitacora-border) !important;
+    background-color: var(--bitacora-card) !important;
+    padding: 14px 20px !important;
+}
+
+.modal-title {
+    font-family: 'JetBrains Mono', ui-monospace, monospace !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    letter-spacing: -0.01em;
+    color: var(--bitacora-ink) !important;
+}
+
+.modal-footer {
+    border-top: 1px solid var(--bitacora-border) !important;
+    background-color: var(--bitacora-bg) !important;
+    padding: 12px 20px !important;
+}
+
+.o_statusbar_status .o_arrow_button {
+    font-family: 'JetBrains Mono', ui-monospace, monospace !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+}
+
+.o_statusbar_status .o_arrow_button.btn-primary,
+.o_statusbar_status .o_arrow_button.o_arrow_button_current {
+    background-color: var(--bitacora-senal) !important;
+    color: #FDFBF7 !important;
+    border-color: var(--bitacora-senal) !important;
+}

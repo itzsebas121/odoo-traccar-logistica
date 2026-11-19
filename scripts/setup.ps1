@@ -10,7 +10,7 @@ $Base = "logistica_dev"
 $Modulos = @("contacts", "fleet", "sale_management", "website", "website_sale", "payment_custom",
              "logistica_base", "logistica_despacho", "logistica_traccar", "logistica_entregas", "logistica_checkout",
              "logistica_conductor", "logistica_analitica_ia")
-$ClavesSecretas = @("ODOO_DB_PASSWORD", "ODOO_ADMIN_PASSWORD", "TRACCAR_DB_PASSWORD", "TRACCAR_ADMIN_PASSWORD")
+$ClavesSecretas = @("ODOO_DB_PASSWORD", "ODOO_ADMIN_PASSWORD", "ODOO_MASTER_PASSWORD", "TRACCAR_DB_PASSWORD", "TRACCAR_ADMIN_PASSWORD", "AGENTE_SESSION_SECRET")
 
 # Ejecuta docker compose; si el comando falla, detiene el script. Devuelve su salida.
 function Invoke-Compose([string[]]$Argumentos) {
@@ -76,15 +76,17 @@ if ((Invoke-Sql $Base "SELECT to_regclass('ir_module_module') IS NOT NULL") -eq 
 $nuevos = @($Modulos | Where-Object { $instalados -notcontains $_ })
 $ya = @($Modulos | Where-Object { $instalados -contains $_ })
 
+# Con Odoo detenido: instalar/actualizar mientras el servidor corre choca con sus crons
+# ("could not serialize access due to concurrent update").
+Invoke-Compose @('stop', 'odoo') | Out-Null
 if ($nuevos.Count -gt 0) {
     Write-Host "      Instalando (-i): $($nuevos -join ', ')"
-    Invoke-Compose @('exec', '-T', 'odoo', '/entrypoint.sh', 'odoo', '-d', $Base, '-i', ($nuevos -join ','), '--without-demo=all', '--stop-after-init')
+    Invoke-Compose @('run', '--rm', '--no-deps', '-T', 'odoo', 'odoo', '-d', $Base, '-i', ($nuevos -join ','), '--load-language=es_EC', '--without-demo=all', '--stop-after-init') | Out-Null
 }
 if ($ya.Count -gt 0) {
     Write-Host "      Actualizando (-u): $($ya -join ', ')"
-    Invoke-Compose @('exec', '-T', 'odoo', '/entrypoint.sh', 'odoo', '-d', $Base, '-u', ($ya -join ','), '--stop-after-init')
+    Invoke-Compose @('run', '--rm', '--no-deps', '-T', 'odoo', 'odoo', '-d', $Base, '-u', ($ya -join ','), '--stop-after-init') | Out-Null
 }
-Invoke-Compose @('restart', 'odoo')
 Invoke-Compose @('up', '-d', '--wait')
 
 # Sincroniza la secuencia de tc_users (Traccar) con las filas existentes: evita el duplicate key de POST /api/users

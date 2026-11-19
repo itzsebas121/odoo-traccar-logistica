@@ -9,6 +9,7 @@ from odoo import fields
 from odoo.exceptions import AccessError
 from odoo.tests.common import HttpCase, TransactionCase, tagged
 
+from ..controllers import monitoreo as monitoreo_ctrl
 from ..models import traccar_server as modulo
 from ..models.logistica_traccar_util import haversine_m, knots_to_kmh
 from .test_conector import CABECERAS, _fake_traccar, _posicion, _respuesta
@@ -48,7 +49,8 @@ class _BaseMonitoreo:
             'order_line': [(0, 0, {'product_id': producto.id, 'product_uom_qty': 1})]})
         pedido.action_confirm()
         entrega = pedido.logistica_entrega_id
-        entrega.action_marcar_preparado()
+        if entrega.state == 'en_preparacion':
+            entrega.action_marcar_preparado()
         return entrega
 
     def _ruta_en_recorrido(self):
@@ -206,6 +208,7 @@ class TestMonitoreoHttp(_BaseMonitoreo, HttpCase):
 
     def setUp(self):
         super().setUp()
+        monitoreo_ctrl.CACHE.reset()
         self._preparar()
         grupos = [self.env.ref(x).id for x in ('base.group_user', 'fleet.fleet_group_manager')]
         self.env['res.users'].with_context(no_reset_password=True).create({

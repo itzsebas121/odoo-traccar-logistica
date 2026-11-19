@@ -1,0 +1,27 @@
+{
+  "_comentario": "Configuracion base de la tienda (empresa, cobertura y categorias). El seed solo carga productos y conductores, sin clientes ni pedidos de demostracion.",
+  "empresa": {
+    "name": "Mercado Andino Ambato",
+    "street": "Av. Los Chasquis y Río Payamino (campus Huachi)",
+    "city": "Ambato",
+    "zip": "180207",
+    "pais": "EC",
+    "provincia": "Tungurahua",
+    "moneda": "USD",
+    "phone": "032000000",
+    "email": "pedidos@example.com",
+    "website": "https://odoo.sebasdev.shop",
+    "logo": "imagenes/logo.png"
+  },
+  "cobertura_km": 19.5,
+  "categorias": [
+    "Comida",
+    "Bebidas",
+    "Tecnología",
+    "Celulares",
+    "Accesorios",
+    "Hogar",
+    "Cuidado personal"
+  ],
+  "clientes": []
+}
