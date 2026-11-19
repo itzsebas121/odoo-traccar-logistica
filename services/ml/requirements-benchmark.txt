@@ -1,0 +1,19 @@
+# Todas las herramientas de la comparativa de modelos (target `benchmark` del Dockerfile, servicio ml-benchmark).
+# Despues de elegir el ganador se poda: produccion (requirements.txt) queda solo con lo que el ganador necesita.
+-r requirements.txt
+# Intermitentes y estadisticos (Croston, SBA, TSB, ADIDA, AutoETS, AutoARIMA). numba 0.61.2 soporta numpy 2.2.
+statsforecast==2.0.1
+numba==0.61.2
+prophet==1.1.7
+# cmdstanpy 1.3 rompe el backend de Prophet 1.1.x (AttributeError: stan_backend)
+cmdstanpy==1.2.5
+# Gradient boosting
+# xgboost-cpu: misma libreria (import xgboost) sin las dependencias CUDA de la rueda normal.
+xgboost-cpu==2.1.4
+lightgbm==4.5.0
+catboost==1.2.8
+# Deep learning (PyTorch solo CPU: la rueda con CUDA pesa varios GB) y modelo fundacional
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1+cpu
+neuralforecast==3.0.0
+chronos-forecasting==1.4.1

@@ -1,6 +1,7 @@
 """Consultas OLAP del BI. Lee SOLO la base del DWH (rol de solo lectura); no usa Odoo."""
 import os
 import re
+from decimal import Decimal
 
 import pandas as pd
 import psycopg2
@@ -13,20 +14,21 @@ class ConfigError(RuntimeError):
     """Falta una variable de entorno obligatoria."""
 
 
-def dsn():
-    """Cadena de conexion al DWH con el rol de solo lectura. La contrasena es obligatoria y no tiene valor por defecto."""
+def params():
+    """Argumentos de conexion al DWH con el rol de solo lectura. La contrasena es obligatoria y no tiene valor por
+    defecto; viaja como argumento (no dentro de una cadena), asi que puede tener espacios o comillas."""
     password = os.environ.get("DWH_DB_PASSWORD")
     if not password:
         raise ConfigError(
             "Falta la variable de entorno obligatoria DWH_DB_PASSWORD (contrasena del rol dwh_ro). "
             "Definala en .env (vea .env.example) y vuelva a levantar el servicio bi.")
     e = os.environ.get
-    return "host=%s port=%s dbname=%s user=%s password=%s" % (
-        e("DWH_HOST", "db"), e("DWH_PORT", "5432"), e("DWH_NAME", "logistica_dwh"), e("DWH_USER", "dwh_ro"), password)
+    return dict(host=e("DWH_HOST", "db"), port=e("DWH_PORT", "5432"), dbname=e("DWH_NAME", "logistica_dwh"),
+                user=e("DWH_USER", "dwh_ro"), password=password)
 
 
 def conectar():
-    return psycopg2.connect(dsn())
+    return psycopg2.connect(**params())
 
 
 def cargar_consultas(ruta=SQL_FILE):
@@ -70,7 +72,23 @@ def consulta(conn, nombre, desde=None, hasta=None, procedencia=None):
         cols = [d[0] for d in cur.description]
         filas = cur.fetchall()
     conn.rollback()
-    return pd.DataFrame(filas, columns=cols)
+    df = pd.DataFrame(filas, columns=cols)
+    # PostgreSQL devuelve los numeric como Decimal: se pasan a float para que las graficas los traten como numeros.
+    for col in df.columns:
+        if df[col].map(lambda v: isinstance(v, Decimal)).any():
+            df[col] = df[col].astype(float)
+    return df
+
+
+def total(df, clave, col):
+    """Valor de la fila de total de un ROLLUP (la que tiene `clave` en NULL) como int o float de Python;
+    0 si no hay datos. PostgreSQL devuelve Decimal, que los indicadores del panel no aceptan."""
+    fila = df[df[clave].isna()]
+    valor = fila[col].iloc[0] if len(fila) else None
+    if valor is None or pd.isna(valor):
+        return 0
+    numero = float(valor)
+    return int(numero) if numero.is_integer() else numero
 
 
 def indicadores(conn, desde=None, hasta=None, procedencia=None):

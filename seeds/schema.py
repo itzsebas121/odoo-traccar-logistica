@@ -14,6 +14,9 @@ DIRECTORIO_DATOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dat
 ARCHIVO_ODOO = 'odoo.json'
 ARCHIVO_TRACCAR = 'traccar.json'
 ARCHIVO_SIMULACION = 'simulacion.json'
+ARCHIVO_HISTORICO = 'historico.json'
+# Caja que contiene el canton Ambato (Tungurahua): las coordenadas del historico deben caer dentro.
+CAJA_AMBATO = {'lat': (-1.45, -1.05), 'lon': (-78.95, -78.45)}
 ARCHIVO_MERCADO = 'mercado.json'
 TIPOS_CLIENTE = ('persona', 'empresa')
 
@@ -360,3 +363,132 @@ def cargar(directorio=DIRECTORIO_DATOS):
     simulacion = datos[ARCHIVO_SIMULACION]
     validar_todo(odoo, traccar, simulacion)
     return odoo, traccar, simulacion
+
+
+def _en_ambato(lat, lon, donde):
+    (lat_min, lat_max), (lon_min, lon_max) = CAJA_AMBATO['lat'], CAJA_AMBATO['lon']
+    if not (lat_min <= lat <= lat_max and lon_min <= lon <= lon_max):
+        raise ErrorEsquema(f'{donde}: la coordenada ({lat}, {lon}) queda fuera del canton Ambato')
+
+
+def _par(objeto, campo, donde, minimo, maximo=None):
+    valor = _campo(objeto, campo, donde)
+    if (not isinstance(valor, list) or len(valor) != 2
+            or any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in valor)):
+        raise ErrorEsquema(f"{donde}: '{campo}' debe ser una lista [minimo, maximo] de numeros")
+    if valor[0] > valor[1] or valor[0] < minimo or (maximo is not None and valor[1] > maximo):
+        raise ErrorEsquema(f"{donde}: '{campo}' fuera de rango ({valor})")
+    return valor
+
+
+def validar_historico(datos):
+    """historico.json: operacion, calendario, parroquias, clientes, categorias y productos."""
+    donde = ARCHIVO_HISTORICO
+    raiz = _objeto(datos, donde)
+
+    op = _objeto(_campo(raiz, 'operacion', donde), f'{donde}: operacion')
+    d_op = f'{donde}: operacion'
+    _numero(op, 'dias_ventas', d_op, minimo=1, maximo=730)
+    _numero(op, 'dias_gps', d_op, minimo=0, maximo=op['dias_ventas'])
+    _numero(op, 'semilla', d_op, minimo=0)
+    _numero(op, 'utc_offset_h', d_op, minimo=-12, maximo=14)
+    _numero(op, 'pedidos_dia_base', d_op, minimo=0, exclusivo_minimo=True)
+    _par(op, 'hora_pedidos', d_op, minimo=0, maximo=24)
+    _numero(op, 'hora_salida_ruta', d_op, minimo=0, maximo=23)
+    _numero(op, 'velocidad_kmh', d_op, minimo=1)
+    _numero(op, 'factor_via', d_op, minimo=1)
+    _par(op, 'minutos_parada', d_op, minimo=0)
+    _numero(op, 'tasa_no_entrega', d_op, minimo=0, maximo=1)
+    _lista(_campo(op, 'motivos_no_entrega', d_op), f'{d_op}: motivos_no_entrega')
+    _par(op, 'lineas_por_pedido', d_op, minimo=1)
+    _numero(op, 'intervalo_gps_s', d_op, minimo=1)
+    _numero(op, 'ruido_gps_m', d_op, minimo=0)
+    _texto(op, 'prefijo_pedido', d_op)
+
+    cal = _objeto(_campo(raiz, 'calendario', donde), f'{donde}: calendario')
+    d_cal = f'{donde}: calendario'
+    pesos = _campo(cal, 'peso_dia_semana', d_cal)
+    if (not isinstance(pesos, list) or len(pesos) != 7
+            or any(isinstance(p, bool) or not isinstance(p, (int, float)) or p < 0 for p in pesos)):
+        raise ErrorEsquema(f"{d_cal}: 'peso_dia_semana' debe tener 7 numeros no negativos (lunes a domingo)")
+    quincena = _objeto(_campo(cal, 'quincena', d_cal), f'{d_cal}: quincena')
+    _lista(_campo(quincena, 'dias', f'{d_cal}: quincena'), f'{d_cal}: quincena.dias')
+    _numero(quincena, 'factor', f'{d_cal}: quincena', minimo=0)
+    _numero(cal, 'tendencia_anual', d_cal, minimo=-1, maximo=5)
+    if not re.match(r'^\d{4}-\d{2}-\d{2}$', str(cal.get('fecha_base_tendencia', ''))):
+        raise ErrorEsquema(f"{d_cal}: 'fecha_base_tendencia' debe tener el formato AAAA-MM-DD")
+    for i, feriado in enumerate(_lista(_campo(cal, 'feriados', d_cal), f'{d_cal}: feriados')):
+        d_f = f'{d_cal}: feriados[{i}]'
+        _objeto(feriado, d_f)
+        if not re.match(r'^\d{4}-\d{2}-\d{2}$', str(feriado.get('fecha', ''))):
+            raise ErrorEsquema(f"{d_f}: 'fecha' debe tener el formato AAAA-MM-DD")
+        _texto(feriado, 'nombre', d_f)
+        _numero(feriado, 'factor', d_f, minimo=0)
+        _numero(feriado, 'factor_vispera', d_f, minimo=0)
+    _sin_repetidos([f['fecha'] for f in cal['feriados']], d_cal, 'feriados.fecha')
+
+    parroquias = _lista(_campo(raiz, 'parroquias', donde), f'{donde}: parroquias')
+    for i, p in enumerate(parroquias):
+        d_p = f'{donde}: parroquias[{i}]'
+        _objeto(p, d_p)
+        _texto(p, 'nombre', d_p)
+        if p.get('tipo') not in ('urbana', 'rural'):
+            raise ErrorEsquema(f"{d_p}: 'tipo' debe ser 'urbana' o 'rural'")
+        lat = _numero(p, 'lat', d_p, minimo=-90, maximo=90)
+        lon = _numero(p, 'lon', d_p, minimo=-180, maximo=180)
+        _en_ambato(lat, lon, d_p)
+        _numero(p, 'radio_km', d_p, minimo=0, maximo=5, exclusivo_minimo=True)
+        _numero(p, 'clientes', d_p, minimo=1)
+        _numero(p, 'peso', d_p, minimo=0, exclusivo_minimo=True)
+    _sin_repetidos([p['nombre'] for p in parroquias], donde, 'parroquias.nombre')
+
+    cli = _objeto(_campo(raiz, 'clientes', donde), f'{donde}: clientes')
+    d_cli = f'{donde}: clientes'
+    for campo in ('nombres', 'apellidos', 'tipos_tienda', 'calles'):
+        _lista(_campo(cli, campo, d_cli), f'{d_cli}: {campo}')
+    _numero(cli, 'fraccion_tiendas', d_cli, minimo=0, maximo=1)
+    _numero(cli, 'factor_tienda', d_cli, minimo=1)
+    for campo in ('prefijo_telefono', 'ciudad', 'provincia'):
+        _texto(cli, campo, d_cli)
+    total = sum(p['clientes'] for p in parroquias)
+    if len(cli['nombres']) * len(cli['apellidos']) < 2 * total:
+        raise ErrorEsquema(f'{d_cli}: hay pocas combinaciones de nombre y apellido para {total} clientes')
+
+    categorias = _lista(_campo(raiz, 'categorias', donde), f'{donde}: categorias')
+    for i, c in enumerate(categorias):
+        d_c = f'{donde}: categorias[{i}]'
+        _objeto(c, d_c)
+        _texto(c, 'nombre', d_c)
+        _texto(c, 'grupo', d_c)
+        afinidad = _objeto(_campo(c, 'afinidad', d_c), f'{d_c}: afinidad')
+        for tipo in ('urbana', 'rural'):
+            _numero(afinidad, tipo, f'{d_c}: afinidad', minimo=0)
+    nombres_cat = {c['nombre'] for c in categorias}
+    _sin_repetidos([c['nombre'] for c in categorias], donde, 'categorias.nombre')
+
+    productos = _lista(_campo(raiz, 'productos', donde), f'{donde}: productos')
+    for i, pr in enumerate(productos):
+        d_pr = f'{donde}: productos[{i}]'
+        _objeto(pr, d_pr)
+        _texto(pr, 'name', d_pr)
+        _texto(pr, 'default_code', d_pr)
+        if pr.get('categoria') not in nombres_cat:
+            raise ErrorEsquema(f"{d_pr}: la categoria {pr.get('categoria')!r} no esta en 'categorias'")
+        _numero(pr, 'list_price', d_pr, minimo=0, exclusivo_minimo=True)
+        _numero(pr, 'demanda_dia', d_pr, minimo=0, exclusivo_minimo=True)
+    _sin_repetidos([p['name'] for p in productos], donde, 'productos.name')
+    _sin_repetidos([p['default_code'] for p in productos], donde, 'productos.default_code')
+
+
+def cargar_historico(directorio=DIRECTORIO_DATOS):
+    """Lee y valida historico.json (independiente de cargar(): el sembrado basico no lo necesita)."""
+    ruta = os.path.join(directorio, ARCHIVO_HISTORICO)
+    try:
+        with open(ruta, encoding='utf-8') as fichero:
+            datos = json.load(fichero)
+    except json.JSONDecodeError as error:
+        raise ErrorEsquema(f'{ARCHIVO_HISTORICO}: JSON mal formado (linea {error.lineno}: {error.msg})') from None
+    except OSError as error:
+        raise ErrorEsquema(f'{ARCHIVO_HISTORICO}: no se puede leer ({error.strerror})') from None
+    validar_historico(datos)
+    return datos

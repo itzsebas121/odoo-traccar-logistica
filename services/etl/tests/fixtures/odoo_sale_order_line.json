@@ -1,0 +1,8 @@
+[
+  {"id": 501, "order_id": [11, "S0001"], "product_id": [30, "[P1] Producto Uno"], "product_uom_qty": 2.0, "price_unit": 10.0, "price_subtotal": 20.0, "price_total": 20.0, "display_type": false, "write_date": "2026-11-05 12:30:00"},
+  {"id": 502, "order_id": [11, "S0001"], "product_id": [31, "Producto Dos"], "product_uom_qty": 1.0, "price_unit": 12.5, "price_subtotal": 12.5, "price_total": 12.5, "display_type": false, "write_date": "2026-11-05 12:30:00"},
+  {"id": 503, "order_id": [12, "S0002"], "product_id": [30, "[P1] Producto Uno"], "product_uom_qty": 1.0, "price_unit": 10.0, "price_subtotal": 10.0, "price_total": 10.0, "display_type": false, "write_date": "2026-11-05 12:35:00"},
+  {"id": 504, "order_id": [13, "S0003"], "product_id": [31, "Producto Dos"], "product_uom_qty": 2.0, "price_unit": 12.5, "price_subtotal": 25.0, "price_total": 25.0, "display_type": false, "write_date": "2026-11-05 12:40:00"},
+  {"id": 505, "order_id": [13, "S0003"], "product_id": false, "product_uom_qty": 0.0, "price_unit": 0.0, "price_subtotal": 0.0, "price_total": 0.0, "display_type": "line_note", "write_date": "2026-11-05 12:40:00"},
+  {"id": 506, "order_id": [14, "S0004"], "product_id": [30, "[P1] Producto Uno"], "product_uom_qty": 1.0, "price_unit": 10.0, "price_subtotal": 10.0, "price_total": 10.0, "display_type": false, "write_date": "2026-11-05 12:50:00"}
+]

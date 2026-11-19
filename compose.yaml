@@ -120,18 +120,29 @@ services:
       timeout: 5s
       retries: 5
 
-  ml:
-    build: ./services/ml
+  ml: &ml
+    build:
+      context: ./services/ml
+      target: produccion
     profiles: ["analitica"]
     restart: unless-stopped
-    environment:
+    environment: &ml-env
       MODEL_DIR: /app/models
       DATA_DIR: /app/data
-      # Lectura del DWH con el rol dwh_ro (solo logistica_dwh). Vacia = no hay usuario de lectura todavia.
-      DWH_DSN: postgresql://dwh_ro:${DWH_DB_PASSWORD:-}@db:5432/logistica_dwh
+      ANALISIS_DIR: /app/analisis
+      # Conexion al DWH por partes (la clave puede tener cualquier caracter). Lectura con dwh_ro; escritura de
+      # resultados (tablas ml_*) con dwh_ml. Vacias = sin usuario todavia (ver .env.example).
+      DWH_HOST: db
+      DWH_PORT: "5432"
+      DWH_NAME: logistica_dwh
+      DWH_USER: dwh_ro
+      DWH_DB_PASSWORD: ${DWH_DB_PASSWORD:-}
+      DWH_ML_USER: dwh_ml
+      DWH_ML_PASSWORD: ${DWH_ML_PASSWORD:-}
     volumes:
       - ./services/ml/models:/app/models
       - ./services/ml/data:/app/data
+      - ./services/ml/analisis:/app/analisis
     ports:
       - "127.0.0.1:8002:8000"
     healthcheck:
@@ -140,20 +151,47 @@ services:
       timeout: 5s
       retries: 5
 
-  etl:
-    build: ./services/etl
-    profiles: ["etl"]
+  # Comparativa de modelos de demanda con TODAS las herramientas (baselines, estadisticos, ML, deep learning,
+  # fundacional). Imagen pesada; bajo demanda:
+  #   docker compose --profile benchmark run --rm ml-benchmark
+  # Deja la tabla en services/ml/analisis/comparativa_modelos.md y en ml_evaluacion_modelos del DWH.
+  ml-benchmark:
+    <<: *ml
+    build:
+      context: ./services/ml
+      target: benchmark
+    image: logistica-ml-benchmark
+    profiles: ["benchmark"]
+    restart: "no"
     depends_on:
       db:
         condition: service_healthy
     environment:
+      <<: *ml-env
+      # Pasos de entrenamiento de las redes de neuralforecast (mas = mejor ajuste y mas lento en CPU).
+      BENCH_PASOS_DL: ${BENCH_PASOS_DL:-300}
+      PROPHET_MAX_SERIES: ${PROPHET_MAX_SERIES:-800}
+    ports: []
+    healthcheck:
+      disable: true
+    command: ["python", "-m", "mlsvc.demanda.benchmark", "--source", "dwh"]
+
+  # ETL bajo demanda: `docker compose --profile etl run --rm etl <comando>` (ver services/etl/README.md).
+  etl: &etl
+    build: ./services/etl
+    image: logistica-etl
+    profiles: ["etl"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment: &etl-env
       ODOO_URL: http://odoo:8069
-      ODOO_DB: logistica_dev
+      ODOO_DB: ${ODOO_DB:-logistica_dev}
       ODOO_USER: admin
-      # OBLIGATORIA, sin valor por defecto: se toma de .env (o del entorno). Se deja sin interpolar con ":?" porque
-      # Compose evalua las variables de TODOS los servicios, aunque su perfil este inactivo, y un ":?" aqui haria
-      # fallar cualquier `docker compose` del proyecto mientras .env no la defina. Si falta, el ETL termina con
-      # un error de configuracion claro (etl.config.require).
+      # OBLIGATORIA, sin valor por defecto: ODOO_PASSWORD de .env o, si esta vacia, ODOO_ADMIN_PASSWORD. Ojo: el
+      # ":?" solo se evalua cuando ODOO_PASSWORD falta, pero entonces hace fallar CUALQUIER `docker compose` del
+      # proyecto (Compose interpola todos los servicios, aunque su perfil este inactivo). Basta con definir una de
+      # las dos en .env.
       ODOO_PASSWORD: ${ODOO_PASSWORD:-${ODOO_ADMIN_PASSWORD:?Configura ODOO_ADMIN_PASSWORD}}
       TRACCAR_URL: http://traccar:8082
       TRACCAR_USER: ${TRACCAR_ADMIN_EMAIL:-admin@logistica.local}
@@ -171,6 +209,32 @@ services:
       DWH_ETL_PASSWORD: ${DWH_ETL_PASSWORD:-}
       # Vacia = no se crea el rol de solo lectura dwh_ro
       DWH_DB_PASSWORD: ${DWH_DB_PASSWORD:-}
+      # Vacia = no se crea el rol dwh_ml (el ML no guarda la comparativa ni los pronosticos en el DWH)
+      DWH_ML_PASSWORD: ${DWH_ML_PASSWORD:-}
+      # Operacion (no secretas; vacias = valor por defecto del ETL).
+      ETL_TZ: ${ETL_TZ:-America/Guayaquil}
+      ETL_INTERVAL_MIN: ${ETL_INTERVAL_MIN:-15}
+      ETL_FULL_HOURS: ${ETL_FULL_HOURS:-24}
+      ETL_RETENTION_DAYS: ${ETL_RETENTION_DAYS:-30}
+      ETL_TRACCAR_DAYS: ${ETL_TRACCAR_DAYS:-30}
+      # Segundos de espera por cada informe de Traccar (subir con mucho historico GPS).
+      ETL_TRACCAR_TIMEOUT_S: ${ETL_TRACCAR_TIMEOUT_S:-30}
+
+  # ETL periodico: una corrida cada ETL_INTERVAL_MIN minutos. Necesita las bases creadas (`etl bootstrap`).
+  # Un fallo de una corrida se registra y se reintenta en el siguiente ciclo; el contenedor no se reinicia.
+  etl-scheduler:
+    <<: *etl
+    profiles: ["analitica"]
+    restart: unless-stopped
+    command: ["schedule"]
+    environment:
+      <<: *etl-env
+    healthcheck:
+      test: ["CMD", "python", "-m", "etl", "health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 
   seed:
     image: python:3.12-slim
@@ -243,6 +307,29 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+
+  # Historico de demostracion (Ambato): pedidos, entregas y rutas de `dias_ventas` dias en Odoo y el GPS de los
+  # ultimos `dias_gps` dias en Traccar (seeds/data/historico.json). Necesita antes `seed`. Bajo demanda:
+  #   docker compose --profile historico run --rm seed-historico [--dias N] [--sin-gps]
+  seed-historico:
+    image: python:3.12-slim
+    profiles: ["historico"]
+    depends_on:
+      odoo:
+        condition: service_healthy
+      traccar:
+        condition: service_healthy
+    working_dir: /app
+    volumes:
+      - ./:/app:ro
+    environment:
+      ODOO_URL: http://odoo:8069
+      ODOO_DB: ${ODOO_DB:-logistica_dev}
+      ODOO_USER: ${ODOO_USER:-admin}
+      ODOO_PASSWORD: ${ODOO_PASSWORD:-${ODOO_ADMIN_PASSWORD}}
+      TRACCAR_OSMAND_URL: http://traccar:5055
+      PYTHONDONTWRITEBYTECODE: "1"
+    entrypoint: ["python", "seeds/historico.py"]
 
   bi:
     build: ./services/bi

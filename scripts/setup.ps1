@@ -115,9 +115,11 @@ if (Test-Path seeds\seed.py) {
 }
 
 if ($ConAnalitica) {
-    Write-Host "[extra] Analitica (routing, ml, bi) y bootstrap del ETL"
+    Write-Host "[extra] Analitica (routing, ml, bi), bootstrap del ETL y programador"
     Invoke-Compose @('--profile', 'analitica', 'up', '-d', '--wait', 'routing', 'ml', 'bi') | Out-Null
     Invoke-Compose @('--profile', 'etl', 'run', '--rm', 'etl', 'bootstrap') | Out-Null
+    # El programador hace la primera carga completa al arrancar y luego una corrida cada ETL_INTERVAL_MIN minutos.
+    Invoke-Compose @('--profile', 'analitica', 'up', '-d', 'etl-scheduler') | Out-Null
 }
 
 Write-Host "Listo. ERP Odoo: http://localhost:8069/web/login | Traccar: http://localhost:8082" -ForegroundColor Green

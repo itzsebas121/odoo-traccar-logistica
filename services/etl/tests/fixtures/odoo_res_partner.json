@@ -1,4 +1,6 @@
 [
-  {"id": 100, "name": "Carlos", "is_driver": true, "write_date": "2026-11-05 07:00:00"},
-  {"id": 101, "name": "Luis", "is_driver": true, "write_date": "2026-11-05 07:00:00"}
+  {"id": 100, "name": "Carlos", "city": "Ambato", "is_driver": true, "write_date": "2026-11-05 07:00:00"},
+  {"id": 101, "name": "Luis", "city": "Ambato", "is_driver": true, "write_date": "2026-11-05 07:00:00"},
+  {"id": 200, "name": "Cliente A", "city": "Ambato", "is_driver": false, "write_date": "2026-11-05 07:00:00"},
+  {"id": 201, "name": "Cliente B", "city": false, "is_driver": false, "write_date": "2026-11-05 07:00:00"}
 ]

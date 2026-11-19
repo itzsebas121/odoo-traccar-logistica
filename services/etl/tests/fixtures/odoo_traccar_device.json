@@ -1,0 +1,4 @@
+[
+  {"id": 5, "name": "GPS ABC", "unique_id": "abc1234", "traccar_id": 10, "write_date": "2026-11-05 07:00:00"},
+  {"id": 6, "name": "GPS DEF", "unique_id": "def5678", "traccar_id": 11, "write_date": "2026-11-05 07:00:00"}
+]
