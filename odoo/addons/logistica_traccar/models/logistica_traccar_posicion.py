@@ -12,7 +12,8 @@ class LogisticaTraccarPosicion(models.Model):
         ondelete='cascade',
         index=True,
     )
-    vehicle_id = fields.Many2one('fleet.vehicle', string='Vehículo')
+    # Índice: el recorrido de una ruta se busca por vehículo y hora del fix (logistica.ruta._recorrido_gps).
+    vehicle_id = fields.Many2one('fleet.vehicle', string='Vehículo', index=True)
     route_id = fields.Many2one('logistica.ruta', string='Ruta activa', index=True,
                                ondelete='set null', help='Ruta en recorrido al recibir el fix.')
     traccar_position_id = fields.Integer(string='ID Posición Traccar', required=True)

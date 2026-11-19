@@ -159,7 +159,8 @@
                                     mapa.fitBounds(puntos, {padding:[20,20], maxZoom:12});
                                     window.cMapaEncuadrado = true;
                                 }
-                                document.getElementById('c-mapa-estado').textContent =
+                                // El aviso (sin GPS o sin posiciones desde la salida) reemplaza la leyenda.
+                                document.getElementById('c-mapa-estado').textContent = d.aviso ||
                                     'Línea morada: ruta planificada · línea azul: recorrido GPS real';
                     }
                     // El siguiente refresco se programa al terminar el anterior para no acumular peticiones.
