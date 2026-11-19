@@ -101,6 +101,21 @@ def dias_retencion():
     return entero("ETL_RETENTION_DAYS", 30, minimo=0)
 
 
+def _lista(name, default):
+    return tuple(x.strip() for x in (env(name) or default).split(",") if x.strip())
+
+
+def prefijos_simulados():
+    """Prefijos de client_order_ref de los pedidos sinteticos del demo (logistica_demo): su venta, su entrega y su
+    ruta se marcan SIMULADO aunque lleguen por Odoo."""
+    return _lista("ETL_PREFIJOS_SIMULADOS", "H-,HOY-")
+
+
+def rutas_simuladas():
+    """Valores de logistica.ruta.optimization_version de las rutas sinteticas del demo."""
+    return _lista("ETL_RUTAS_SIMULADAS", "historial-demo")
+
+
 def dias_ventana_traccar():
     """Dias hacia atras de la primera extraccion de Traccar (cuando no hay marca de agua)."""
     return entero("ETL_TRACCAR_DAYS", 30, minimo=1)

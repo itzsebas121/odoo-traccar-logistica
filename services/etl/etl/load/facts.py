@@ -7,7 +7,7 @@ from datetime import timedelta
 
 from psycopg2.extras import execute_values
 
-from .. import staging
+from .. import config, staging
 from ..transform import normalize as n
 from ..transform import quality as q
 from . import link
@@ -37,9 +37,17 @@ def _rechazar(scur, ctx, entidad, fuente_id, motivo, payload):
     ctx.rechazados[motivo] = ctx.rechazados.get(motivo, 0) + 1
 
 
+def procedencia_pedido(pedido, prefijos=None):
+    """SIMULADO si el pedido es del historial sintetico del demo (client_order_ref con un prefijo conocido)."""
+    ref = n.texto((pedido or {}).get("client_order_ref")) or ""
+    prefijos = config.prefijos_simulados() if prefijos is None else prefijos
+    return "SIMULADO" if any(ref.startswith(p) for p in prefijos) else "REAL"
+
+
 def _podar(dcur, tabla, columna, ids_validos):
-    """Quita los hechos REALES cuyo registro de origen ya no existe o dejo de ser valido."""
-    dcur.execute("DELETE FROM %s WHERE procedencia='REAL' AND %s <> ALL(%%s)" % (tabla, columna),
+    """Quita los hechos de Odoo cuyo registro de origen ya no existe o dejo de ser valido. Todas las filas de estas
+    tablas vienen de Odoo (las del historial del demo tambien, marcadas SIMULADO)."""
+    dcur.execute("DELETE FROM %s WHERE %s <> ALL(%%s)" % (tabla, columna),
                  (list(ids_validos),))
 
 
@@ -190,7 +198,8 @@ def _norm_ruta(r, tz):
         carga=n.parse_ts(r.get("confirmed_load_at")), inicio=n.parse_ts(r.get("started_at")),
         fin=n.parse_ts(r.get("finished_at")),
         # 0 en Odoo = todavia no se calculo el plan
-        km_plan=km or None, min_plan=mins or None, fuente_distancia=n.texto(r.get("distance_source")))
+        km_plan=km or None, min_plan=mins or None, fuente_distancia=n.texto(r.get("distance_source")),
+        procedencia="SIMULADO" if n.texto(r.get("optimization_version")) in config.rutas_simuladas() else "REAL")
 
 
 def _norm_parada(p):
@@ -235,8 +244,8 @@ def load_rutas(dcur, ctx, odoo, rutas, paradas):
             """INSERT INTO fact_rutas
                  (ruta_id_odoo, codigo, vehiculo_sk, conductor_sk, tiempo_sk, fecha, estado, carga_confirmada_utc,
                   inicio_utc, fin_utc, km_planificado, min_planificado, fuente_distancia, min_real, paradas_total,
-                  paradas_entregadas, paradas_fallidas, paradas_pendientes, lote_id)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                  paradas_entregadas, paradas_fallidas, paradas_pendientes, procedencia, lote_id)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                ON CONFLICT (ruta_id_odoo) DO UPDATE SET
                  codigo=EXCLUDED.codigo, vehiculo_sk=EXCLUDED.vehiculo_sk, conductor_sk=EXCLUDED.conductor_sk,
                  tiempo_sk=EXCLUDED.tiempo_sk, fecha=EXCLUDED.fecha, estado=EXCLUDED.estado,
@@ -245,12 +254,13 @@ def load_rutas(dcur, ctx, odoo, rutas, paradas):
                  min_planificado=EXCLUDED.min_planificado, fuente_distancia=EXCLUDED.fuente_distancia,
                  min_real=EXCLUDED.min_real, paradas_total=EXCLUDED.paradas_total,
                  paradas_entregadas=EXCLUDED.paradas_entregadas, paradas_fallidas=EXCLUDED.paradas_fallidas,
-                 paradas_pendientes=EXCLUDED.paradas_pendientes, lote_id=EXCLUDED.lote_id""",
+                 paradas_pendientes=EXCLUDED.paradas_pendientes, procedencia=EXCLUDED.procedencia,
+                 lote_id=EXCLUDED.lote_id""",
             (r["id"], r["codigo"], ctx.vehiculo.get(r["vehiculo_id"]), ctx.conductor.get(conductor),
              ensure_tiempo(dcur, ctx, r["inicio"] or r["fecha_utc"]), r["fecha"], r["estado"], r["carga"],
              r["inicio"], r["fin"], r["km_plan"], r["min_plan"], r["fuente_distancia"],
              n.minutos(r["inicio"], r["fin"]), len(estados), estados.count("entregado"),
-             estados.count("no_entregado"), estados.count("pendiente"), ctx.lote_id))
+             estados.count("no_entregado"), estados.count("pendiente"), r["procedencia"], ctx.lote_id))
         ctx.contar("fact_rutas")
     _podar(dcur, "fact_rutas", "ruta_id_odoo", rutas)
 
@@ -278,7 +288,7 @@ def medir_rutas(dcur, ctx):
            SET posiciones_gps = COALESCE(t.posiciones, 0),
                km_real = CASE WHEN t.posiciones >= 2 THEN round(t.km::numeric, 3) END
            FROM fact_rutas r2 LEFT JOIN tot t ON t.sk = r2.sk
-           WHERE r2.sk = r.sk AND r.procedencia = 'REAL'""", {"now": ctx.now})
+           WHERE r2.sk = r.sk""", {"now": ctx.now})
 
 
 def load_paradas(dcur, ctx, odoo, rutas, paradas, entregas):
@@ -296,8 +306,8 @@ def load_paradas(dcur, ctx, odoo, rutas, paradas, entregas):
             """INSERT INTO fact_paradas
                  (parada_id_odoo, ruta_id_odoo, entrega_id_odoo, vehiculo_sk, conductor_sk, cliente_sk, zona_sk,
                   tiempo_sk, orden, estado, posible_llegada_utc, llegada_utc, cierre_utc, min_en_parada,
-                  min_desde_inicio_ruta, motivo, lote_id)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                  min_desde_inicio_ruta, motivo, procedencia, lote_id)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                ON CONFLICT (parada_id_odoo) DO UPDATE SET
                  ruta_id_odoo=EXCLUDED.ruta_id_odoo, entrega_id_odoo=EXCLUDED.entrega_id_odoo,
                  vehiculo_sk=EXCLUDED.vehiculo_sk, conductor_sk=EXCLUDED.conductor_sk, cliente_sk=EXCLUDED.cliente_sk,
@@ -305,14 +315,14 @@ def load_paradas(dcur, ctx, odoo, rutas, paradas, entregas):
                  posible_llegada_utc=EXCLUDED.posible_llegada_utc, llegada_utc=EXCLUDED.llegada_utc,
                  cierre_utc=EXCLUDED.cierre_utc, min_en_parada=EXCLUDED.min_en_parada,
                  min_desde_inicio_ruta=EXCLUDED.min_desde_inicio_ruta, motivo=EXCLUDED.motivo,
-                 lote_id=EXCLUDED.lote_id""",
+                 procedencia=EXCLUDED.procedencia, lote_id=EXCLUDED.lote_id""",
             (p["id"], p["ruta_id"], p["entrega_id"], ctx.vehiculo.get(ruta["vehiculo_id"]),
              ctx.conductor.get(conductor), ctx.cliente.get(ent.get("cliente_id")),
              ctx.zona(ent.get("lat"), ent.get("lon")),
              ensure_tiempo(dcur, ctx, p["cierre"] or p["llegada"] or ruta["inicio"] or ruta["fecha_utc"]),
              p["orden"], p["estado"], p["posible_llegada"], p["llegada"], p["cierre"],
              n.minutos(p["llegada"], p["cierre"]), n.minutos(ruta["inicio"], p["cierre"] or p["llegada"]),
-             p["motivo"] if p["estado"] == "no_entregado" else None, ctx.lote_id))
+             p["motivo"] if p["estado"] == "no_entregado" else None, ruta["procedencia"], ctx.lote_id))
         cargadas.append(p["id"])
         ctx.contar("fact_paradas")
     _podar(dcur, "fact_paradas", "parada_id_odoo", cargadas)
@@ -339,6 +349,8 @@ def load_entregas(dcur, scur, ctx, odoo, rutas, paradas, entregas):
         ruta = rutas.get(p["ruta_id"])
         if p["entrega_id"] is not None and ruta is not None and ruta["estado"] not in RUTAS_SIN_EFECTO:
             paradas_de.setdefault(p["entrega_id"], []).append(p)
+    pedidos = {o["id"]: o for o in odoo.get("sale.order") or []}
+    prefijos = config.prefijos_simulados()
     eventos = {}
     for ev in odoo.get("logistica.entrega.evento") or []:
         eventos.setdefault(n.m2o_id(ev.get("entrega_id")), []).append(ev)
@@ -381,7 +393,7 @@ def load_entregas(dcur, scur, ctx, odoo, rutas, paradas, entregas):
                  (cliente_sk, vehiculo_sk, conductor_sk, tiempo_sk, zona_sk, entrega_id_odoo, ruta_id_odoo,
                   resultado, motivo, planificado_utc, completado_utc, pedido_id_odoo, estado_odoo, creado_utc,
                   limite_plan_utc, a_tiempo, intentos, procedencia, lote_id)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'REAL',%s)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                ON CONFLICT (entrega_id_odoo) DO UPDATE SET
                  cliente_sk=EXCLUDED.cliente_sk, vehiculo_sk=EXCLUDED.vehiculo_sk, conductor_sk=EXCLUDED.conductor_sk,
                  tiempo_sk=EXCLUDED.tiempo_sk, zona_sk=EXCLUDED.zona_sk, ruta_id_odoo=EXCLUDED.ruta_id_odoo,
@@ -389,11 +401,11 @@ def load_entregas(dcur, scur, ctx, odoo, rutas, paradas, entregas):
                  completado_utc=EXCLUDED.completado_utc, pedido_id_odoo=EXCLUDED.pedido_id_odoo,
                  estado_odoo=EXCLUDED.estado_odoo, creado_utc=EXCLUDED.creado_utc,
                  limite_plan_utc=EXCLUDED.limite_plan_utc, a_tiempo=EXCLUDED.a_tiempo, intentos=EXCLUDED.intentos,
-                 lote_id=EXCLUDED.lote_id""",
+                 procedencia=EXCLUDED.procedencia, lote_id=EXCLUDED.lote_id""",
             (ctx.cliente.get(e["cliente_id"]), ctx.vehiculo.get(vehiculo_id), ctx.conductor.get(conductor_id),
              ensure_tiempo(dcur, ctx, completado or planificado or e["creado"]), ctx.zona(e["lat"], e["lon"]),
              e["id"], ruta_id, resultado, motivo, planificado, completado, e["pedido_id"], e["estado"], e["creado"],
-             limite, a_tiempo, len(intentos), ctx.lote_id))
+             limite, a_tiempo, len(intentos), procedencia_pedido(pedidos.get(e["pedido_id"]), prefijos), ctx.lote_id))
         cargadas.append(e["id"])
         ctx.contar("fact_entregas")
     _podar(dcur, "fact_entregas", "entrega_id_odoo", cargadas)
@@ -413,6 +425,7 @@ def load_ventas(dcur, scur, ctx, odoo, entregas):
         return
     pedidos = {o["id"]: o for o in odoo["sale.order"]}
     entrega_de = {e["pedido_id"]: e for e in entregas.values() if e["pedido_id"] is not None}
+    prefijos = config.prefijos_simulados()
     cargadas = []
     for linea in odoo["sale.order.line"]:
         if linea.get("display_type"):      # secciones y notas: no son venta
@@ -436,8 +449,8 @@ def load_ventas(dcur, scur, ctx, odoo, entregas):
             """INSERT INTO fact_ventas
                  (linea_id_odoo, pedido_id_odoo, pedido_ref, cliente_sk, producto_sk, zona_sk, tiempo_sk,
                   fecha_pedido_utc, estado_pedido, cantidad, precio_unitario, subtotal, total, entrega_id_odoo, lote_id,
-                  lat_aprox, lon_aprox)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                  lat_aprox, lon_aprox, procedencia)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                ON CONFLICT (linea_id_odoo) DO UPDATE SET
                  pedido_id_odoo=EXCLUDED.pedido_id_odoo, pedido_ref=EXCLUDED.pedido_ref,
                  cliente_sk=EXCLUDED.cliente_sk, producto_sk=EXCLUDED.producto_sk, zona_sk=EXCLUDED.zona_sk,
@@ -445,11 +458,11 @@ def load_ventas(dcur, scur, ctx, odoo, entregas):
                  estado_pedido=EXCLUDED.estado_pedido, cantidad=EXCLUDED.cantidad,
                  precio_unitario=EXCLUDED.precio_unitario, subtotal=EXCLUDED.subtotal, total=EXCLUDED.total,
                  entrega_id_odoo=EXCLUDED.entrega_id_odoo, lote_id=EXCLUDED.lote_id,
-                 lat_aprox=EXCLUDED.lat_aprox, lon_aprox=EXCLUDED.lon_aprox""",
+                 lat_aprox=EXCLUDED.lat_aprox, lon_aprox=EXCLUDED.lon_aprox, procedencia=EXCLUDED.procedencia""",
             (v["id"], pedido["id"], n.texto(pedido.get("name")), ctx.cliente.get(n.m2o_id(pedido.get("partner_id"))),
              ctx.producto.get(v["producto_id"]), ctx.zona(lat, lon), ensure_tiempo(dcur, ctx, fecha), fecha,
              pedido.get("state"), v["cantidad"], v["precio"], v["subtotal"], v["total"], ent.get("id"), ctx.lote_id,
-             _aprox(lat), _aprox(lon)))
+             _aprox(lat), _aprox(lon), procedencia_pedido(pedido, prefijos)))
         cargadas.append(v["id"])
         ctx.contar("fact_ventas")
     _podar(dcur, "fact_ventas", "linea_id_odoo", cargadas)

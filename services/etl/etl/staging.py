@@ -54,6 +54,18 @@ def advance_watermark(cur, fuente, valor):
         (fuente, valor))
 
 
+def get_estado(cur, clave):
+    """(existe, valor) del estado guardado; valor puede ser None."""
+    cur.execute("SELECT valor FROM etl_estado WHERE clave=%s", (clave,))
+    r = cur.fetchone()
+    return (True, r[0]) if r else (False, None)
+
+
+def set_estado(cur, clave, valor):
+    cur.execute("""INSERT INTO etl_estado (clave, valor) VALUES (%s,%s)
+                   ON CONFLICT (clave) DO UPDATE SET valor=EXCLUDED.valor, actualizado_utc=now()""", (clave, valor))
+
+
 # ---------------------------------------------------------------- Odoo
 def _ultimas(cur, modelo):
     """{fuente_id: (huella, eliminado)} de la ultima version guardada de cada registro del modelo."""

@@ -16,13 +16,13 @@ MODELS = {
                                   "logistica_capacidad", "write_date"], inactivos=True),
     "product.product": dict(fields=["id", "display_name", "default_code", "categ_id", "lst_price", "write_date"],
                             inactivos=True),
-    "sale.order": dict(fields=["id", "name", "partner_id", "date_order", "state", "amount_total",
+    "sale.order": dict(fields=["id", "name", "client_order_ref", "partner_id", "date_order", "state", "amount_total",
                                "delivery_latitude", "delivery_longitude", "write_date"]),
     "sale.order.line": dict(fields=["id", "order_id", "product_id", "product_uom_qty", "price_unit",
                                     "price_subtotal", "price_total", "display_type", "write_date"]),
     "logistica.ruta": dict(fields=["id", "name", "date", "vehicle_id", "driver_id", "state", "confirmed_load_at",
                                    "started_at", "finished_at", "planned_distance_km", "planned_duration_min",
-                                   "distance_source", "write_date"]),
+                                   "distance_source", "optimization_version", "write_date"]),
     "logistica.ruta.parada": dict(fields=["id", "route_id", "sequence", "entrega_id", "state",
                                           "arrival_candidate_at", "actual_arrival_at", "completed_at",
                                           "failed_reason", "write_date"]),
@@ -67,6 +67,18 @@ class OdooSource:
 
     def model_exists(self, model):
         return bool(self._call("ir.model", "search", [("model", "=", model)], limit=1))
+
+    def contar(self, model, domain):
+        """search_count (incluye archivados no: cuenta lo activo, como lo ve el usuario)."""
+        return self._call(model, "search_count", list(domain))
+
+    def parametro(self, clave):
+        """Valor de un ir.config_parameter, o None si no existe o el usuario no puede leerlo."""
+        try:
+            filas = self._call("ir.config_parameter", "search_read", [("key", "=", clave)], fields=["value"], limit=1)
+        except xmlrpc.client.Fault:
+            return None
+        return filas[0]["value"] if filas else None
 
     def fetch(self, model, since=None):
         """Filas del modelo (todas las paginas); None si el modelo o un campo que su dominio exige no existe.

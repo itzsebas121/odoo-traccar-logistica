@@ -58,7 +58,7 @@ export default function App() {
           <BarraLateral vista={vista} alCambiar={cambiarVista} usuario={usuario} alSalir={salir} />
           <main className="relative min-h-0 min-w-0 flex-1">
             {vista === 'chat' && <Chat modelo={usuario.modelo} alSesionCaducada={sesionCaducada} />}
-            {vista === 'tablero' && <Tablero />}
+            {vista === 'tablero' && <Tablero alSesionCaducada={sesionCaducada} />}
             {vista === 'basedatos' && <BaseDeDatos alSesionCaducada={sesionCaducada} />}
           </main>
         </div>

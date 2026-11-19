@@ -13,7 +13,7 @@ import argparse
 import sys
 from datetime import datetime, timedelta, timezone
 
-from . import config, db, pipeline, scheduler, simulate, staging
+from . import calidad, config, db, pipeline, scheduler, simulate, staging
 
 
 # ---------------------------------------------------------------- fuentes
@@ -42,6 +42,8 @@ def _sources():
 
 
 def _resumen(modo, conteos):
+    if conteos.get("motivo_full"):
+        modo = "full (pedida %s; cambio en Odoo: %s)" % (modo, conteos["motivo_full"])
     return "ETL %s: extraidos=%s cargados=%s rechazados=%s omitidos=%s" % (
         modo, conteos["extraidos"], conteos["cargados"], conteos["rechazados"] or "ninguno",
         conteos["omitidos"] or "ninguno")
@@ -128,6 +130,8 @@ def cmd_report(a):
                 duracion = "%.1fs" % (fin - inicio).total_seconds() if fin else "en curso"
                 print("  lote %-4d %-11s %-8s %s  %s" % (lote, modo, estado, inicio.strftime("%Y-%m-%d %H:%M:%SZ"),
                                                          duracion))
+                if conteos.get("motivo_full"):
+                    print("       completa por: %s" % conteos["motivo_full"])
                 if conteos.get("cargados"):
                     print("       cargados:   %s" % conteos["cargados"])
                 if conteos.get("rechazados"):
@@ -148,7 +152,34 @@ def cmd_report(a):
                 print("  %-32s %s" % (fuente, valor.strftime("%Y-%m-%d %H:%M:%SZ")))
     finally:
         conn.close()
+    if not a.sin_conteos:
+        _reporte_calidad()
     return 0
+
+
+def _reporte_calidad():
+    """Conteos del DWH frente a Odoo y cobertura del vinculo GPS. Si falta algo, avisa y no falla el reporte."""
+    import psycopg2
+    try:
+        dwh_c = psycopg2.connect(**config.dwh_params())
+    except Exception as exc:
+        print("== Conteos: DWH no disponible (%s)" % exc)
+        return
+    try:
+        with dwh_c.cursor() as cur:
+            dwh = calidad.conteos_dwh(cur)
+    finally:
+        dwh_c.close()
+    odoo = {}
+    try:
+        from .extract.odoo import OdooSource
+        fuente = OdooSource(config.env("ODOO_URL", "http://odoo:8069"), config.env("ODOO_DB", "logistica_dev"),
+                            config.env("ODOO_USER", "admin"), config.require("ODOO_PASSWORD"))
+        odoo = calidad.conteos_odoo(fuente)
+    except Exception as exc:
+        print("AVISO: Odoo no disponible para comparar (%s)" % exc, file=sys.stderr)
+    for linea in calidad.lineas(dwh, odoo):
+        print(linea)
 
 
 def cmd_purge(a):
@@ -198,6 +229,7 @@ def main(argv=None):
     sub.add_parser("schedule", help="corre periodicamente (ETL_INTERVAL_MIN)").set_defaults(fn=cmd_schedule)
     rep = sub.add_parser("report", help="ultimas corridas, rechazos y marcas de agua")
     rep.add_argument("--lotes", type=int, default=10)
+    rep.add_argument("--sin-conteos", action="store_true", help="no compara el DWH con Odoo")
     rep.set_defaults(fn=cmd_report)
     p = sub.add_parser("purge", help="aplica la retencion del crudo de staging")
     p.add_argument("--dias", type=int, default=None, help="por defecto ETL_RETENTION_DAYS")

@@ -95,3 +95,13 @@ def test_dwh_ro_no_escribe_tablas_ml(dbs_roles):
             cur.execute("insert into ml_unidad_espacial (tipo, unidad_id) values ('zona','x')")
     finally:
         ro.close()
+
+
+def test_vista_de_lineas_de_venta_cuadra_con_las_ventas(stg_con, dwh_con, odoo, traccar):
+    """v_bi_lineas_venta (base de los filtros del tablero) tiene las mismas ventas que v_bi_ventas_diarias y cuenta cada
+    pedido una sola vez aunque tenga varias lineas."""
+    correr(stg_con, dwh_con, "full", odoo, traccar)
+    assert q1(dwh_con, "select sum(importe) from v_bi_lineas_venta") == q1(dwh_con, "select sum(importe) from v_bi_ventas_diarias")
+    assert q1(dwh_con, "select sum(unidades) from v_bi_lineas_venta") == q1(dwh_con, "select sum(unidades) from v_bi_ventas_diarias")
+    assert q1(dwh_con, "select count(distinct pedido_id_odoo) from v_bi_lineas_venta") == q1(
+        dwh_con, "select count(*) from v_bi_pedidos")

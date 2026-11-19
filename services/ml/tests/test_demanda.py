@@ -98,15 +98,74 @@ def test_benchmark_compara_y_elige(ventas, tmp_path):
     t = res["tabla"]
     assert set(t["modelo"]) == set(RAPIDOS)
     assert (t["estado"] == "ok").all(), t[t["estado"] != "ok"][["modelo", "detalle"]]
-    ref = t[(t["modelo"] == "estacional_7") & (t["unidad_espacial"] == "kmeans")]["wape"].iloc[0]
+    km = t[t["unidad_espacial"] == "kmeans"]
+    mejor_baseline = km[km["familia"] == "baseline"]["wape_7d"].min()
     el = res["elegido"]
     assert el is not None and el["unidad_espacial"] == "kmeans"      # zona solo es referencia
-    assert el["wape"] < ref                                          # le gana al estacional ingenuo
-    assert t["elegido"].sum() == 1
+    assert el["wape_7d"] <= mejor_baseline                           # nunca peor que el mejor baseline
+    assert t["elegido"].sum() == 1 and el["regla"] == res["motivo"]
+    assert t.loc[t["estado"] == "ok", ["wape_7d_zona", "wape_7d_total", "mejora_pct"]].notna().all().all()
+    # agregar no puede empeorar el error: total <= zona <= serie
+    ok = t[t["estado"] == "ok"]
+    assert (ok["wape_7d_total"] <= ok["wape_7d_zona"] + 1e-9).all()
+    assert (ok["wape_7d_zona"] <= ok["wape_7d"] + 1e-9).all()
     benchmark.guardar_archivos(res, tmp_path)
     md = (tmp_path / "comparativa_modelos.md").read_text(encoding="utf-8")
     assert "Modelo elegido" in md and el["modelo"] in md
     assert json.loads((tmp_path / "comparativa_modelos.json").read_text(encoding="utf-8"))["elegido"]["modelo"] == el["modelo"]
+
+
+def _tabla(filas):
+    base = dict(corrida_id="c", procedencia="REAL", estado="ok", seg_entrenar=1.0, seg_predecir=0.0, series=10,
+                wape_7d_zona=None, sesgo=0.0)
+    cols = benchmark.COLUMNAS
+    return pd.DataFrame([dict(base, **f) for f in filas]).reindex(columns=cols)
+
+
+def test_elegir_compara_con_el_mejor_baseline():
+    t = _tabla([
+        dict(modelo="estacional_7", familia="baseline", unidad_espacial="kmeans", wape_7d=1.00),
+        dict(modelo="media_dia_semana_8", familia="baseline", unidad_espacial="kmeans", wape_7d=0.52),
+        dict(modelo="lgbm", familia="ml_arboles", unidad_espacial="kmeans", wape_7d=0.517)])
+    tabla, final, motivo = benchmark.elegir(t, mejora_min=0.03)
+    # lgbm le gana a estacional_7 pero no mejora 3 % al mejor baseline: se elige el baseline
+    assert final["modelo"] == "media_dia_semana_8" and "baseline" in motivo
+    assert tabla.set_index("modelo").loc["lgbm", "mejora_pct"] == pytest.approx(0.58, abs=0.01)
+
+
+def test_elegir_excluye_modelos_con_mucho_sesgo():
+    t = _tabla([
+        dict(modelo="naive", familia="baseline", unidad_espacial="kmeans", wape_7d=1.0),
+        dict(modelo="casi_cero", familia="deep_learning", unidad_espacial="kmeans", wape_7d=0.6, sesgo=-0.9),
+        dict(modelo="lgbm", familia="ml_arboles", unidad_espacial="kmeans", wape_7d=0.8, sesgo=-0.1)])
+    _, final, motivo = benchmark.elegir(t)
+    assert final["modelo"] == "lgbm" and "20.0 %" in motivo
+
+
+def test_elegir_unidad_por_error_a_nivel_zona():
+    """h3 tiene peor WAPE 7d por serie (mas fina) pero mejor al sumar a zona: gana h3."""
+    t = _tabla([
+        dict(modelo="naive", familia="baseline", unidad_espacial="h3:8", wape_7d=1.2, wape_7d_zona=0.9, series=40),
+        dict(modelo="lgbm", familia="ml_arboles", unidad_espacial="h3:8", wape_7d=0.9, wape_7d_zona=0.40, series=40),
+        dict(modelo="naive", familia="baseline", unidad_espacial="dbscan", wape_7d=0.9, wape_7d_zona=0.8, series=10),
+        dict(modelo="lgbm", familia="ml_arboles", unidad_espacial="dbscan", wape_7d=0.5, wape_7d_zona=0.45,
+             series=10),
+        dict(modelo="naive", familia="baseline", unidad_espacial="zona", wape_7d=0.5, wape_7d_zona=0.5, series=4),
+        dict(modelo="lgbm", familia="ml_arboles", unidad_espacial="zona", wape_7d=0.3, wape_7d_zona=0.3, series=4)])
+    _, final, _ = benchmark.elegir(t)
+    assert (final["modelo"], final["unidad_espacial"]) == ("lgbm", "h3:8")
+
+
+def test_elegir_empate_a_nivel_zona_prefiere_mas_series():
+    t = _tabla([
+        dict(modelo="naive", familia="baseline", unidad_espacial="kmeans", wape_7d=1.0, wape_7d_zona=0.9, series=8),
+        dict(modelo="lgbm", familia="ml_arboles", unidad_espacial="kmeans", wape_7d=0.6, wape_7d_zona=0.500,
+             series=8),
+        dict(modelo="naive", familia="baseline", unidad_espacial="dbscan", wape_7d=1.0, wape_7d_zona=0.9, series=30),
+        dict(modelo="lgbm", familia="ml_arboles", unidad_espacial="dbscan", wape_7d=0.7, wape_7d_zona=0.505,
+             series=30)])
+    _, final, _ = benchmark.elegir(t)
+    assert final["unidad_espacial"] == "dbscan"
 
 
 def test_modelo_sin_libreria_se_omite(ventas, monkeypatch):
@@ -164,3 +223,78 @@ def test_api_demanda_sin_modelo_503(tmp_path):
     c = TestClient(create_app(tmp_path, tmp_path))
     assert c.post("/demanda/predict", json={"producto_sk": 1, "lat": -1.24, "lon": -78.62}).status_code == 503
     assert c.get("/demanda/comparativa").status_code == 503
+
+
+def test_elegir_solo_modelos_que_el_servidor_puede_usar_sin_entrenar():
+    t = _tabla([
+        dict(modelo="naive", familia="baseline", unidad_espacial="kmeans", wape_7d=1.0),
+        dict(modelo="auto_ets", familia="estadistico", unidad_espacial="kmeans", wape_7d=0.5),
+        dict(modelo="lightgbm_tweedie", familia="ml_arboles", unidad_espacial="kmeans", wape_7d=0.6)])
+    _, final, _ = benchmark.elegir(t)
+    assert final["modelo"] == "lightgbm_tweedie"
+
+
+# ---------------------------------------------------------------- servidor: predecir sin entrenar
+def _ventas_servidor(ventas, desfase=100):
+    """Mismas ventas, pero el DWH del servidor numera los productos distinto (mismo id de Odoo)."""
+    return ventas.assign(producto_sk=ventas["producto_sk"] + desfase)
+
+
+def test_paquete_trae_lo_necesario_para_predecir(entrenado):
+    _, paq = entrenado
+    assert paq["estimador"] is not None and paq["columnas"]
+    assert set(paq["versiones"]) >= {"python", "scikit-learn", "lightgbm", "pandas", "numpy"}
+    assert {"unique_id", "producto_sk", "unidad_id"} <= set(paq["info"].columns)
+
+
+def test_predecir_no_entrena_y_traduce_productos(entrenado, ventas, monkeypatch):
+    from mlsvc.demanda import predecir as P
+    _, paq = entrenado
+
+    def prohibido(*a, **k):
+        raise AssertionError("el servidor no debe entrenar")
+    monkeypatch.setattr(type(paq["estimador"]), "fit", prohibido)
+    pred = P.predecir(paq, _ventas_servidor(ventas))
+    pron = pred["pronostico"]
+    assert pron["ds"].nunique() == HORIZONTE
+    assert set(pron["producto_sk"]) <= set(ventas["producto_sk"] + 100)        # sk del DWH del servidor
+    assert (pron["p10"] <= pron["yhat"] + 1e-9).all() and (pron["yhat"] <= pron["p90"] + 1e-9).all()
+    # con los mismos datos, el mismo estimador da el mismo pronostico que se calculo al entrenar
+    ref = paq["pronostico"].set_index(["unique_id", "ds"])["yhat"]
+    got = pron.set_index(["unique_id", "ds"])["yhat"]
+    assert np.allclose(got.loc[ref.index].to_numpy(), ref.to_numpy(), atol=1e-6)
+    assert len(pred["backtest"]) and pred["backtest"]["y"].notna().all()
+    assert pred["model_version"].startswith(paq["model_version"] + "+")
+
+
+def test_predecir_rechaza_versiones_distintas(entrenado, ventas):
+    from mlsvc.demanda import predecir as P
+    _, paq = entrenado
+    otro = dict(paq, versiones=dict(paq["versiones"], **{"scikit-learn": "0.0.1"}))
+    with pytest.raises(P.VersionIncompatible, match="scikit-learn"):
+        P.predecir(otro, ventas)
+
+
+def test_api_usa_la_prediccion_del_servidor(entrenado, ventas, tmp_path):
+    import shutil
+    import joblib
+    from mlsvc.demanda import predecir as P
+    d, paq = entrenado
+    shutil.copy(d / "demanda.joblib", tmp_path / "demanda.joblib")
+    c = TestClient(create_app(tmp_path, tmp_path))
+    h = c.get("/demanda/health").json()
+    assert h["status"] == "ok" and h["prediccion_servidor"] is None and "predecir" in h["aviso"]
+    pred = P.predecir(paq, _ventas_servidor(ventas))
+    joblib.dump(pred, tmp_path / "demanda_prediccion.joblib")
+    h = c.get("/demanda/health").json()
+    assert h["prediccion_servidor"]["model_version"] == pred["model_version"]
+    r = c.post("/demanda/predict", json={"producto_sk": 101, "lat": -1.2401, "lon": -78.6201})
+    assert r.status_code == 200, r.text
+    assert r.json()["origen"] == "servidor" and r.json()["producto_sk"] == 1
+
+
+def test_api_sin_modelo_avisa(tmp_path):
+    c = TestClient(create_app(tmp_path, tmp_path))
+    h = c.get("/demanda/health").json()
+    assert h["model_loaded"] is False and "entrena en local" in h["aviso"]
+    assert c.post("/demanda/predict", json={"producto_sk": 1, "lat": -1.24, "lon": -78.62}).status_code == 503

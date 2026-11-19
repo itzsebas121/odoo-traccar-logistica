@@ -267,8 +267,9 @@ GROUP BY tipo_registro, fecha
 ORDER BY fecha, tipo_registro;
 
 -- name: comparativa_modelos
--- Tabla comparativa de la ultima corrida del benchmark (ordenada por WAPE dentro de cada unidad y procedencia).
-SELECT procedencia, unidad_espacial, puesto, modelo, familia, libreria, estado, wape_7d, wape, mae, rmse, mase, sesgo,
+-- Tabla comparativa de la ultima corrida del benchmark (ordenada por WAPE 7d dentro de cada unidad y procedencia).
+SELECT procedencia, unidad_espacial, puesto, modelo, familia, libreria, estado, wape_7d, wape_7d_zona, wape_7d_total,
+       mejora_pct, wape, mae, rmse, mase, sesgo,
        seg_entrenar, mb_dependencias, elegido, detalle
 FROM v_bi_comparativa_modelos
 WHERE (%(proc)s::text[] IS NULL OR TRUE)

@@ -30,6 +30,10 @@ class FixtureOdoo:
             data = {m: _load("odoo_%s.json" % m.replace(".", "_")) for m in MODELS}
         self.data = data
         self.pedidos = []      # (modelo, since) de cada llamada
+        self.parametros = {}   # ir.config_parameter: clave -> valor
+
+    def parametro(self, clave):
+        return self.parametros.get(clave)
 
     def fetch(self, model, since=None):
         self.pedidos.append((model, since))

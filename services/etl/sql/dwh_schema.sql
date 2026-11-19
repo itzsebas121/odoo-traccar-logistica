@@ -225,6 +225,11 @@ CREATE TABLE IF NOT EXISTS ml_evaluacion_modelos (
     UNIQUE (corrida_id, modelo, unidad_espacial, procedencia)
 );
 ALTER TABLE ml_evaluacion_modelos ADD COLUMN IF NOT EXISTS wape_7d numeric(10,4);
+-- WAPE 7d tras sumar las predicciones a producto x zona y a producto (nivel comun entre unidades espaciales), y
+-- cuanto mejora (%) el WAPE 7d frente al mejor baseline de la misma unidad y procedencia.
+ALTER TABLE ml_evaluacion_modelos ADD COLUMN IF NOT EXISTS wape_7d_zona numeric(10,4);
+ALTER TABLE ml_evaluacion_modelos ADD COLUMN IF NOT EXISTS wape_7d_total numeric(10,4);
+ALTER TABLE ml_evaluacion_modelos ADD COLUMN IF NOT EXISTS mejora_pct numeric(8,2);
 -- Unidades espaciales con que se agrega la demanda (celdas H3, clusters o zonas): para dibujar el mapa.
 CREATE TABLE IF NOT EXISTS ml_unidad_espacial (
     tipo text NOT NULL,             -- h3:8, kmeans:10, dbscan, zona
@@ -278,3 +283,4 @@ CREATE INDEX IF NOT EXISTS ix_fact_rec_ruta ON fact_recorridos (ruta_id_odoo);
 CREATE INDEX IF NOT EXISTS ix_fact_ent_recorrido ON fact_entregas (recorrido_sk);
 CREATE INDEX IF NOT EXISTS ix_fact_ven_fecha ON fact_ventas (fecha_pedido_utc);
 CREATE INDEX IF NOT EXISTS ix_ml_pron_fecha ON ml_pronostico_demanda (fecha_objetivo);
+CREATE INDEX IF NOT EXISTS ix_ml_pron_version ON ml_pronostico_demanda (tipo_registro, model_version);

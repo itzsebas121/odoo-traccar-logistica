@@ -44,6 +44,8 @@ Códigos de salida: `0` correcto, `1` fallo, `2` falta configuración, `3` ya ha
 | `ETL_RETENTION_DAYS` | 30 | Días que se conserva el crudo de staging. 0 = no se borra. |
 | `ETL_TRACCAR_DAYS` | 30 | Días hacia atrás de la primera lectura de Traccar. |
 | `ETL_TZ` | America/Guayaquil | Zona horaria de la operación. |
+| `ETL_PREFIJOS_SIMULADOS` | `H-,HOY-` | Prefijos de `client_order_ref` de los pedidos sintéticos del demo: su venta y su entrega se cargan `SIMULADO`. |
+| `ETL_RUTAS_SIMULADAS` | `historial-demo` | `optimization_version` de las rutas sintéticas del demo: la ruta y sus paradas se cargan `SIMULADO`. |
 
 ## Cómo funciona
 
@@ -93,6 +95,7 @@ Si un modelo de Odoo no existe todavía, o una de las dos fuentes no responde, s
 
 - **Incremental.** Odoo: registros con `write_date` posterior a la marca de agua de cada modelo. Traccar: posiciones desde la última vista (menos 10 minutos de solape) y viajes desde la marca de viajes. Esa marca es el fin más tardío visto, rechazados incluidos, y se retiene en el inicio de cualquier viaje que siga en curso.
 - **Completa.** Vuelve a leer todo. Es la única que detecta registros **borrados** en Odoo, y los quita del DWH. El programador hace una cada `ETL_FULL_HOURS`.
+- **Incremental que pasa a completa.** El historial del demo (`logistica_demo`, `SEED_HISTORIAL=true`) reescribe `create_date` y `write_date` al pasado, así que lo sembrado queda por detrás de la marca de agua y una incremental no lo vería. El demo anota en `ir.config_parameter` `logistica_demo.historial_hasta` el último día cargado; el ETL guarda ese valor en `etl_estado` (staging) y, si cambió desde la última corrida correcta, la incremental se ejecuta como completa (el motivo sale en el resumen y en `etl report`). Igual conviene correr `etl run --mode full` justo después de sembrar.
 
 Staging guarda una versión nueva de un registro de Odoo solo cuando su contenido cambia. Los hechos de Odoo se recalculan en cada corrida a partir del estado completo, así que un cambio en una ruta también actualiza sus entregas y paradas.
 
@@ -171,6 +174,7 @@ Las dimensiones son de tipo 1: el valor nuevo reemplaza al anterior. Todas las f
   - Una ruta sin conductor en Odoo toma el conductor actual del vehículo.
 - **Dispositivo del vehículo.** `fleet.vehicle.traccar_device_id` apunta a un registro `traccar.device` de Odoo; el id que usa Traccar es el campo `traccar_id` de ese registro. Si el vehículo no tiene dispositivo en Odoo, se busca en Traccar uno cuyo nombre sea la placa.
 - **Ventas.** Solo pedidos en estado `sale` o `done`. Si un pedido se cancela, sus líneas salen del DWH.
+- **Historial del demo.** Los pedidos `H-*` y `HOY-*` del módulo `logistica_demo` son sintéticos aunque lleguen por Odoo: `fact_ventas` y `fact_entregas` los cargan `SIMULADO`, y las rutas `historial-demo` (con sus paradas) también. Esas rutas se miden con el GPS y se vinculan con sus recorridos igual que las reales; los recorridos de Traccar conservan `REAL` en `fact_recorridos`, pero `v_bi_recorridos` y `v_bi_conductor_resumen` muestran `SIMULADO` cuando el recorrido cae en una ruta del demo. `fact_entregas.intentos` cuenta las paradas de la entrega en rutas no canceladas (el campo `intentos` de Odoo cuenta solo los «No entregado» y no se usa).
 - **Datos simulados.** Llevan `procedencia = 'SIMULADO'` y vehículos `SIM-00x`. Nunca se mezclan con los reales sin esa marca. La jornada simulada va de 07:00 a 21:00 en hora local (`ETL_TZ`) y en el DWH se guarda en UTC. Cada día de calendario se genera siempre igual, se corra con la ventana que sea (`--dias`) y el día que sea: cada (semilla, vehículo, día) tiene su propio generador. Dentro de los días que regenera, `simulate` quita los SIMULADO que ya no corresponden, por ejemplo los de otra semilla o los de la versión anterior, que generaba la jornada en UTC y desplazaba 5 horas el patrón por franja.
 
 ## Calidad de datos
@@ -189,7 +193,7 @@ Lo que no pasa una regla **no llega al DWH**: queda en la tabla `rechazados` de 
 
 Además: los duplicados se cargan una sola vez; las velocidades pasan de nudos a km/h y las distancias de metros a km; las fechas con cualquier desfase horario se guardan en UTC.
 
-Cuando un dato de Odoo rechazado se corrige, su rechazo queda marcado como resuelto en la corrida siguiente. Una posición o un viaje de Traccar rechazado queda resuelto cuando se carga más tarde. Pasa, por ejemplo, cuando el vehículo recibe su dispositivo y la corrida completa vuelve a traer los datos. `etl report` muestra solo los que siguen sin resolver. El panel BI muestra los conteos por corrida en la pestaña «Calidad del ETL».
+Cuando un dato de Odoo rechazado se corrige, su rechazo queda marcado como resuelto en la corrida siguiente. Una posición o un viaje de Traccar rechazado queda resuelto cuando se carga más tarde. Pasa, por ejemplo, cuando el vehículo recibe su dispositivo y la corrida completa vuelve a traer los datos. `etl report` muestra solo los que siguen sin resolver, y al final compara los conteos del DWH con Odoo (pedidos confirmados, pedidos del demo, entregas, rutas) y la cobertura del vínculo entrega-GPS (`--sin-conteos` lo omite). Una diferencia suele deberse a filas rechazadas. El panel BI muestra los conteos por corrida en la pestaña «Calidad del ETL».
 
 ## Límites conocidos
 

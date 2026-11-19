@@ -9,6 +9,10 @@ comparativa, usa lightgbm_tweedie con h3:8 (el ganador esperado segun la literat
 2. Reentrena con todo el historico y pronostica los 7 dias siguientes al ultimo dia con ventas.
 3. Guarda models/demanda.joblib y models/demanda_metrics.json de forma atomica (temporal + os.replace) y, si
    DWH_ML_PASSWORD esta definida, escribe ml_pronostico_demanda (pronostico y backtest) y ml_unidad_espacial.
+
+Se corre EN LOCAL (imagen del perfil benchmark, mismas versiones que produccion). El paquete lleva el estimador ya
+ajustado, las series, el asignador espacial, las bandas y las versiones de las librerias: en el servidor,
+`python -m mlsvc.demanda.predecir` lo usa con los datos del DWH del servidor sin entrenar nada.
 """
 import argparse
 import hashlib
@@ -23,8 +27,9 @@ import numpy as np
 import pandas as pd
 
 from . import HORIZONTE, datos, espacial, metricas, panel
-from .modelos import POR_NOMBRE
+from .modelos import POR_NOMBRE, servible
 
+LIBRERIAS = ("scikit-learn", "lightgbm", "pandas", "numpy", "joblib")
 POR_DEFECTO = {"modelo": "lightgbm_tweedie", "unidad_espacial": "h3:8", "procedencia": "TODAS"}
 
 
@@ -40,6 +45,19 @@ def _atomico(ruta, escribir):
             os.remove(tmp)
 
 
+def versiones():
+    """Versiones de python y de las librerias que hacen falta para cargar el estimador (pickle)."""
+    import platform
+    from importlib import metadata
+    out = {"python": platform.python_version()}
+    for lib in LIBRERIAS:
+        try:
+            out[lib] = metadata.version(lib)
+        except metadata.PackageNotFoundError:
+            out[lib] = None
+    return out
+
+
 def eleccion(analisis_dir):
     f = pathlib.Path(analisis_dir) / "comparativa_modelos.json"
     if f.exists():
@@ -52,6 +70,9 @@ def eleccion(analisis_dir):
 def entrenar(ventas, modelo, unidad, procedencia, model_dir, ctx=None):
     ctx = dict(ctx or {}, semilla=42)
     m = POR_NOMBRE[modelo]
+    if not servible(modelo):
+        raise SystemExit("El modelo %s se ajusta al predecir (modelo por serie): el servidor no podria usarlo sin "
+                         "entrenar. Elija un baseline o un modelo tabular global." % modelo)
     if not m.disponible():
         raise SystemExit("El modelo %s necesita %s, que no esta instalado en esta imagen." % (
             modelo, ", ".join(m.modulos)))
@@ -76,7 +97,9 @@ def entrenar(ventas, modelo, unidad, procedencia, model_dir, ctx=None):
 
     # 2. modelo con todo el historico
     fechas = panel.futuro(pnl)
+    ctx["_nombre"] = modelo
     pron = m.fn(pnl, fechas, info, ctx)
+    ajustado = ctx.get("_modelos_ajustados", {}).get(modelo)
     pron["paso"] = (pron["ds"] - fechas[0]).dt.days
     pron["p10"] = np.clip(pron["yhat"] + pron["paso"].map(lambda k: bandas.get(k, (0, 0))[0]), 0, None)
     pron["p90"] = np.clip(pron["yhat"] + pron["paso"].map(lambda k: bandas.get(k, (0, 0))[1]), 0, None)
@@ -94,9 +117,14 @@ def entrenar(ventas, modelo, unidad, procedencia, model_dir, ctx=None):
                    corte_backtest=str(inicio.date()), ultimo_dia=str(pnl["ds"].max().date()),
                    series=int(info.shape[0]), unidades=len(geo), lineas_venta=int(len(v)),
                    espacial=asign.describir(), bandas_p10_p90=bandas)
-    paquete = {"model_version": version, "modelo": modelo, "unidad": unidad, "procedencia": procedencia,
-               "asignador": asign, "pronostico": pron, "backtest": bt, "productos": productos,
-               "unidades": geo, "metrics": metrics}
+    metrics["versiones"] = versiones()
+    paquete = {"model_version": version, "modelo": modelo, "familia": m.familia, "unidad": unidad,
+               "procedencia": procedencia, "asignador": asign, "pronostico": pron, "backtest": bt,
+               "productos": productos, "unidades": geo, "metrics": metrics,
+               # lo que necesita predecir.py en el servidor (sin entrenar)
+               "estimador": ajustado[0] if ajustado else None, "columnas": ajustado[1] if ajustado else None,
+               "info": info, "centros": ctx["centros"], "bandas": bandas, "versiones": metrics["versiones"],
+               "ultimo_dia": str(pnl["ds"].max().date())}
     model_dir = pathlib.Path(model_dir)
     model_dir.mkdir(parents=True, exist_ok=True)
     _atomico(model_dir / "demanda.joblib", lambda t: joblib.dump(paquete, t))

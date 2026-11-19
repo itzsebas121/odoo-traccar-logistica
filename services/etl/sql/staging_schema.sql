@@ -22,6 +22,14 @@ CREATE TABLE IF NOT EXISTS watermark (
     actualizado_utc timestamptz NOT NULL DEFAULT now()
 );
 
+-- Valores de las fuentes que el ETL recuerda entre corridas (p. ej. logistica_demo.historial_hasta de Odoo: si
+-- cambia, el demo reescribio fechas al pasado y la corrida siguiente debe ser completa).
+CREATE TABLE IF NOT EXISTS etl_estado (
+    clave           text PRIMARY KEY,
+    valor           text,
+    actualizado_utc timestamptz NOT NULL DEFAULT now()
+);
+
 -- Historial de versiones de cada registro de Odoo: una fila nueva solo cuando el contenido cambia (huella).
 -- La transformacion lee la ultima version de cada (modelo, fuente_id). eliminado = ya no existe en Odoo.
 CREATE TABLE IF NOT EXISTS odoo_raw (

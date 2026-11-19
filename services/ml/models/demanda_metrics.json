@@ -1,0 +1,60 @@
+{
+  "mae": 0.6851629913710451,
+  "rmse": 1.3917096768164625,
+  "wape": 1.061849925705795,
+  "mase": 0.860572371642576,
+  "sesgo": -0.019687964338781574,
+  "modelo": "media_dia_semana_8",
+  "familia": "baseline",
+  "libreria": "propio (numpy)",
+  "unidad_espacial": "dbscan",
+  "procedencia": "REAL",
+  "model_version": "20261119143010-media_dia_semana_8-12ada628",
+  "horizonte_dias": 7,
+  "corte_backtest": "2026-11-10",
+  "ultimo_dia": "2026-11-16",
+  "series": 298,
+  "unidades": 10,
+  "lineas_venta": 14788,
+  "espacial": {
+    "tipo": "dbscan"
+  },
+  "bandas_p10_p90": {
+    "0": [
+      -0.875,
+      0.0
+    ],
+    "1": [
+      -0.875,
+      0.5
+    ],
+    "2": [
+      -1.0,
+      0.4125000000000014
+    ],
+    "3": [
+      -1.1624999999999996,
+      1.5
+    ],
+    "4": [
+      -1.0374999999999996,
+      1.9125000000000014
+    ],
+    "5": [
+      -1.0374999999999996,
+      1.875
+    ],
+    "6": [
+      -0.625,
+      1.875
+    ]
+  },
+  "versiones": {
+    "python": "3.12.16",
+    "scikit-learn": "1.6.1",
+    "lightgbm": "4.5.0",
+    "pandas": "2.2.3",
+    "numpy": "2.2.1",
+    "joblib": "1.4.2"
+  }
+}

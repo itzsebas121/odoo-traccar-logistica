@@ -151,10 +151,28 @@ services:
       timeout: 5s
       retries: 5
 
+  # Pronostico de demanda en el SERVIDOR con el modelo entrenado en local (models/demanda.joblib, va en el repo).
+  # No entrena: lee las ventas del DWH, predice los proximos 7 dias y escribe ml_pronostico_demanda (y la
+  # comparativa de analisis/ en ml_evaluacion_modelos). Correrlo despues de cada `etl run` (o con cron del host):
+  #   docker compose --profile analitica run --rm ml-predecir
+  ml-predecir:
+    <<: *ml
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports: []
+    healthcheck:
+      disable: true
+    command: ["python", "-m", "mlsvc.demanda.predecir", "--source", "dwh"]
+
   # Comparativa de modelos de demanda con TODAS las herramientas (baselines, estadisticos, ML, deep learning,
-  # fundacional). Imagen pesada; bajo demanda:
+  # fundacional). Imagen pesada. SOLO EN LOCAL (el servidor no entrena):
   #   docker compose --profile benchmark run --rm ml-benchmark
-  # Deja la tabla en services/ml/analisis/comparativa_modelos.md y en ml_evaluacion_modelos del DWH.
+  #   docker compose --profile benchmark run --rm ml-benchmark python -m mlsvc.demanda.train --source dwh
+  # La misma imagen base que produccion (requirements.txt): el modelo guardado carga igual en el servidor.
+  # Deja la tabla en services/ml/analisis/comparativa_modelos.md, el modelo en services/ml/models/demanda.joblib
+  # (se commitea) y, en el DWH local, ml_evaluacion_modelos y ml_pronostico_demanda.
   ml-benchmark:
     <<: *ml
     build:
@@ -295,6 +313,12 @@ services:
       # Cada respaldo/restauracion pide la contrasena maestra de Odoo.
       ODOO_MASTER_PASSWORD: ${ODOO_MASTER_PASSWORD:?Configura ODOO_MASTER_PASSWORD}
       AGENTE_MAX_SUBIDA_MB: ${AGENTE_MAX_SUBIDA_MB:-2048}
+      # Tablero: lee las vistas v_bi_* del DWH con el rol de solo lectura dwh_ro (vacia = el tablero avisa).
+      DWH_HOST: db
+      DWH_PORT: "5432"
+      DWH_NAME: logistica_dwh
+      DWH_USER: dwh_ro
+      DWH_DB_PASSWORD: ${DWH_DB_PASSWORD:-}
     volumes:
       # Filestore de Odoo (adjuntos): va dentro de los respaldos y se reemplaza al restaurar.
       - odoo_data:/var/lib/odoo
@@ -308,10 +332,11 @@ services:
       timeout: 5s
       retries: 5
 
-  # Historico de demostracion (Ambato): pedidos, entregas y rutas de `dias_ventas` dias en Odoo y el GPS de los
-  # ultimos `dias_gps` dias en Traccar (seeds/data/historico.json). Necesita antes `seed`. Bajo demanda:
-  #   docker compose --profile historico run --rm seed-historico [--dias N] [--sin-gps]
-  seed-historico:
+  # GPS del historial de demostracion en Traccar: toma de Odoo las rutas cerradas del historial que carga `seed`
+  # (modulo logistica_demo, SEED_HISTORIAL=true) y manda sus posiciones por OsmAnd con la hora de cada ruta.
+  # Necesita antes `seed`. Bajo demanda (despues, `etl run --mode full`):
+  #   docker compose --profile historico run --rm gps-historico [--dias N] [--forzar] [--plan]
+  gps-historico:
     image: python:3.12-slim
     profiles: ["historico"]
     depends_on:
@@ -329,7 +354,7 @@ services:
       ODOO_PASSWORD: ${ODOO_PASSWORD:-${ODOO_ADMIN_PASSWORD}}
       TRACCAR_OSMAND_URL: http://traccar:5055
       PYTHONDONTWRITEBYTECODE: "1"
-    entrypoint: ["python", "seeds/historico.py"]
+    entrypoint: ["python", "seeds/gps_historico.py"]
 
   bi:
     build: ./services/bi

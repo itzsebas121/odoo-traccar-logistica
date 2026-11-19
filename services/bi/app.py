@@ -198,8 +198,8 @@ with t_dem:
         el = cm[cm["elegido"] == True]  # noqa: E712 (columna booleana de pandas)
         if len(el):
             f = el.iloc[0]
-            st.success("Elegido: %s (%s) con unidad %s: WAPE %.3f" % (f["modelo"], f["familia"],
-                                                                   f["unidad_espacial"], f["wape"]))
+            st.success("Elegido: %s (%s) con unidad %s: WAPE 7d %.3f" % (f["modelo"], f["familia"],
+                                                                      f["unidad_espacial"], f["wape_7d"]))
         tabla(cm)
 
 # ---------------------------------------------------------------- ETL

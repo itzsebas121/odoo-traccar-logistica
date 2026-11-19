@@ -1,4 +1,9 @@
 models/*
 !models/.gitkeep
+# El modelo se entrena en local y se sube con el repo: el servidor solo predice (mlsvc.demanda.predecir).
+!models/demanda.joblib
+!models/demanda_metrics.json
+!models/model.joblib
+!models/metrics.json
 data/*
 !data/.gitkeep
