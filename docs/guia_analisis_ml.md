@@ -2,6 +2,10 @@
 
 **Estado:** documento de diseño para una implementación posterior. El ETL ya deja en el Data Warehouse todo lo que esta guía usa. El servicio `services/ml` existe y funciona (entrena, evalúa y sirve `/predict`), pero el análisis de modelos que se describe aquí **no está implementado**.
 
+**Nota sobre el modelo publicado:** `model.joblib` (el que sirve `/predict`) se entrenó solo con datos **SIMULADO**
+(`procedencia_counts` en `metrics.json`: 547 viajes). Sirve para la demostración; sus métricas no describen el
+rendimiento sobre datos reales.
+
 **Requisito que cubre:** §10.4 de la [especificación](flujo_funcional_odoo_traccar.md) y el último criterio de §13. El clasificador recibe vehículo, día, hora y zona de origen, y devuelve el destino probable, las alternativas y sus probabilidades. Se valida con partición temporal, accuracy, precision, recall, F1, matriz de confusión y comparación con un predictor básico. Los datos reales y los simulados van separados.
 
 **Antes de empezar:** el ETL tiene que correr sin fallos (`etl report` sin errores en las últimas corridas).

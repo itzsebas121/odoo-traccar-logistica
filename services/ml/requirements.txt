@@ -8,5 +8,7 @@ psycopg2-binary==2.9.10
 # Pronostico de demanda por ubicacion: celdas H3 y feriados de Ecuador (livianas, las usa produccion).
 h3==4.1.2
 holidays==0.62
-# Modelo ganador del benchmark de demanda (ver services/ml/analisis/comparativa_modelos.md)
+# LightGBM: solo lo necesita el servidor si se despliega lightgbm_tweedie (opcion del informe, docs/informe_modelo_demanda.md).
+# El modelo desplegado es media_dia_semana_8 (baseline en numpy) y no lo usa. Se deja para poder cambiar de modelo sin
+# reconstruir la imagen; quitarlo es seguro mientras no se despliegue un modelo de LightGBM.
 lightgbm==4.5.0
