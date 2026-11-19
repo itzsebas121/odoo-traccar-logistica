@@ -200,6 +200,16 @@ env $(grep -v '^#' .env | grep '=' | xargs) python3 seeds/seed.py
 
 `SEED_HISTORIAL=false` omite el historial (por ejemplo, en una instalación real que solo quiere el catálogo).
 
+Para la analítica, el historial necesita además el GPS de sus rutas en Traccar y una carga completa del ETL (el demo
+fecha sus registros en el pasado, por detrás de la marca de agua incremental):
+
+```bash
+docker compose --profile historico run --rm gps-historico   # posiciones de las rutas del historial en Traccar
+docker compose --profile etl run --rm etl run --mode full    # Odoo + Traccar -> DWH
+```
+
+En el DWH esos pedidos (`H-*`, `HOY-*`) y sus rutas quedan con `procedencia = 'SIMULADO'`.
+
 ## Flujo del administrador (despacho)
 
 1. **El cliente compra** en `/shop` y marca su punto en el mapa (el círculo muestra la cobertura). Los pedidos
