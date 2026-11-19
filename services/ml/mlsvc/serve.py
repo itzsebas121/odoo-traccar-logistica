@@ -66,6 +66,8 @@ def create_app(model_dir=None, analisis_dir=None) -> FastAPI:
     mdir = pathlib.Path(model_dir or os.environ.get("MODEL_DIR", "models"))
     adir = pathlib.Path(analisis_dir or os.environ.get("ANALISIS_DIR", "analisis"))
     demanda = _Recargable(mdir / "demanda.joblib")
+    # Pronostico hecho en este servidor con sus datos (mlsvc.demanda.predecir, sin entrenar): manda sobre el del paquete.
+    prediccion = _Recargable(mdir / "demanda_prediccion.joblib")
     app = FastAPI(title="Prediccion de destinos")
     model_file = mdir / "model.joblib"
     state = {"model": None, "firma": None}
@@ -120,18 +122,54 @@ def create_app(model_dir=None, analisis_dir=None) -> FastAPI:
             raise HTTPException(503, "No hay modelo de demanda entrenado (python -m mlsvc.demanda.train)")
         return paq
 
+    def _prediccion(paq):
+        """Prediccion del servidor si corresponde al modelo cargado; si no, None (se usa la del paquete)."""
+        try:
+            pred = prediccion()
+        except Exception:
+            return None
+        if pred is None or paq is None or pred.get("model_version_entreno") != paq["model_version"]:
+            return None
+        return pred
+
     @app.get("/demanda/health")
     def demanda_health():
-        paq = demanda()
-        return {"status": "ok", "model_loaded": paq is not None,
-                "model_version": None if paq is None else paq["model_version"]}
+        try:
+            paq = demanda()
+        except Exception as exc:       # p. ej. guardado con otra version de scikit-learn o lightgbm
+            return {"status": "error", "model_loaded": False, "model_version": None,
+                    "aviso": "No se pudo cargar models/demanda.joblib (%s: %s). Reentrene en local con la imagen "
+                             "del perfil benchmark y vuelva a subirlo." % (type(exc).__name__, exc)}
+        if paq is None:
+            return {"status": "sin_modelo", "model_loaded": False, "model_version": None,
+                    "aviso": "Falta models/demanda.joblib: el modelo se entrena en local (mlsvc.demanda.train) y "
+                             "se sube con el repo. Este servidor no entrena."}
+        from .demanda.predecir import comprobar_versiones
+        difs = comprobar_versiones(paq)
+        pred = _prediccion(paq)
+        out = {"status": "ok" if not difs else "versiones_distintas", "model_loaded": True,
+               "model_version": paq["model_version"], "modelo": paq["modelo"], "unidad_espacial": paq["unidad"],
+               "versiones_entreno": paq.get("versiones"), "ultimo_dia_entreno": paq.get("ultimo_dia"),
+               "prediccion_servidor": None if pred is None else {
+                   "ultimo_dia": pred["ultimo_dia"], "generado_utc": pred["generado_utc"],
+                   "model_version": pred["model_version"]}}
+        if difs:
+            out["aviso"] = "Versiones distintas a las del entrenamiento: " + "; ".join(difs)
+        elif pred is None:
+            out["aviso"] = ("Sin pronostico con los datos de este servidor: corra `python -m mlsvc.demanda.predecir` "
+                            "(servicio ml-predecir). Mientras tanto se sirve el pronostico hecho en local.")
+        return out
 
     @app.post("/demanda/predict")
     def demanda_predict(body: DemandaIn):
         paq = _paquete()
+        pred = _prediccion(paq)
         prods = paq["productos"]
         if body.producto_sk is not None:
-            fila = prods[prods["producto_sk"] == body.producto_sk]
+            # producto_sk de ESTE DWH: con prediccion del servidor se traduce al del modelo
+            local = {v: k for k, v in (pred or {}).get("a_servidor", {}).items()}.get(body.producto_sk,
+                                                                                     body.producto_sk)
+            fila = prods[prods["producto_sk"] == local]
         else:
             fila = prods[prods["producto_id_odoo"] == body.producto_id]
         if fila.empty:
@@ -142,7 +180,7 @@ def create_app(model_dir=None, analisis_dir=None) -> FastAPI:
         else:
             unidad = str(paq["asignador"].asignar([body.lat], [body.lon])[0])
         uid = "%s|%s" % (int(fila["producto_sk"]), unidad)
-        pron = paq["pronostico"]
+        pron = pred["pronostico"] if pred is not None else paq["pronostico"]
         serie = pron[pron["unique_id"] == uid].sort_values("ds").head(body.horizonte)
         sin_historial = serie.empty
         if sin_historial:          # el producto nunca se vendio en esa unidad: demanda esperada 0
@@ -158,7 +196,9 @@ def create_app(model_dir=None, analisis_dir=None) -> FastAPI:
             "unidad_espacial": paq["unidad"], "unidad_id": unidad,
             "centro": None if centro is None else {"lat": centro["centro_lat"], "lon": centro["centro_lon"]},
             "sin_historial": sin_historial, "total_unidades": round(sum(d["unidades"] for d in dias), 2),
-            "dias": dias, "modelo": paq["modelo"], "model_version": paq["model_version"],
+            "dias": dias, "modelo": paq["modelo"],
+            "model_version": pred["model_version"] if pred is not None else paq["model_version"],
+            "origen": "servidor" if pred is not None else "entrenamiento",
         }
 
     @app.get("/demanda/metrics")

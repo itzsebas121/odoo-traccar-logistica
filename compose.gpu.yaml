@@ -1,0 +1,13 @@
+# GPU NVIDIA para la comparativa de modelos (solo en local; el servidor no entrena). Acelera los modelos de PyTorch
+# (LSTM, N-BEATS, N-HiTS, TFT y Chronos); los demas siguen en CPU. Requiere Docker con el runtime de NVIDIA.
+#   docker compose -f compose.yaml -f compose.gpu.yaml --profile benchmark run --rm ml-benchmark
+# ML_GPU elige la tarjeta por su indice de `nvidia-smi` (por defecto 0).
+services:
+  ml-benchmark:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${ML_GPU:-0}"]
+              capabilities: [gpu]

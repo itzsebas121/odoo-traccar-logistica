@@ -151,10 +151,28 @@ services:
       timeout: 5s
       retries: 5
 
+  # Pronostico de demanda en el SERVIDOR con el modelo entrenado en local (models/demanda.joblib, va en el repo).
+  # No entrena: lee las ventas del DWH, predice los proximos 7 dias y escribe ml_pronostico_demanda (y la
+  # comparativa de analisis/ en ml_evaluacion_modelos). Correrlo despues de cada `etl run` (o con cron del host):
+  #   docker compose --profile analitica run --rm ml-predecir
+  ml-predecir:
+    <<: *ml
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports: []
+    healthcheck:
+      disable: true
+    command: ["python", "-m", "mlsvc.demanda.predecir", "--source", "dwh"]
+
   # Comparativa de modelos de demanda con TODAS las herramientas (baselines, estadisticos, ML, deep learning,
-  # fundacional). Imagen pesada; bajo demanda:
+  # fundacional). Imagen pesada. SOLO EN LOCAL (el servidor no entrena):
   #   docker compose --profile benchmark run --rm ml-benchmark
-  # Deja la tabla en services/ml/analisis/comparativa_modelos.md y en ml_evaluacion_modelos del DWH.
+  #   docker compose --profile benchmark run --rm ml-benchmark python -m mlsvc.demanda.train --source dwh
+  # La misma imagen base que produccion (requirements.txt): el modelo guardado carga igual en el servidor.
+  # Deja la tabla en services/ml/analisis/comparativa_modelos.md, el modelo en services/ml/models/demanda.joblib
+  # (se commitea) y, en el DWH local, ml_evaluacion_modelos y ml_pronostico_demanda.
   ml-benchmark:
     <<: *ml
     build:

@@ -8,6 +8,9 @@
 - WAPE 7d = el mismo error pero sobre el TOTAL de los 7 dias de cada serie (lo que importa para planificar compras o
   rutas de la semana): los errores de un dia se compensan con los del dia siguiente.
 - sesgo = sum(pronostico - real) / sum(real): > 0 sobreestima, < 0 subestima.
+- WAPE 7d por zona / total: el WAPE 7d despues de sumar las series al mismo nivel para todas las unidades espaciales
+  (producto x zona del DWH, y producto). Una unidad fina tiene mas error por serie solo por ser mas rala; comparar a un
+  nivel comun separa eso de la calidad del pronostico.
 """
 import numpy as np
 
@@ -37,3 +40,11 @@ def wape_semanal(real_semana, pred_semana):
     real, pred = np.asarray(real_semana, float), np.asarray(pred_semana, float)
     total = real.sum()
     return float(np.abs(pred - real).sum() / total) if total > 0 else float("nan")
+
+
+def wape_agregado(semana, claves):
+    """semana: DataFrame con y, yhat (totales de la semana) y las columnas `claves`. WAPE tras sumar por claves."""
+    if semana is None or len(semana) == 0:
+        return float("nan")
+    g = semana.groupby(list(claves), dropna=False)[["y", "yhat"]].sum()
+    return wape_semanal(g["y"].to_numpy(), g["yhat"].to_numpy())

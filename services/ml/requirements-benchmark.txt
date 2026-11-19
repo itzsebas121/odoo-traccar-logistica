@@ -12,8 +12,11 @@ cmdstanpy==1.2.5
 xgboost-cpu==2.1.4
 lightgbm==4.5.0
 catboost==1.2.8
-# Deep learning (PyTorch solo CPU: la rueda con CUDA pesa varios GB) y modelo fundacional
---extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.5.1+cpu
+# Deep learning y modelo fundacional. PyTorch con CUDA 12.8: corre en CPU si no hay GPU y en GPU NVIDIA cuando el
+# contenedor la recibe (compose.gpu.yaml). 2.7 es la primera version que soporta las RTX 50 (Blackwell, sm_120).
+# Solo la usa la comparativa: produccion (requirements.txt) no instala torch.
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.7.1+cu128
 neuralforecast==3.0.0
-chronos-forecasting==1.4.1
+# 1.5.3: misma API que 1.4 y admite torch >= 2.6 (la 1.4.1 exige torch < 2.6, sin soporte para RTX 50)
+chronos-forecasting==1.5.3

@@ -10,11 +10,18 @@ mide cada modelo con las mismas series y los mismos cortes. Salidas:
   - analisis/comparativa_modelos.csv  y .json (mismas filas)
   - tablas ml_evaluacion_modelos y ml_unidad_espacial del DWH (si DWH_ML_PASSWORD esta definida)
 
-Regla de eleccion: la metrica principal es el WAPE 7d (error sobre el total de los 7 dias de cada serie; el WAPE
-diario se informa tambien). Entre los modelos que terminaron bien y le ganan al estacional ingenuo (WAPE 7d menor que
-el de estacional_7 en la misma unidad y procedencia; los baselines no son elegibles), el de menor WAPE 7d. Si otro queda a menos de 2 % relativo
-de ese WAPE y es mas rapido (entrenar + predecir), gana el mas rapido. La unidad espacial elegida es la del mejor modelo
-entre las unidades basadas en coordenadas (h3, kmeans, dbscan); la zona queda como referencia.
+Regla de eleccion (por unidad espacial y procedencia):
+  1. Metrica: WAPE 7d (error sobre el total de los 7 dias de cada serie). El WAPE diario se informa pero no decide: un
+     modelo que predice casi cero gana en WAPE diario con conteos ralos.
+  2. Referencia: el MEJOR baseline del grupo (no solo estacional_7). mejora_pct = cuanto baja el WAPE 7d frente a el.
+  3. Candidatos: modelos no baseline que terminaron bien, con |sesgo| <= SESGO_MAX y mejora_pct >= MEJORA_MIN, y que
+     se puedan servir sin reentrenar (modelos tabulares globales: el servidor solo predice, ver predecir.py).
+     El de menor WAPE 7d; si otro queda a menos de TOLERANCIA relativo y es mas rapido, el mas rapido.
+     Si ninguno cumple, se elige el mejor baseline (y el informe lo dice).
+  4. Unidad espacial: entre las basadas en coordenadas (h3, kmeans, dbscan), la de menor WAPE 7d a nivel ZONA (sus
+     predicciones sumadas a producto x zona, comun a todas las unidades); a menos de TOLERANCIA, la de mas series
+     (mas detalle espacial). La zona del DWH queda como referencia.
+  5. Procedencia: REAL si se pudo evaluar; si no, TODAS; si no, SIMULADO.
 """
 import argparse
 import json
@@ -28,22 +35,27 @@ import numpy as np
 import pandas as pd
 
 from . import HORIZONTE, datos, espacial, metricas, panel
-from .modelos import MODELOS, POR_NOMBRE, REFERENCIA, peso_mb
+from .modelos import MODELOS, POR_NOMBRE, peso_mb, servible
 
 UNIDADES_DEF = "h3:7,h3:8,h3:9,kmeans,dbscan,zona"
 MIN_DIAS = 8 * 7          # historia minima para evaluar una procedencia (rezagos de 28 dias + 3 cortes)
 TOLERANCIA = 0.02
+MEJORA_MIN = float(os.environ.get("BENCH_MEJORA_MIN", "0.03"))   # mejora relativa minima sobre el mejor baseline
+SESGO_MAX = float(os.environ.get("BENCH_SESGO_MAX", "0.5"))      # |sesgo| maximo de un modelo elegible
 COLUMNAS = ["corrida_id", "modelo", "familia", "libreria", "unidad_espacial", "procedencia", "estado", "detalle",
-            "cortes", "horizonte_dias", "series", "mae", "rmse", "wape", "wape_7d", "mase", "sesgo", "seg_entrenar",
-            "seg_predecir", "mb_dependencias", "puesto", "elegido"]
+            "cortes", "horizonte_dias", "series", "mae", "rmse", "wape", "wape_7d", "wape_7d_zona", "wape_7d_total",
+            "mejora_pct", "mase", "sesgo", "seg_entrenar", "seg_predecir", "mb_dependencias", "puesto", "elegido"]
 
 
-def evaluar_modelo(modelo, pnl, info, cortes, ctx):
-    """Backtest de un modelo: (metricas, predicciones del ultimo corte, segundos)."""
+def evaluar_modelo(modelo, pnl, info, cortes, ctx, zona_de_unidad=None):
+    """Backtest de un modelo: (metricas, predicciones del ultimo corte, segundos).
+    zona_de_unidad: {unidad_id: zona} para medir el WAPE 7d a nivel producto x zona."""
     reales, preds, t_total = [], [], 0.0
-    sem_real, sem_pred = [], []
+    sem_real, sem_pred, semanas = [], [], []
+    claves = info[["unique_id", "producto_sk", "unidad_id"]].copy()
+    claves["zona"] = claves["unidad_id"].map(zona_de_unidad or {}).fillna(claves["unidad_id"])
     ultimo = None
-    for inicio in cortes:
+    for i, inicio in enumerate(cortes):
         entreno, prueba = panel.partir(pnl, inicio)
         fechas = pd.date_range(inicio, periods=HORIZONTE, freq="D")
         ctx["_nombre"] = modelo.nombre
@@ -54,13 +66,24 @@ def evaluar_modelo(modelo, pnl, info, cortes, ctx):
         tot = m.groupby("unique_id")[["y", "yhat"]].sum()
         sem_real.append(tot["y"].to_numpy())
         sem_pred.append(tot["yhat"].to_numpy())
+        semanas.append(tot.reset_index().merge(claves, on="unique_id", how="left").assign(corte=i))
         reales.append(m["y"].to_numpy())
         preds.append(m["yhat"].to_numpy())
         ultimo = m
     escala = metricas.escala_mase(panel.partir(pnl, cortes[0])[0])
     met = metricas.calcular(np.concatenate(reales), np.concatenate(preds), escala)
     met["wape_7d"] = metricas.wape_semanal(np.concatenate(sem_real), np.concatenate(sem_pred))
+    sem = pd.concat(semanas, ignore_index=True)
+    met["wape_7d_zona"] = metricas.wape_agregado(sem, ["corte", "producto_sk", "zona"])
+    met["wape_7d_total"] = metricas.wape_agregado(sem, ["corte", "producto_sk"])
     return met, ultimo, t_total
+
+
+def zonas_de_unidades(zonas, unidad):
+    """{unidad_id: zona mas frecuente entre sus ventas}."""
+    df = pd.DataFrame({"u": np.asarray(unidad, dtype=object).astype(str),
+                       "z": pd.Series(zonas).fillna("(sin zona)").astype(str).to_numpy()})
+    return df.groupby("u")["z"].agg(lambda s: s.value_counts().index[0]).to_dict()
 
 
 def _procedencias(ventas, pedidas):
@@ -77,38 +100,63 @@ def _filtrar(ventas, procedencia):
     return ventas if procedencia == "TODAS" else ventas[ventas["procedencia"] == procedencia]
 
 
-def elegir(tabla):
-    """Marca puesto (por WAPE dentro de unidad y procedencia) y el modelo elegido por la regla del modulo."""
+def _mas_rapido(g):
+    mejor = g["wape_7d"].min()
+    cerca = g[g["wape_7d"] <= mejor * (1 + TOLERANCIA)]
+    t = cerca["seg_entrenar"].fillna(0) + cerca["seg_predecir"].fillna(0)
+    return cerca.assign(_t=t).sort_values(["_t", "wape_7d"]).index[0]
+
+
+def elegir(tabla, mejora_min=None, sesgo_max=None):
+    """Marca puesto (por WAPE 7d dentro de unidad y procedencia), mejora_pct y el elegido por la regla del modulo.
+    Devuelve (tabla, fila elegida | None, motivo)."""
+    mejora_min = MEJORA_MIN if mejora_min is None else mejora_min
+    sesgo_max = SESGO_MAX if sesgo_max is None else sesgo_max
     tabla = tabla.copy()
     tabla["puesto"] = None
     tabla["elegido"] = False
+    tabla["mejora_pct"] = np.nan
     ok = tabla["estado"] == "ok"
-    for (u, p), g in tabla[ok].groupby(["unidad_espacial", "procedencia"]):
-        orden = g.sort_values("wape_7d").index
-        tabla.loc[orden, "puesto"] = range(1, len(orden) + 1)
-    candidatos = []
-    for (u, p), g in tabla[ok].groupby(["unidad_espacial", "procedencia"]):
-        ref = g.loc[g["modelo"] == REFERENCIA, "wape_7d"]
-        tope = float(ref.iloc[0]) if len(ref) else np.inf
-        g = g[(g["wape_7d"] < tope) & (g["familia"] != "baseline")]     # los baselines son referencia, no se despliegan
-        if len(g):
-            mejor = g["wape_7d"].min()
-            cerca = g[g["wape_7d"] <= mejor * (1 + TOLERANCIA)]
-            fila = cerca.assign(t=cerca["seg_entrenar"] + cerca["seg_predecir"]).sort_values(["t", "wape_7d"]).iloc[0]
-            candidatos.append(fila)
+    candidatos = {}          # indice de la fila -> True si es un baseline (nadie lo supero en su grupo)
+    for _, g in tabla[ok].groupby(["unidad_espacial", "procedencia"]):
+        tabla.loc[g.sort_values("wape_7d").index, "puesto"] = range(1, len(g) + 1)
+        base = g[g["familia"] == "baseline"]
+        ref = float(base["wape_7d"].min()) if len(base) else np.nan
+        if np.isfinite(ref) and ref > 0:
+            tabla.loc[g.index, "mejora_pct"] = (100.0 * (ref - g["wape_7d"]) / ref).round(2)
+        mejora = tabla.loc[g.index, "mejora_pct"]
+        aptos = ((g["familia"] != "baseline") & (g["sesgo"].abs() <= sesgo_max)
+                 & pd.Series([servible(n, f) for n, f in zip(g["modelo"], g["familia"])], index=g.index))
+        if np.isfinite(ref):
+            aptos &= mejora.fillna(-np.inf) >= 100.0 * mejora_min
+        if aptos.any():
+            candidatos[_mas_rapido(g[aptos])] = False
+        elif len(base):
+            candidatos[base.sort_values("wape_7d").index[0]] = True
     if not candidatos:
-        return tabla, None
-    cand = pd.DataFrame(candidatos)
-    # Procedencia de la eleccion: REAL si se pudo evaluar; si no, TODAS; si no, SIMULADO.
+        return tabla, None, "Ningun modelo termino bien: no hay eleccion."
+    cand = tabla.loc[list(candidatos)].assign(_baseline=[candidatos[i] for i in candidatos])
     for proc in ("REAL", "TODAS", "SIMULADO"):
-        c = cand[cand["procedencia"] == proc]
-        if len(c):
-            cand = c
+        if (cand["procedencia"] == proc).any():
+            cand = cand[cand["procedencia"] == proc]
             break
+    if (~cand["_baseline"]).any():       # se prefieren las unidades donde un modelo supera al baseline
+        cand = cand[~cand["_baseline"]]
     geo = cand[~cand["unidad_espacial"].eq("zona")]
-    final = (geo if len(geo) else cand).sort_values("wape_7d").iloc[0]
-    tabla.loc[final.name, "elegido"] = True
-    return tabla, final
+    pool = geo if len(geo) else cand
+    nivel = pool["wape_7d_zona"].astype(float).fillna(pool["wape_7d"].astype(float))
+    cerca = pool[nivel <= nivel.min() * (1 + TOLERANCIA)]
+    idx = cerca.assign(_n=nivel[cerca.index]).sort_values(["series", "_n"], ascending=[False, True]).index[0]
+    tabla.loc[idx, "elegido"] = True
+    final = tabla.loc[idx]
+    if cand.loc[idx, "_baseline"]:
+        motivo = ("Ningun modelo mejora al mejor baseline en al menos %.0f %% de WAPE 7d con |sesgo| <= %.2f: se "
+                  "elige el baseline %s." % (100 * mejora_min, sesgo_max, final["modelo"]))
+    else:
+        motivo = ("%s mejora %.1f %% el WAPE 7d del mejor baseline de su unidad; unidad %s elegida por el WAPE 7d a "
+                  "nivel zona (%.3f)." % (final["modelo"], float(final["mejora_pct"]), final["unidad_espacial"],
+                                           float(nivel[idx])))
+    return tabla, final, motivo
 
 
 def correr(ventas, unidades, nombres_modelos, n_cortes=3, procedencias="auto", ctx=None, registro=print):
@@ -141,6 +189,7 @@ def correr(ventas, unidades, nombres_modelos, n_cortes=3, procedencias="auto", c
             for g in geo:
                 unidades_geo.append(dict(g, tipo=tipo))
             ctx["centros"] = {g["unidad_id"]: (g["centro_lat"], g["centro_lon"]) for g in geo}
+            zona_de = zonas_de_unidades(v["zona"].to_numpy(), unidad)
             cortes = panel.cortes(pnl, n_cortes)
             n_series = int(info.shape[0])
             registro("benchmark: %s / %s: %d series, %d dias, unidad %s" % (
@@ -155,7 +204,7 @@ def correr(ventas, unidades, nombres_modelos, n_cortes=3, procedencias="auto", c
                         n_series, m.max_series))
                 else:
                     try:
-                        met, ultimo, seg = evaluar_modelo(m, pnl, info, cortes, ctx)
+                        met, ultimo, seg = evaluar_modelo(m, pnl, info, cortes, ctx, zona_de)
                         fila.update(met, estado="ok", seg_entrenar=round(seg, 3), seg_predecir=0.0)
                         predicciones[(m.nombre, tipo, proc)] = ultimo
                         registro("  %-20s WAPE7d=%.3f WAPE=%.3f MAE=%.3f MASE=%.3f (%.1f s)" % (
@@ -167,8 +216,9 @@ def correr(ventas, unidades, nombres_modelos, n_cortes=3, procedencias="auto", c
                             traceback.print_exc()
                 filas.append(fila)
     tabla = pd.DataFrame(filas).reindex(columns=COLUMNAS)
-    tabla, final = elegir(tabla)
-    return {"corrida_id": corrida, "tabla": tabla, "elegido": None if final is None else final.to_dict(),
+    tabla, final, motivo = elegir(tabla)
+    elegido = None if final is None else dict(final.to_dict(), regla=motivo)
+    return {"corrida_id": corrida, "tabla": tabla, "elegido": elegido, "motivo": motivo,
             "unidades": pd.DataFrame(unidades_geo), "predicciones": predicciones}
 
 
@@ -196,31 +246,42 @@ def informe_md(res):
               "(producto × unidad espacial) y mismos cortes para todos los modelos." % (
                   res["corrida_id"], int(t["cortes"].dropna().iloc[0]) if t["cortes"].notna().any() else "-",
                   HORIZONTE), "",
-              "**Métrica principal: WAPE 7d** (error absoluto del total de los 7 días de cada serie / unidades reales; menor es "
-              "mejor). WAPE = el mismo error medido día a día (más duro: el ruido diario de un conteo ralo no se "
-              "compensa). MASE < 1: menos "
-              "error que repetir la semana anterior. Sesgo > 0: sobreestima.", ""]
+              "**Métrica principal: WAPE 7d** (error absoluto del total de los 7 días de cada serie / unidades reales; "
+              "menor es mejor). **7d zona / 7d total**: el mismo error tras sumar las predicciones a producto × zona del "
+              "DWH y a producto; es el nivel común para comparar unidades espaciales de distinto tamaño. **Mejora %**: "
+              "cuánto baja el WAPE 7d frente al mejor baseline de la misma unidad. WAPE día = el error día a día: **no "
+              "decide**, porque un modelo que predice casi cero gana ahí con conteos ralos (se le ve en el sesgo, cerca "
+              "de −1). MASE < 1: menos error que repetir la semana anterior. Sesgo > 0: sobreestima.", ""]
     if el:
         lineas += ["## Modelo elegido", "",
-                   "**%s** (%s, librería %s) con unidad espacial **%s**, procedencia %s: WAPE 7d %s, WAPE diario %s, MAE %s, MASE %s." % (
+                   "**%s** (%s, librería %s) con unidad espacial **%s**, procedencia %s: WAPE 7d %s (zona %s, total "
+                   "%s), mejora %s %% sobre el mejor baseline, WAPE diario %s, MAE %s, MASE %s, sesgo %s." % (
                        el["modelo"], el["familia"], el["libreria"], el["unidad_espacial"], el["procedencia"],
-                       _fmt(el["wape_7d"]), _fmt(el["wape"]), _fmt(el["mae"]), _fmt(el["mase"])), "",
-                   "Regla: menor WAPE entre los modelos que le ganan al estacional ingenuo (`estacional_7`); si otro "
-                   "queda a menos de 2 % del mejor y es más rápido, gana el más rápido. Los baselines son la referencia y no se eligen. La unidad se elige entre las "
-                   "basadas en coordenadas (H3, KMeans, DBSCAN); la zona del DWH es la referencia.", ""]
+                       _fmt(el["wape_7d"]), _fmt(el.get("wape_7d_zona")), _fmt(el.get("wape_7d_total")),
+                       _fmt(el.get("mejora_pct"), 1), _fmt(el["wape"]), _fmt(el["mae"]), _fmt(el["mase"]),
+                       _fmt(el["sesgo"])), "",
+                   "**Por qué:** %s" % res.get("motivo", ""), "",
+                   "Regla: cada modelo se compara con el **mejor baseline** de su unidad y procedencia. Es elegible si "
+                   "baja el WAPE 7d al menos %.0f %%, su |sesgo| es ≤ %.2f y se puede servir sin reentrenar (modelo "
+                   "tabular global: el servidor solo predice); entre los elegibles gana el de menor "
+                   "WAPE 7d (a menos de 2 %%, el más rápido). Si ninguno lo es, se elige el baseline. La unidad se "
+                   "elige entre las basadas en coordenadas (H3, KMeans, DBSCAN) por el WAPE 7d a nivel zona (a menos "
+                   "de 2 %%, la de más series); la zona del DWH es la referencia." % (100 * MEJORA_MIN, SESGO_MAX), ""]
     else:
-        lineas += ["## Modelo elegido", "", "Ningún modelo superó al estacional ingenuo: no hay ganador.", ""]
+        lineas += ["## Modelo elegido", "", res.get("motivo") or "No hay ganador.", ""]
     for (proc, unidad), g in t.groupby(["procedencia", "unidad_espacial"], sort=False):
         lineas += ["## %s · unidad %s" % (proc, unidad), "",
-                   "| # | Modelo | Familia | Librería | WAPE 7d | WAPE día | MAE | RMSE | MASE | Sesgo | Seg. | MB deps | "
-                   "Estado |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+                   "| # | Modelo | Familia | Librería | WAPE 7d | 7d zona | 7d total | Mejora % | WAPE día | MAE | "
+                   "RMSE | MASE | Sesgo | Seg. | MB deps | Estado |",
+                   "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         g = g.assign(_o=g["wape_7d"].fillna(np.inf)).sort_values(["_o", "modelo"])
         for _, f in g.iterrows():
             marca = " ⭐" if f["elegido"] else ""
             estado = f["estado"] if f["estado"] == "ok" else "%s: %s" % (f["estado"], f["detalle"] or "")
-            lineas.append("| %s | %s%s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
+            lineas.append("| %s | %s%s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |" % (
                 "" if pd.isna(f["puesto"]) else int(f["puesto"]), f["modelo"], marca, f["familia"], f["libreria"],
-                _fmt(f["wape_7d"]), _fmt(f["wape"]), _fmt(f["mae"]), _fmt(f["rmse"]), _fmt(f["mase"]), _fmt(f["sesgo"]),
+                _fmt(f["wape_7d"]), _fmt(f["wape_7d_zona"]), _fmt(f["wape_7d_total"]), _fmt(f["mejora_pct"], 1),
+                _fmt(f["wape"]), _fmt(f["mae"]), _fmt(f["rmse"]), _fmt(f["mase"]), _fmt(f["sesgo"]),
                 _fmt(f["seg_entrenar"], 1), _fmt(f["mb_dependencias"], 0), estado))
         lineas.append("")
     lineas += ["## Familias de modelos", ""] + ["- **%s**: %s" % (k, v) for k, v in FAMILIAS.items()] + [""]
@@ -233,7 +294,7 @@ def guardar_archivos(res, carpeta):
     carpeta.mkdir(parents=True, exist_ok=True)
     t = res["tabla"]
     t.to_csv(carpeta / "comparativa_modelos.csv", index=False)
-    doc = {"corrida_id": res["corrida_id"], "elegido": res["elegido"],
+    doc = {"corrida_id": res["corrida_id"], "elegido": res["elegido"], "motivo": res.get("motivo"),
            "filas": json.loads(t.to_json(orient="records", force_ascii=False))}
     (carpeta / "comparativa_modelos.json").write_text(json.dumps(doc, indent=2, ensure_ascii=False, default=str),
                                                       encoding="utf-8")
@@ -281,6 +342,8 @@ def main(argv=None):
     p.add_argument("--salida", default=os.environ.get("ANALISIS_DIR", "analisis"))
     p.add_argument("--sin-dwh", action="store_true", help="no escribe en el DWH")
     a = p.parse_args(argv)
+    from .modelos import dispositivo
+    print("benchmark: modelos de PyTorch en %s" % dispositivo())
     ventas = datos.cargar(a.source)
     print("benchmark: %d lineas de venta, %s a %s, procedencias %s" % (
         len(ventas), ventas["fecha_local"].min().date(), ventas["fecha_local"].max().date(),

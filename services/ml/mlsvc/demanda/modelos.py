@@ -34,6 +34,19 @@ class Modelo:
         return all(importlib.util.find_spec(m) is not None for m in self.modulos)
 
 
+def dispositivo():
+    """'cuda' si PyTorch ve una GPU (contenedor lanzado con compose.gpu.yaml) y ML_DISPOSITIVO no la prohibe; si no,
+    'cpu'. Solo lo usan los modelos de PyTorch (redes de neuralforecast y Chronos); los demas van siempre en CPU."""
+    pedido = os.environ.get("ML_DISPOSITIVO", "auto").lower()
+    if pedido == "cpu":
+        return "cpu"
+    try:
+        import torch
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    except ImportError:
+        return "cpu"
+
+
 def _salida(ids, fechas, valores):
     """Matriz (series x h) -> formato largo, sin negativos."""
     valores = np.clip(np.nan_to_num(np.asarray(valores, float), nan=0.0), 0, None)
@@ -138,6 +151,7 @@ def _tabular(crear, escalar=False):
         pred = modelo.predict(F.tabla(entreno, objetivo, info, ctx.get("centros")))
         ctx.setdefault("_modelos_ajustados", {})[ctx.get("_nombre")] = (modelo, list(X.columns))
         return objetivo.assign(yhat=np.clip(pred, 0, None))
+    fn.tabular = True       # un solo estimador global: se guarda entrenado y el servidor solo llama a predict
     return fn
 
 
@@ -201,7 +215,8 @@ def _neural(nombre_clase, **kw):
         h = len(fechas)
         clase = getattr(nm, nombre_clase)
         modelo = clase(h=h, input_size=28, max_steps=ctx.get("pasos_dl", 300), random_seed=ctx.get("semilla", 42),
-                       scaler_type="robust", accelerator="cpu", enable_progress_bar=False, logger=False,
+                       scaler_type="robust", accelerator="gpu" if dispositivo() == "cuda" else "cpu", devices=1,
+                       enable_progress_bar=False, logger=False,
                        enable_model_summary=False, **kw)
         nf = NeuralForecast(models=[modelo], freq="D")
         nf.fit(df=entreno[["unique_id", "ds", "y"]])
@@ -220,14 +235,15 @@ def chronos_bolt(entreno, fechas, info, ctx):
     import torch
     from chronos import BaseChronosPipeline
     nombre = os.environ.get("CHRONOS_MODEL", "amazon/chronos-bolt-small")
-    pipe = BaseChronosPipeline.from_pretrained(nombre, device_map="cpu", torch_dtype=torch.float32)
+    disp = dispositivo()
+    pipe = BaseChronosPipeline.from_pretrained(nombre, device_map=disp, torch_dtype=torch.float32)
     ids, _d, y = _matriz(entreno)
     contexto = y[:, -int(ctx.get("contexto_chronos", 112)):]
     out = []
     for i in range(0, len(contexto), 256):
         lote = torch.tensor(contexto[i:i + 256], dtype=torch.float32)
         _q, media = pipe.predict_quantiles(context=lote, prediction_length=len(fechas), quantile_levels=[0.5])
-        out.append(media.numpy())
+        out.append(media.cpu().numpy())
     return _salida(ids, fechas, np.vstack(out))
 
 
@@ -288,6 +304,16 @@ MODELOS = [
            "Modelo fundacional preentrenado (zero-shot, sin entrenar con estos datos)."),
 ]
 POR_NOMBRE = {m.nombre: m for m in MODELOS}
+
+
+def servible(nombre, familia=None):
+    """True si el modelo se puede usar en el servidor sin entrenar nada alli: un baseline (regla fija) o un modelo
+    tabular global (se guarda el estimador ajustado en local). Los modelos por serie (estadisticos, intermitentes,
+    redes de series, fundacional) se ajustan al predecir, asi que no lo son."""
+    m = POR_NOMBRE.get(nombre)
+    if m is not None:
+        return m.familia == "baseline" or bool(getattr(m.fn, "tabular", False))
+    return familia in ("baseline", "ml_lineal", "ml_arboles")
 REFERENCIA = "estacional_7"
 
 
