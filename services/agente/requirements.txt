@@ -3,3 +3,4 @@ uvicorn[standard]==0.54.0
 openai==3.52.0
 itsdangerous==2.2.0
 python-multipart==0.0.34
+psycopg[binary]==3.2.13

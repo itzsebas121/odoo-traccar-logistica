@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import agente, basedatos
+from . import agente, basedatos, tablero
 from .config import cargar
 from .conversaciones import Almacen
 from .odoo import ClienteOdoo, ErrorOdoo
@@ -31,6 +31,8 @@ odoo = ClienteOdoo(config.odoo_url, config.odoo_db, config.odoo_user, config.odo
 almacen = Almacen()
 _cliente_ia = None
 config_bd = basedatos.ConfigBD.desde_entorno()
+dwh = tablero.Dwh.desde_entorno()
+cache_tablero = tablero.Cache()
 operacion_bd = asyncio.Lock()
 MAX_SUBIDA_BYTES = int(os.environ.get('AGENTE_MAX_SUBIDA_MB') or 2048) * 1024 * 1024
 CONFIRMACION_RESTAURAR = 'RESTAURAR'
@@ -82,7 +84,7 @@ async def cabeceras_seguridad(request: Request, call_next):
     respuesta.headers.setdefault('X-Frame-Options', 'DENY')
     respuesta.headers.setdefault(
         'Content-Security-Policy',
-        "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; "
+        "default-src 'self'; img-src 'self' data: https://server.arcgisonline.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; "
         "connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
     if request.url.path.startswith('/api/'):
         respuesta.headers.setdefault('Cache-Control', 'no-store')
@@ -338,6 +340,67 @@ async def _guardar_subida(archivo: UploadFile, destino):
 @app.exception_handler(HTTPException)
 async def error_http(_request: Request, exc: HTTPException):
     return JSONResponse({'detalle': exc.detail}, status_code=exc.status_code)
+
+
+# ------------------------------------------------------------------ tablero (DWH, solo lectura)
+async def _seccion(nombre, filtros=None, **extra):
+    """filtros: dict con desde, hasta, procedencia, zona, categoria y conductor (los que vengan)."""
+    try:
+        f = tablero.filtros(**(filtros or {}))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    clave = (nombre, f.clave(), tuple(sorted(extra.items())))
+    fn = tablero.SECCIONES[nombre]
+    try:
+        return await asyncio.to_thread(cache_tablero.obtener, clave, lambda: fn(dwh, f, **extra))
+    except tablero.SinDwh as exc:
+        # el detalle técnico (qué comando correr) va al log; el usuario del tablero ve un mensaje simple
+        _logger.warning('tablero_sin_datos seccion=%s detalle=%s', nombre, exc)
+        raise HTTPException(503, tablero.MENSAJE_USUARIO) from exc
+
+
+@app.get('/api/tablero/resumen')
+async def tablero_resumen(desde: str | None = None, hasta: str | None = None, procedencia: str | None = None,
+                          zona: str | None = None, categoria: str | None = None, _usuario=Depends(usuario_actual)):
+    return await _seccion('resumen', dict(desde=desde, hasta=hasta, procedencia=procedencia, zona=zona,
+                                          categoria=categoria))
+
+
+@app.get('/api/tablero/demanda')
+async def tablero_demanda(desde: str | None = None, hasta: str | None = None, procedencia: str | None = None,
+                          zona: str | None = None, categoria: str | None = None, _usuario=Depends(usuario_actual)):
+    return await _seccion('demanda', dict(desde=desde, hasta=hasta, procedencia=procedencia, zona=zona,
+                                          categoria=categoria))
+
+
+@app.get('/api/tablero/pronostico')
+async def tablero_pronostico(desde: str | None = None, hasta: str | None = None, procedencia: str | None = None,
+                             zona: str | None = None, categoria: str | None = None, _usuario=Depends(usuario_actual)):
+    return await _seccion('pronostico', dict(desde=desde, hasta=hasta, procedencia=procedencia, zona=zona,
+                                             categoria=categoria))
+
+
+@app.get('/api/tablero/pronostico_detalle')
+async def tablero_pronostico_detalle(producto_sk: int | None = None, desde: str | None = None,
+                                     hasta: str | None = None, procedencia: str | None = None,
+                                     zona: str | None = None, categoria: str | None = None,
+                                     _usuario=Depends(usuario_actual)):
+    return await _seccion('pronostico_detalle', dict(desde=desde, hasta=hasta, procedencia=procedencia, zona=zona,
+                                                      categoria=categoria), producto_sk=producto_sk)
+
+
+@app.get('/api/tablero/operacion')
+async def tablero_operacion(desde: str | None = None, hasta: str | None = None, procedencia: str | None = None,
+                            zona: str | None = None, conductor: str | None = None,
+                            _usuario=Depends(usuario_actual)):
+    return await _seccion('operacion', dict(desde=desde, hasta=hasta, procedencia=procedencia, zona=zona,
+                                            conductor=conductor))
+
+
+@app.get('/api/tablero/opciones')
+async def tablero_opciones(_usuario=Depends(usuario_actual)):
+    """Valores de los filtros: zonas, categorías y conductores."""
+    return await _seccion('opciones')
 
 
 # ------------------------------------------------------------------ interfaz (SPA)
