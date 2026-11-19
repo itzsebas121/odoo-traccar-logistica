@@ -193,3 +193,156 @@ export function restaurarBD(
     xhr.send(formulario)
   })
 }
+
+// ------------------------------------------------------------------ tablero (DWH, solo lectura)
+export type Procedencia = 'REAL' | 'SIMULADO'
+export type FiltrosTablero = {
+  desde?: string
+  hasta?: string
+  procedencia?: Procedencia
+  zona?: string
+  categoria?: string
+  conductor?: string
+}
+export type Rango = {
+  desde: string
+  hasta: string
+  procedencia: Procedencia | null
+  zona: string | null
+  categoria: string | null
+  conductor: string | null
+}
+
+export type PuntoPronosticoNegocio = {
+  fecha: string
+  tipo: 'backtest' | 'pronostico'
+  pronostico: number
+  real: number | null
+}
+
+export type ResumenTablero = {
+  rango: Rango
+  ultimo_dia: string | null
+  hay_demo: boolean
+  kpi: {
+    importe: number
+    pedidos: number
+    unidades: number
+    ticket: number | null
+    variacion_importe_7d: number | null
+    variacion_pedidos_7d: number | null
+  }
+  serie: { fecha: string; procedencia: Procedencia; pedidos: number; importe: number; unidades: number }[]
+  simulado: { pedidos: number; total: number }
+  pronostico_total: PuntoPronosticoNegocio[]
+}
+
+export type DemandaTablero = {
+  rango: Rango
+  categorias: { categoria: string; unidades: number; importe: number; pedidos: number }[]
+  zonas: { zona: string; nombre: string; unidades: number; importe: number; pedidos: number }[]
+  top_por_zona: {
+    zona: string
+    nombre: string
+    productos: { producto_sk: number; producto: string; unidades: number; importe: number; puesto: number }[]
+  }[]
+  puntos: { latitud: number; longitud: number; pedidos: number; unidades: number; importe: number }[]
+}
+
+export type PuntoPronostico = {
+  fecha: string
+  real: number | null
+  pronostico: number | null
+  p10: number | null
+  p90: number | null
+  tipo: 'historia' | 'backtest' | 'pronostico'
+}
+
+/** Lo esperado los próximos 7 días y lo vendido la última semana de un producto en una zona. */
+export type CeldaPronostico = {
+  producto_sk: number
+  producto: string
+  categoria: string
+  zona: string
+  unidades: number
+  /** Cantidad que cubre la demanda en la mayoría de los casos (el extremo alto del rango probable). */
+  unidades_con_margen: number
+  vendido_semana: number
+  /** Lo que el modelo había pronosticado para la semana pasada (para medir su acierto). */
+  pronostico_semana: number
+}
+
+export type PronosticoTablero = {
+  rango: Rango
+  zonas: { codigo: string; nombre: string; latitud: number; longitud: number }[]
+  celdas: CeldaPronostico[]
+  actualizado_utc: string | null
+  aviso?: string
+}
+
+export type PronosticoDetalle = {
+  rango: Rango
+  serie: PuntoPronostico[]
+}
+
+export type OperacionTablero = {
+  rango: Rango
+  kpi: {
+    entregas: number
+    entregadas: number
+    no_entregadas: number
+    pendientes: number
+    pct_a_tiempo: number | null
+    pct_vinculadas_gps: number | null
+    rutas: number
+    rutas_con_gps: number
+    km_planificado: number
+    km_real: number
+  }
+  por_dia: { fecha: string; resultado: 'entregado' | 'no_entregado' | 'pendiente'; entregas: number }[]
+  rutas: {
+    codigo: string
+    fecha: string
+    conductor: string | null
+    placa: string | null
+    km_planificado: number | null
+    km_real: number | null
+    desviacion_km_pct: number | null
+    min_planificado: number | null
+    min_real: number | null
+    desviacion_min_pct: number | null
+    paradas_total: number
+    pct_entregado: number | null
+  }[]
+  conductores: { conductor: string; rutas: number; km_plan: number | null; km_real: number | null }[]
+}
+
+export type OpcionesTablero = {
+  zonas: { codigo: string; nombre: string }[]
+  categorias: string[]
+  conductores: string[]
+}
+
+/** Filtros que usa cada sección: zona y categoría para ventas y pronóstico; zona y conductor para la operación. */
+const CLAVES = {
+  resumen: ['desde', 'hasta', 'procedencia', 'zona', 'categoria'],
+  demanda: ['desde', 'hasta', 'procedencia', 'zona', 'categoria'],
+  pronostico: ['desde', 'hasta', 'procedencia', 'zona', 'categoria'],
+  pronostico_detalle: ['desde', 'hasta', 'procedencia', 'zona', 'categoria'],
+  operacion: ['desde', 'hasta', 'procedencia', 'zona', 'conductor'],
+} as const
+export type SeccionTablero = keyof typeof CLAVES
+
+/** URL de una sección con solo los filtros que le sirven (así cambiar uno que no usa no la vuelve a pedir). */
+export function urlTablero(seccion: SeccionTablero, f: FiltrosTablero, extra: { producto_sk?: number } = {}) {
+  const p = new URLSearchParams()
+  for (const k of CLAVES[seccion]) if (f[k]) p.set(k, String(f[k]))
+  if (extra.producto_sk !== undefined) p.set('producto_sk', String(extra.producto_sk))
+  const s = p.toString()
+  return `/api/tablero/${seccion}${s ? `?${s}` : ''}`
+}
+
+export const apiTablero = {
+  obtener: <T,>(url: string) => pedir<T>(url),
+  opciones: () => pedir<OpcionesTablero>('/api/tablero/opciones'),
+}
