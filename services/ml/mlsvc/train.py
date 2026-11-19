@@ -14,6 +14,7 @@ from sklearn.metrics import (accuracy_score, confusion_matrix, f1_score,
                              precision_score, recall_score)
 from sklearn.pipeline import Pipeline
 
+from . import integridad
 from .features import build_features, make_preprocessor
 
 COLUMNAS = ["vehiculo_codigo", "fecha_hora", "zona_origen", "zona_destino", "procedencia"]
@@ -73,6 +74,7 @@ def entrenar(df: pd.DataFrame, model_dir) -> dict:
         "model_version": f"{datetime.now(timezone.utc):%Y%m%d%H%M%S}-{digest}",
     }
     joblib.dump({"pipeline": modelo, "model_version": metrics["model_version"]}, model_dir / "model.joblib")
+    integridad.registrar(model_dir / "model.joblib")        # el servidor solo carga lo que tiene hash registrado
     (model_dir / "metrics.json").write_text(json.dumps(metrics, indent=2, ensure_ascii=False))
     return metrics
 

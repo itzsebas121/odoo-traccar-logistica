@@ -1,4 +1,6 @@
 import json
+import shutil
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -112,7 +114,19 @@ def test_benchmark_compara_y_elige(ventas, tmp_path):
     benchmark.guardar_archivos(res, tmp_path)
     md = (tmp_path / "comparativa_modelos.md").read_text(encoding="utf-8")
     assert "Modelo elegido" in md and el["modelo"] in md
-    assert json.loads((tmp_path / "comparativa_modelos.json").read_text(encoding="utf-8"))["elegido"]["modelo"] == el["modelo"]
+    texto = (tmp_path / "comparativa_modelos.json").read_text(encoding="utf-8")
+    assert json.loads(texto, parse_constant=_sin_constantes)["elegido"]["modelo"] == el["modelo"]   # JSON estricto
+
+
+def _sin_constantes(nombre):
+    raise ValueError("JSON no estricto: aparece %s" % nombre)
+
+
+def test_sin_nan_ni_infinitos_en_el_json():
+    doc = {"a": float("nan"), "b": [1.0, float("inf")], "c": {"d": np.float64("nan")}, "e": "x"}
+    limpio = benchmark._sin_nan(doc)
+    assert limpio == {"a": None, "b": [1.0, None], "c": {"d": None}, "e": "x"}
+    json.dumps(limpio, allow_nan=False)                 # no lanza
 
 
 def _tabla(filas):
@@ -225,6 +239,26 @@ def test_api_demanda_sin_modelo_503(tmp_path):
     assert c.get("/demanda/comparativa").status_code == 503
 
 
+def test_api_demanda_rechaza_archivo_alterado(entrenado, tmp_path):
+    d, _ = entrenado
+    copia = tmp_path / "modelos"
+    shutil.copytree(d, copia)
+    with open(copia / "demanda.joblib", "ab") as f:
+        f.write(b"x")
+    c = TestClient(create_app(copia, copia))
+    r = c.post("/demanda/predict", json={"producto_sk": 1, "lat": -1.2401, "lon": -78.6201})
+    assert r.status_code == 503 and "no coincide" in r.json()["detail"]
+    assert c.get("/demanda/health").json()["status"] == "error"
+
+
+def test_api_comparativa_con_el_archivo_del_repo(tmp_path):
+    analisis = Path(__file__).resolve().parents[1] / "analisis"
+    c = TestClient(create_app(tmp_path, analisis))
+    r = c.get("/demanda/comparativa")
+    assert r.status_code == 200, r.text
+    assert r.json()["elegido"]["modelo"] == "media_dia_semana_8"
+
+
 def test_elegir_solo_modelos_que_el_servidor_puede_usar_sin_entrenar():
     t = _tabla([
         dict(modelo="naive", familia="baseline", unidad_espacial="kmeans", wape_7d=1.0),
@@ -280,7 +314,9 @@ def test_api_usa_la_prediccion_del_servidor(entrenado, ventas, tmp_path):
     import joblib
     from mlsvc.demanda import predecir as P
     d, paq = entrenado
+    # como en el servidor: el modelo viaja con su manifiesto (SHA256SUMS)
     shutil.copy(d / "demanda.joblib", tmp_path / "demanda.joblib")
+    shutil.copy(d / "SHA256SUMS", tmp_path / "SHA256SUMS")
     c = TestClient(create_app(tmp_path, tmp_path))
     h = c.get("/demanda/health").json()
     assert h["status"] == "ok" and h["prediccion_servidor"] is None and "predecir" in h["aviso"]

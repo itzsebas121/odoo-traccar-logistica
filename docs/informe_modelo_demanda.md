@@ -150,7 +150,8 @@ patrón de las 8 semanas anteriores.
 # Local (con GPU para los modelos de PyTorch; sin compose.gpu.yaml corre todo en CPU)
 docker compose -f compose.yaml -f compose.gpu.yaml --profile benchmark run --rm ml-benchmark
 docker compose --profile benchmark run --rm ml-benchmark python -m mlsvc.demanda.train --source dwh
-# se suben services/ml/models/demanda.joblib, demanda_metrics.json y services/ml/analisis/comparativa_modelos.*
+# se suben services/ml/models/demanda.joblib, demanda_metrics.json, SHA256SUMS y services/ml/analisis/comparativa_modelos.*
+# (el entrenamiento actualiza SHA256SUMS; el servidor no carga un .joblib cuyo hash no coincida con él)
 
 # Servidor: solo predice, después de cada `etl run`
 docker compose --profile analitica run --rm ml-predecir
@@ -169,3 +170,32 @@ docker compose --profile analitica run --rm ml-predecir
   podría superarlo.
 - **Repetir la comparativa** cada vez que haya bastantes datos nuevos (por ejemplo, cada mes). La regla es la misma, así
   que si un modelo de aprendizaje automático empieza a ganar por más de 3 %, se elige solo.
+
+## 7. Despliegue en el servidor (en este orden)
+
+El modelo ya viene entrenado en el repo. En el servidor no se entrena nada. En el `.env` del servidor deben estar
+`DWH_DB_PASSWORD` (rol `dwh_ro`, para el tablero) y `DWH_ML_PASSWORD` (rol `dwh_ml`, para que `ml-predecir` guarde el
+pronóstico en el DWH).
+
+```bash
+git pull                                                      # trae el modelo, su SHA256SUMS y el código
+docker compose --profile etl run --rm etl bootstrap           # SIN --reset: agrega tablas ml_*, vistas v_bi_* y el rol dwh_ml
+docker compose --profile etl run --rm etl run                 # ETL (la primera vez: --mode full)
+docker compose --profile analitica run --rm ml-predecir       # pronóstico con el modelo entrenado; no entrena
+```
+
+Comprobaciones:
+
+- `curl -s http://127.0.0.1:8002/demanda/health`: `"status": "ok"` y `prediccion_servidor` con fecha. Si dice `error`,
+  el archivo `demanda.joblib` no coincide con `SHA256SUMS` y el servicio no lo carga: vuelva a subir el par completo.
+- `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8002/demanda/comparativa`: `200`.
+- Tablero, pestaña *Pronóstico*: con datos. Si sale vacía, falta `ml-predecir` o `DWH_ML_PASSWORD`; `ml-predecir`
+  avisa en la consola si no puede guardar en el DWH.
+
+Notas:
+
+- `ml-predecir` vuelve a correrse después de cada `etl run`.
+- `models/demanda_prediccion.joblib` lo genera el servidor con sus propios datos. No va en el repo y no está en
+  `SHA256SUMS`, porque no sale de una revisión.
+- Reentrenar o cambiar de modelo se hace en local. Hay que subir juntos `demanda.joblib`, `demanda_metrics.json` y
+  `SHA256SUMS`.
