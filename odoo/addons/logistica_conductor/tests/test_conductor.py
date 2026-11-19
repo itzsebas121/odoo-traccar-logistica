@@ -1,7 +1,15 @@
 # -*- coding: utf-8 -*-
+import json
 import re
+from datetime import timedelta
+from unittest import mock
 
+import requests
+
+from odoo import fields
 from odoo.tests.common import HttpCase, tagged
+
+from ..controllers import conductor as conductor_ctrl
 
 LAT, LON = -1.2417, -78.6197
 
@@ -214,3 +222,46 @@ class TestConductor(HttpCase):
         self.assertEqual(respuesta.status_code, 400)
         self._refrescar()
         self.assertEqual(ruta.stop_ids.state, 'pendiente')
+
+    # ------------------------------------------------------------ mapa del recorrido
+    def _mapa(self, ruta):
+        """GET mapa-data sin llamar al servicio de rutas (se dibuja la línea recta)."""
+        self._entrar(self.user_a)
+        with mock.patch.object(conductor_ctrl.requests, 'post', side_effect=requests.ConnectionError('sin routing')):
+            respuesta = self.url_open('/logistica/conductor/ruta/%s/mapa-data' % ruta.id)
+        self.assertEqual(respuesta.status_code, 200)
+        return json.loads(respuesta.text)
+
+    def _con_gps(self, ruta, unique_id):
+        servidor = self.env['traccar.server'].create({'name': 'Servidor conductor'})
+        dispositivo = self.env['traccar.device'].create({
+            'name': unique_id, 'unique_id': unique_id, 'traccar_id': 77, 'server_id': servidor.id})
+        ruta.vehicle_id.traccar_device_id = dispositivo.id
+        return dispositivo
+
+    def test_mapa_avisa_si_el_vehiculo_no_tiene_gps(self):
+        ruta = self._ruta(self.user_a, 'CND-0010', n=1, estado='en_recorrido')
+        datos = self._mapa(ruta)
+        self.assertEqual(datos['recorrido'], [])
+        self.assertIn('no tiene GPS', datos['aviso'])
+
+    def test_mapa_avisa_si_no_llegan_posiciones(self):
+        ruta = self._ruta(self.user_a, 'CND-0011', n=1, estado='en_recorrido')
+        self._con_gps(ruta, 'CND-GPS-11')
+        datos = self._mapa(ruta)
+        self.assertEqual(datos['recorrido'], [])
+        self.assertIn('CND-GPS-11', datos['aviso'])
+
+    def test_mapa_muestra_recorrido_guardado_desde_la_salida(self):
+        ruta = self._ruta(self.user_a, 'CND-0012', n=1, estado='en_recorrido')
+        dispositivo = self._con_gps(ruta, 'CND-GPS-12')
+        ruta.sudo().write({'started_at': fields.Datetime.now() - timedelta(hours=1)})
+        for i, minutos in enumerate((-90, -30, -10)):  # el primero es anterior a la salida
+            self.env['logistica.traccar.posicion'].create({
+                'device_id': dispositivo.id, 'vehicle_id': ruta.vehicle_id.id, 'traccar_position_id': 7700 + i,
+                'fix_time': fields.Datetime.now() + timedelta(minutes=minutos),
+                'latitude': LAT + i * 0.001, 'longitude': LON, 'valid': True})
+        datos = self._mapa(ruta)
+        recorrido = [[round(lat, 7), round(lon, 7)] for lat, lon in datos['recorrido']]
+        self.assertEqual(recorrido, [[round(LAT + 0.001, 7), LON], [round(LAT + 0.002, 7), LON]])
+        self.assertIsNone(datos['aviso'])

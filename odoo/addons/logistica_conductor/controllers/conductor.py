@@ -5,7 +5,7 @@ import requests
 
 from werkzeug.exceptions import Forbidden, NotFound
 
-from odoo import _, fields, http
+from odoo import _, http
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.http import request
 
@@ -133,17 +133,9 @@ class ConductorController(http.Controller):
         # del conductor a fleet.vehicle o traccar.device.
         ruta_mapa = ruta.sudo()
         puntos = ruta.stop_ids.sorted('sequence')
-        recorrido = []
         dispositivo = ruta_mapa.vehicle_id.traccar_device_id
-        if dispositivo and ruta_mapa.started_at:
-            try:
-                # interactivo: un intento corto, sin reintentos ni escritura del estado del servidor.
-                posiciones = dispositivo.server_id.get_route_report(
-                    dispositivo, ruta_mapa.started_at, fields.Datetime.now(), interactivo=True)
-                recorrido = [[p['latitude'], p['longitude']] for p in posiciones
-                             if p.get('latitude') is not None and p.get('longitude') is not None]
-            except UserError:
-                recorrido = []
+        # Mismo recorrido que el mapa de monitoreo: posiciones ya guardadas en Odoo (logistica_traccar).
+        recorrido = ruta_mapa._recorrido_gps()
         gps = dispositivo._estado_gps() if dispositivo else None
         origen_dinamico = None
         if ruta_mapa.state == 'en_recorrido' and gps and gps.get('tiene_posicion'):
@@ -154,7 +146,14 @@ class ConductorController(http.Controller):
         # para que el conductor pueda revisar el recorrido planificado.
         puntos_para_ruta = puntos_pendientes or list(puntos)
         origen_recalculo = origen_dinamico if puntos_pendientes else None
+        aviso = None
+        if not dispositivo:
+            aviso = _('Este vehículo no tiene GPS asignado: no se puede mostrar el recorrido real.')
+        elif ruta_mapa.state == 'en_recorrido' and not recorrido:
+            aviso = _('Aún no llegan posiciones GPS desde la salida. Revise que Traccar Client esté activo '
+                      'y use el identificador «%s».') % dispositivo.unique_id
         return {
+            'aviso': aviso,
             'ruta': ruta.name, 'estado': ruta.state,
             'origen': [ruta_mapa.bodega_id.latitude, ruta_mapa.bodega_id.longitude],
             'planificada': [[ruta_mapa.bodega_id.latitude, ruta_mapa.bodega_id.longitude]] +

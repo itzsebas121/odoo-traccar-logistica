@@ -9,7 +9,7 @@ from odoo import fields
 from odoo.exceptions import AccessError
 from odoo.tests.common import HttpCase, TransactionCase, tagged
 
-from ..controllers import monitoreo as monitoreo_ctrl
+from ..models import logistica_ruta_gps as modulo_ruta
 from ..models import traccar_server as modulo
 from ..models.logistica_traccar_util import haversine_m, knots_to_kmh
 from .test_conector import CABECERAS, _fake_traccar, _posicion, _respuesta
@@ -20,6 +20,11 @@ LAT, LON = -1.2417, -78.6197
 # 0,00027 grados de latitud son unos 30 m; 0,0045 son unos 500 m.
 CERCA = 0.00027
 LEJOS = 0.0045
+
+
+def _redondear(puntos):
+    """Las coordenadas se guardan con 7 decimales (digits=(10, 7))."""
+    return [[round(lat, 7), round(lon, 7)] for lat, lon in puntos]
 
 
 class _BaseMonitoreo:
@@ -52,6 +57,11 @@ class _BaseMonitoreo:
         if entrega.state == 'en_preparacion':
             entrega.action_marcar_preparado()
         return entrega
+
+    def _posicion_guardada(self, id_traccar, fix, lat, lon):
+        return self.env['logistica.traccar.posicion'].create({
+            'device_id': self.dispositivo.id, 'vehicle_id': self.vehiculo.id, 'traccar_position_id': id_traccar,
+            'fix_time': fix, 'latitude': lat, 'longitude': lon, 'valid': True})
 
     def _ruta_en_recorrido(self):
         entrega = self._entrega_preparada()
@@ -204,11 +214,71 @@ class TestMonitoreoTraccar(_BaseMonitoreo, TransactionCase):
 
 
 @tagged('post_install', '-at_install', 'logistica_traccar')
+class TestRecorridoGps(_BaseMonitoreo, TransactionCase):
+    """Recorrido de la ruta a partir de las posiciones guardadas en Odoo."""
+
+    def setUp(self):
+        super().setUp()
+        self._preparar()
+
+    def _ruta_salida_hace_una_hora(self):
+        """Ruta en recorrido que salió hace una hora: los fixes de prueba quedan dentro de la ventana."""
+        ruta, entrega = self._ruta_en_recorrido()
+        ruta.sudo().write({'started_at': fields.Datetime.now() - timedelta(hours=1)})
+        return ruta, entrega
+
+    def test_recorrido_solo_desde_la_salida_y_en_orden(self):
+        ruta, _entrega = self._ruta_salida_hace_una_hora()
+        salida = ruta.started_at
+        self._posicion_guardada(4001, salida - timedelta(minutes=5), LAT, LON)  # antes de salir: fuera
+        self._posicion_guardada(4003, salida + timedelta(minutes=2), LAT + 2 * CERCA, LON)
+        self._posicion_guardada(4002, salida + timedelta(minutes=1), LAT + CERCA, LON)
+        self.assertEqual(_redondear(ruta._recorrido_gps()), _redondear([[LAT + CERCA, LON], [LAT + 2 * CERCA, LON]]))
+
+    def test_recorrido_termina_al_cerrar(self):
+        ruta, _entrega = self._ruta_salida_hace_una_hora()
+        self._posicion_guardada(4101, ruta.started_at + timedelta(minutes=1), LAT, LON)
+        ruta.sudo().write({'finished_at': ruta.started_at + timedelta(minutes=10)})
+        self._posicion_guardada(4102, ruta.started_at + timedelta(minutes=20), LAT + LEJOS, LON)
+        self.assertEqual(ruta._recorrido_gps(), [[LAT, LON]])
+
+    def test_ruta_sin_salir_no_tiene_recorrido(self):
+        entrega = self._entrega_preparada()
+        ruta = self.env['logistica.ruta'].create({
+            'vehicle_id': self.vehiculo.id, 'driver_id': self.vehiculo.driver_id.id,
+            'bodega_id': self.env['logistica.bodega'].get_bodega_activa().id,
+            'stop_ids': [(0, 0, {'entrega_id': entrega.id, 'sequence': 1})]})
+        self._posicion_guardada(4201, fields.Datetime.now(), LAT, LON)
+        self.assertEqual(ruta._recorrido_gps(), [])
+
+    def test_recorrido_largo_se_reduce_y_conserva_el_ultimo_punto(self):
+        ruta, _entrega = self._ruta_salida_hace_una_hora()
+        for i in range(7):
+            self._posicion_guardada(4300 + i, ruta.started_at + timedelta(seconds=i + 1), LAT + i * CERCA, LON)
+        with mock.patch.object(modulo_ruta, 'MAX_PUNTOS_RECORRIDO', 3):
+            puntos = ruta._recorrido_gps()
+        self.assertLessEqual(len(puntos), 4)
+        self.assertEqual(_redondear(puntos[:1] + puntos[-1:]), _redondear([[LAT, LON], [LAT + 6 * CERCA, LON]]))
+
+    def test_sincronizacion_asocia_a_la_ruta_solo_desde_la_salida(self):
+        ruta, _entrega = self._ruta_en_recorrido()
+        formato = '%Y-%m-%dT%H:%M:%S.000+00:00'
+        antes = (ruta.started_at - timedelta(minutes=1)).strftime(formato)
+        despues = (ruta.started_at + timedelta(minutes=1)).strftime(formato)
+        with mock.patch.object(modulo.requests, 'get', side_effect=_fake_traccar(posiciones={41: [
+                _posicion(4401, fix=antes, lat=LAT + LEJOS, lon=LON),
+                _posicion(4402, fix=despues, lat=LAT + LEJOS, lon=LON)]})):
+            self.servidor._sincronizar_todo()
+        Posicion = self.env['logistica.traccar.posicion']
+        self.assertFalse(Posicion.search([('traccar_position_id', '=', 4401)]).route_id)
+        self.assertEqual(Posicion.search([('traccar_position_id', '=', 4402)]).route_id, ruta)
+
+
+@tagged('post_install', '-at_install', 'logistica_traccar')
 class TestMonitoreoHttp(_BaseMonitoreo, HttpCase):
 
     def setUp(self):
         super().setUp()
-        monitoreo_ctrl.CACHE.reset()
         self._preparar()
         grupos = [self.env.ref(x).id for x in ('base.group_user', 'fleet.fleet_group_manager')]
         self.env['res.users'].with_context(no_reset_password=True).create({
@@ -227,10 +297,11 @@ class TestMonitoreoHttp(_BaseMonitoreo, HttpCase):
         self.dispositivo._registrar_posicion(fields.Datetime.now(), LAT + LEJOS, LON, 20.0)
         self.servidor.sudo().write({'username': 'usuario-secreto@logistica.local'})
         self.servidor.password = 'clave-secreta-mon'
+        self._posicion_guardada(3001, fields.Datetime.now(), LAT + LEJOS, LON)
         cabeceras = dict(CABECERAS, Authorization='Basic Y3JlZGVuY2lhbGVz')
-        recorrido = [{'latitude': LAT + LEJOS, 'longitude': LON}]
+        # El recorrido sale de las posiciones guardadas en Odoo: el mapa no consulta a Traccar.
         with mock.patch.object(modulo.TraccarServer, '_get_auth_headers', return_value=cabeceras), \
-                mock.patch.object(modulo.requests, 'get', return_value=_respuesta(recorrido)):
+                mock.patch.object(modulo.requests, 'get', side_effect=AssertionError('no debe llamar a Traccar')):
             self.authenticate('monitor-flota', 'monitor-flota-clave')
             respuesta = self.url_open('/logistica/monitoreo/data')
         self.assertEqual(respuesta.status_code, 200)

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Logística Conductor - Portal móvil',
-    'version': '16.0.1.1.0',
+    'version': '16.0.1.2.0',
     'category': 'Inventory/Logistics',
     'summary': 'Vista móvil restringida para que el conductor confirme carga, recorra paradas y registre entregas',
     'description': """
@@ -14,7 +14,8 @@ Portal del conductor
     """,
     'author': 'Equipo Logística Inteligente',
     'license': 'LGPL-3',
-    'depends': ['logistica_despacho'],
+    # logistica_traccar: el mapa usa el GPS del vehículo y su recorrido (logistica.ruta._recorrido_gps).
+    'depends': ['logistica_despacho', 'logistica_traccar'],
     'data': [
         'security/security.xml',
         'views/conductor_templates.xml',
