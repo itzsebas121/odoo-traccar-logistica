@@ -90,3 +90,64 @@ LEFT JOIN dim_tiempo t ON t.sk = p.tiempo_sk
 LEFT JOIN dim_zona z ON z.sk = p.zona_sk
 WHERE p.estado IN ('entregado', 'no_entregado')
 WINDOW w AS (PARTITION BY p.ruta_id_odoo ORDER BY COALESCE(p.cierre_utc, p.llegada_utc), p.orden, p.parada_id_odoo);
+
+-- Ventas con su ubicacion aproximada para el pronostico de demanda por ubicacion. Una fila por linea de pedido
+-- confirmado. Fecha y hora en la zona horaria de la operacion (ETL_TZ). lat_aprox/lon_aprox: punto de entrega del
+-- pedido redondeado a ~110 m (puede ser NULL si el pedido no tiene ubicacion). categoria: ultimo nivel de la
+-- categoria de Odoo ("Todos / Alimentos / Granos y cereales" -> "Granos y cereales"); grupo: el nivel anterior.
+CREATE OR REPLACE VIEW v_ml_ventas_geo AS
+SELECT s.linea_id_odoo,
+       s.pedido_id_odoo,
+       s.procedencia,
+       s.fecha_pedido_utc,
+       t.fecha_local,
+       t.hora_local,
+       t.dia_semana_local,
+       t.fin_de_semana,
+       p.sk AS producto_sk,
+       p.producto_id_odoo,
+       p.nombre AS producto,
+       p.referencia,
+       COALESCE(NULLIF(btrim(regexp_replace(p.categoria, '^.*/', '')), ''), '(sin categoria)') AS categoria,
+       COALESCE(NULLIF(btrim(split_part(p.categoria, '/', GREATEST(array_length(string_to_array(p.categoria, '/'), 1) - 1, 1))), ''),
+                '(sin grupo)') AS grupo,
+       s.cliente_sk,
+       z.codigo AS zona,
+       s.lat_aprox,
+       s.lon_aprox,
+       s.cantidad,
+       s.precio_unitario,
+       s.subtotal
+FROM fact_ventas s
+LEFT JOIN dim_tiempo t ON t.sk = s.tiempo_sk
+LEFT JOIN dim_producto p ON p.sk = s.producto_sk
+LEFT JOIN dim_zona z ON z.sk = s.zona_sk;
+
+-- Demanda diaria por producto y zona, con los dias sin venta en 0 (serie completa entre el primer y el ultimo dia
+-- con ventas de cada procedencia). Es la referencia por zona; la agregacion por celda H3 o por cluster la hace el
+-- servicio ML a partir de v_ml_ventas_geo, porque depende de la unidad espacial elegida.
+CREATE OR REPLACE VIEW v_ml_demanda_diaria_zona AS
+WITH v AS (
+    SELECT procedencia, fecha_local, producto_sk, zona,
+           SUM(cantidad) AS unidades, COUNT(DISTINCT pedido_id_odoo) AS pedidos, SUM(subtotal) AS importe
+    FROM v_ml_ventas_geo
+    WHERE fecha_local IS NOT NULL AND producto_sk IS NOT NULL
+    GROUP BY 1, 2, 3, 4
+), rango AS (
+    SELECT procedencia, MIN(fecha_local) AS d0, MAX(fecha_local) AS d1 FROM v GROUP BY 1
+), series AS (
+    SELECT DISTINCT procedencia, producto_sk, zona FROM v
+)
+SELECT s.procedencia,
+       d::date AS fecha_local,
+       EXTRACT(ISODOW FROM d)::int AS dia_semana_local,
+       s.producto_sk,
+       s.zona,
+       COALESCE(v.unidades, 0) AS unidades,
+       COALESCE(v.pedidos, 0) AS pedidos,
+       COALESCE(v.importe, 0) AS importe
+FROM series s
+JOIN rango r ON r.procedencia = s.procedencia
+CROSS JOIN LATERAL generate_series(r.d0::timestamp, r.d1::timestamp, interval '1 day') AS d
+LEFT JOIN v ON v.procedencia = s.procedencia AND v.producto_sk = s.producto_sk
+           AND v.zona IS NOT DISTINCT FROM s.zona AND v.fecha_local = d::date;

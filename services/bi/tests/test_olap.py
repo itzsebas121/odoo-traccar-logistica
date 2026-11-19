@@ -8,7 +8,9 @@ import olap
 NOMBRES = {"distancia_vehiculo", "recorridos_dia_hora", "duracion_promedio", "zonas_visitadas", "paradas",
            "entregas_cliente", "entregas_estado", "motivos_no_entrega", "cumplimiento", "plan_real_vehiculo",
            "rutas_plan_real", "tiempos_parada", "ventas_cliente", "ventas_producto", "ventas_zona",
-           "etl_ejecuciones", "etl_rechazos"}
+           "etl_ejecuciones", "etl_rechazos", "od_viajes", "conductor_resumen", "vinculo_gps",
+           "demanda_producto_zona", "ventas_categoria", "ventas_dia_semana", "pronostico_vs_real",
+           "comparativa_modelos"}
 
 
 def total(df, clave, col):
@@ -143,3 +145,54 @@ def test_rango_fecha_unica():
     assert olap.rango_fechas(d) == (d, d)
     assert olap.rango_fechas((d, date(2026, 11, 5))) == (d, date(2026, 11, 5))
     assert olap.rango_fechas(()) == (None, None)
+
+
+def test_recorridos_por_hora_local(conn):
+    """Un viaje de las 08:00 UTC se cuenta a las 03:00 locales (UTC-5), no a las 08:00."""
+    h = olap.consulta(conn, "recorridos_dia_hora", procedencia=["REAL"])
+    horas = set(h["k_hora"].dropna().astype(int))
+    assert horas == {3, 4}
+
+
+def test_consultas_para_la_web(conn):
+    ind = olap.indicadores(conn)
+    od = ind["od_viajes"]
+    assert od["viajes"].sum() == 4 and {"centro", "ficoa"} <= set(od["zona_origen"])
+    assert total(ind["conductor_resumen"], "k_conductor", "recorridos") == 4
+    vg = ind["vinculo_gps"]
+    assert total(vg, "k_resultado", "entregas") == 3          # la pendiente no esta cerrada
+    dz = ind["demanda_producto_zona"]
+    assert float(dz["unidades"].sum()) == 6.0
+    cat = ind["ventas_categoria"].dropna(subset=["k_categoria"]).set_index("k_categoria")
+    assert float(cat.loc["Granos", "unidades"]) == 5.0 and float(cat.loc["Limpieza", "importe"]) == 12.5
+    assert total(ind["ventas_categoria"], "k_categoria", "importe") == 62.5
+    assert set(ind["ventas_dia_semana"]["dia_semana"]) <= set(range(1, 8))
+    pr = ind["pronostico_vs_real"].set_index("tipo_registro")
+    assert float(pr.loc["backtest", "unidades_real"]) == 2.0 and float(pr.loc["pronostico", "p90"]) == 5.0
+    cm = ind["comparativa_modelos"]
+    assert cm.loc[cm["elegido"], "modelo"].tolist() == ["lightgbm_tweedie"]
+    assert cm["modelo"].tolist()[:2] == ["lightgbm_tweedie", "estacional_7"]
+
+
+def test_filtro_procedencia_en_ventas_y_viajes(conn):
+    assert olap.consulta(conn, "od_viajes", procedencia=["SIMULADO"])["viajes"].sum() == 2
+    assert olap.consulta(conn, "demanda_producto_zona", procedencia=["SIMULADO"]).empty
+
+
+def test_vistas_bi_para_power_bi(conn):
+    """Las vistas planas sin parametros existen y suman lo mismo que los hechos."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT table_name FROM information_schema.views WHERE table_name LIKE 'v_bi_%'")
+        vistas = {r[0] for r in cur.fetchall()}
+        assert len(vistas) >= 20
+        for v in sorted(vistas):
+            cur.execute("SELECT count(*) FROM %s" % v)
+        cur.execute("SELECT sum(importe) FROM v_bi_ventas_diarias")
+        assert float(cur.fetchone()[0]) == 62.5
+        cur.execute("SELECT count(*) FROM v_bi_recorridos")
+        assert cur.fetchone()[0] == 4
+        cur.execute("SELECT modelo FROM v_bi_comparativa_modelos WHERE elegido")
+        assert cur.fetchall() == [("lightgbm_tweedie",)]
+        cur.execute("SELECT puesto FROM v_bi_top_productos_zona WHERE zona='centro' ORDER BY puesto")
+        assert [r[0] for r in cur.fetchall()] == [1, 2]
+    conn.rollback()

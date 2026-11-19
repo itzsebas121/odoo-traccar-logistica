@@ -9,7 +9,9 @@ from . import config
 # Version del esquema de las dos bases. Se sube cuando cambia el DDL de forma incompatible.
 SCHEMA_VERSION = 2
 STAGING_FILES = ("staging_schema.sql",)
-DWH_FILES = ("dwh_schema.sql", "dwh_views.sql")
+DWH_FILES = ("dwh_schema.sql", "dwh_views.sql", "dwh_bi_views.sql")
+# Tablas de resultados del servicio ML: las unicas que puede escribir el rol dwh_ml.
+TABLAS_ML = ("ml_evaluacion_modelos", "ml_unidad_espacial", "ml_pronostico_demanda")
 # Clave del candado: una sola corrida del ETL a la vez (manual o programada).
 CANDADO = 7402601
 
@@ -119,19 +121,48 @@ def _grant_readonly(admin_dsn, dbname, ro_role, owner):
         conn.close()
 
 
+def _grant_ml(admin_dsn, dbname, ml_role, owner):
+    """Rol del servicio ML: lee todas las tablas y vistas del DWH (como dwh_ro) y solo escribe las tablas ml_*
+    (resultados del benchmark, unidades espaciales y pronosticos). Solo actua si el rol existe."""
+    conn = psycopg2.connect(admin_dsn, dbname=dbname)
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            if not _role_exists(cur, ml_role):
+                return False
+            r = sql.Identifier(ml_role)
+            cur.execute(sql.SQL("GRANT CONNECT ON DATABASE {} TO {}").format(sql.Identifier(dbname), r))
+            cur.execute(sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(r))
+            cur.execute(sql.SQL("GRANT SELECT ON ALL TABLES IN SCHEMA public TO {}").format(r))
+            cur.execute(sql.SQL("ALTER DEFAULT PRIVILEGES FOR ROLE {} IN SCHEMA public GRANT SELECT ON TABLES TO {}")
+                        .format(sql.Identifier(owner), r))
+            for tabla in TABLAS_ML:
+                cur.execute(sql.SQL("GRANT INSERT, UPDATE, DELETE ON {} TO {}").format(sql.Identifier(tabla), r))
+            # Secuencias de las claves bigserial de esas tablas (ml_unidad_espacial no tiene).
+            cur.execute("SELECT s.relname FROM pg_depend d JOIN pg_class s ON s.oid = d.objid AND s.relkind = 'S' "
+                        "JOIN pg_class t ON t.oid = d.refobjid WHERE t.relname = ANY(%s)", (list(TABLAS_ML),))
+            for (secuencia,) in cur.fetchall():
+                cur.execute(sql.SQL("GRANT USAGE, SELECT ON SEQUENCE {} TO {}").format(sql.Identifier(secuencia), r))
+        return True
+    finally:
+        conn.close()
+
+
 def bootstrap(admin_dsn=None, staging_db=None, dwh_db=None, stg_user=None, dwh_user=None,
-              stg_password=None, dwh_password=None, ro_password=None, ro_role=config.RO_ROLE, reset=False):
+              stg_password=None, dwh_password=None, ro_password=None, ro_role=config.RO_ROLE, reset=False,
+              ml_password=None, ml_role=config.ML_ROLE):
     """Crea las bases de staging y del DWH (si faltan), los roles propietarios y el rol de lectura, y aplica el DDL.
 
     - Un rol (propietario de staging, propietario del DWH, dwh_ro) se crea o actualiza SOLO si se da su clave.
     - Un propietario que ya existe pasa a ser dueno de su base y de sus tablas aunque no se de la clave.
     - dwh_ro recibe CONNECT, USAGE y SELECT sobre las tablas de public de la base del DWH (mas las futuras);
       sobre la base de staging no recibe nada.
+    - dwh_ml (servicio ML) lee igual que dwh_ro y ademas escribe solo las tablas ml_* (resultados del modelo).
     - CONNECT se quita a PUBLIC en ambas bases y se concede solo a sus roles de servicio: etl_stg en staging;
-      dwh_etl y dwh_ro en el DWH.
+      dwh_etl, dwh_ro y dwh_ml en el DWH.
     - reset=True borra antes las dos bases (los roles se conservan).
     - Si una base ya tiene tablas de otra version del esquema, lanza EsquemaIncompatible sin modificarla.
-    Idempotente. Devuelve {'staging_owner': bool, 'dwh_owner': bool, 'ro': bool}: True si se creo/actualizo el rol."""
+    Idempotente. Devuelve {'staging_owner', 'dwh_owner', 'ro', 'ml'}: True si se creo/actualizo el rol."""
     admin_dsn = admin_dsn or config.admin_dsn()
     staging_db = staging_db or config.staging_db()
     dwh_db = dwh_db or config.dwh_db()
@@ -140,14 +171,15 @@ def bootstrap(admin_dsn=None, staging_db=None, dwh_db=None, stg_user=None, dwh_u
 
     conn = psycopg2.connect(admin_dsn)
     conn.autocommit = True
-    hecho = {"staging_owner": False, "dwh_owner": False, "ro": False}
+    hecho = {"staging_owner": False, "dwh_owner": False, "ro": False, "ml": False}
     try:
         with conn.cursor() as cur:
             if reset:
                 for base in (staging_db, dwh_db):
                     cur.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(base)))
             for clave, rol, clave_rol in (("staging_owner", stg_user, stg_password),
-                                          ("dwh_owner", dwh_user, dwh_password), ("ro", ro_role, ro_password)):
+                                          ("dwh_owner", dwh_user, dwh_password), ("ro", ro_role, ro_password),
+                                          ("ml", ml_role, ml_password)):
                 if clave_rol:
                     _ensure_role(cur, rol, clave_rol)
                     hecho[clave] = True
@@ -156,7 +188,7 @@ def bootstrap(admin_dsn=None, staging_db=None, dwh_db=None, stg_user=None, dwh_u
             _ensure_database(cur, staging_db, stg_owner)
             _ensure_database(cur, dwh_db, dwh_owner)
             _restringir_conexion(cur, staging_db, (stg_user,))
-            _restringir_conexion(cur, dwh_db, (dwh_user, ro_role))
+            _restringir_conexion(cur, dwh_db, (dwh_user, ro_role, ml_role))
             cur.execute("SELECT current_user")
             admin_user = cur.fetchone()[0]
     finally:
@@ -165,6 +197,7 @@ def bootstrap(admin_dsn=None, staging_db=None, dwh_db=None, stg_user=None, dwh_u
     _apply_ddl(admin_dsn, staging_db, STAGING_FILES, stg_owner)
     _apply_ddl(admin_dsn, dwh_db, DWH_FILES, dwh_owner)
     _grant_readonly(admin_dsn, dwh_db, ro_role, dwh_owner or admin_user)
+    _grant_ml(admin_dsn, dwh_db, ml_role, dwh_owner or admin_user)
     return hecho
 
 

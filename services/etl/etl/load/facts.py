@@ -399,6 +399,14 @@ def load_entregas(dcur, scur, ctx, odoo, rutas, paradas, entregas):
     _podar(dcur, "fact_entregas", "entrega_id_odoo", cargadas)
 
 
+# Decimales con que se guarda la ubicacion de un pedido en fact_ventas (~110 m): ubicacion aproximada (spec 12).
+DECIMALES_UBICACION = 3
+
+
+def _aprox(valor):
+    return None if valor is None else round(float(valor), DECIMALES_UBICACION)
+
+
 def load_ventas(dcur, scur, ctx, odoo, entregas):
     """fact_ventas: una fila por linea de producto de un pedido confirmado."""
     if odoo.get("sale.order.line") is None or odoo.get("sale.order") is None:
@@ -427,18 +435,21 @@ def load_ventas(dcur, scur, ctx, odoo, entregas):
         dcur.execute(
             """INSERT INTO fact_ventas
                  (linea_id_odoo, pedido_id_odoo, pedido_ref, cliente_sk, producto_sk, zona_sk, tiempo_sk,
-                  fecha_pedido_utc, estado_pedido, cantidad, precio_unitario, subtotal, total, entrega_id_odoo, lote_id)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                  fecha_pedido_utc, estado_pedido, cantidad, precio_unitario, subtotal, total, entrega_id_odoo, lote_id,
+                  lat_aprox, lon_aprox)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                ON CONFLICT (linea_id_odoo) DO UPDATE SET
                  pedido_id_odoo=EXCLUDED.pedido_id_odoo, pedido_ref=EXCLUDED.pedido_ref,
                  cliente_sk=EXCLUDED.cliente_sk, producto_sk=EXCLUDED.producto_sk, zona_sk=EXCLUDED.zona_sk,
                  tiempo_sk=EXCLUDED.tiempo_sk, fecha_pedido_utc=EXCLUDED.fecha_pedido_utc,
                  estado_pedido=EXCLUDED.estado_pedido, cantidad=EXCLUDED.cantidad,
                  precio_unitario=EXCLUDED.precio_unitario, subtotal=EXCLUDED.subtotal, total=EXCLUDED.total,
-                 entrega_id_odoo=EXCLUDED.entrega_id_odoo, lote_id=EXCLUDED.lote_id""",
+                 entrega_id_odoo=EXCLUDED.entrega_id_odoo, lote_id=EXCLUDED.lote_id,
+                 lat_aprox=EXCLUDED.lat_aprox, lon_aprox=EXCLUDED.lon_aprox""",
             (v["id"], pedido["id"], n.texto(pedido.get("name")), ctx.cliente.get(n.m2o_id(pedido.get("partner_id"))),
              ctx.producto.get(v["producto_id"]), ctx.zona(lat, lon), ensure_tiempo(dcur, ctx, fecha), fecha,
-             pedido.get("state"), v["cantidad"], v["precio"], v["subtotal"], v["total"], ent.get("id"), ctx.lote_id))
+             pedido.get("state"), v["cantidad"], v["precio"], v["subtotal"], v["total"], ent.get("id"), ctx.lote_id,
+             _aprox(lat), _aprox(lon)))
         cargadas.append(v["id"])
         ctx.contar("fact_ventas")
     _podar(dcur, "fact_ventas", "linea_id_odoo", cargadas)

@@ -88,12 +88,15 @@ def cargar_fuente(source: str, data_dir) -> pd.DataFrame:
         df.to_csv(data_dir / "viajes_simulados.csv", index=False)
         return df
     if source == "dwh":
-        import psycopg2
-        dsn = os.environ.get("DWH_DSN")
-        if not dsn:
-            raise SystemExit("DWH_DSN no esta definido")
-        with psycopg2.connect(dsn) as con:
-            return pd.read_sql_query(f"SELECT {', '.join(COLUMNAS)} FROM v_viajes_entrenamiento", con)
+        from contextlib import closing
+        from .demanda import datos
+        try:
+            con = datos.conectar()
+        except datos.ConfigError as exc:
+            raise SystemExit(str(exc))
+        with closing(con), con.cursor() as cur:
+            cur.execute(f"SELECT {', '.join(COLUMNAS)} FROM v_viajes_entrenamiento")
+            return pd.DataFrame(cur.fetchall(), columns=COLUMNAS)
     raise SystemExit(f"Fuente desconocida: {source} (use csv:<ruta>, simulate o dwh)")
 
 

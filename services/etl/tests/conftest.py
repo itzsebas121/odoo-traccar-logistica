@@ -98,19 +98,20 @@ class Dbs:
         self.stg_user = "etl_stg_t_" + tag
         self.dwh_user = "dwh_etl_t_" + tag
         self.ro_role = "dwh_ro_t_" + tag
+        self.ml_role = "dwh_ml_t_" + tag
         self.passwords = {}
         self.result = None
 
     def bootstrap(self, roles=False, reset=False):
         if roles:
             self.passwords = {self.stg_user: uuid.uuid4().hex, self.dwh_user: uuid.uuid4().hex,
-                              self.ro_role: uuid.uuid4().hex}
+                              self.ro_role: uuid.uuid4().hex, self.ml_role: uuid.uuid4().hex}
         pw = self.passwords
         self.result = db.bootstrap(
             admin_dsn=self.admin, staging_db=self.stg_db, dwh_db=self.dwh_db,
-            stg_user=self.stg_user, dwh_user=self.dwh_user, ro_role=self.ro_role,
+            stg_user=self.stg_user, dwh_user=self.dwh_user, ro_role=self.ro_role, ml_role=self.ml_role,
             stg_password=pw.get(self.stg_user), dwh_password=pw.get(self.dwh_user),
-            ro_password=pw.get(self.ro_role), reset=reset)
+            ro_password=pw.get(self.ro_role), ml_password=pw.get(self.ml_role), reset=reset)
         return self.result
 
     def connect(self, dbname, role=None, autocommit=False):
@@ -130,7 +131,7 @@ class Dbs:
         with a.cursor() as cur:
             for base in (self.stg_db, self.dwh_db):
                 cur.execute('DROP DATABASE IF EXISTS "%s" WITH (FORCE)' % base)
-            for role in (self.stg_user, self.dwh_user, self.ro_role):
+            for role in (self.stg_user, self.dwh_user, self.ro_role, self.ml_role):
                 cur.execute('DROP ROLE IF EXISTS "%s"' % role)
         a.close()
 

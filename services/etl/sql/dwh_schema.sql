@@ -189,6 +189,72 @@ CREATE TABLE IF NOT EXISTS fact_ventas (
     lote_id int
 );
 
+-- Ubicacion aproximada del punto de entrega del pedido (la que marca el cliente en el mapa de Odoo), redondeada a
+-- 3 decimales (~110 m): basta para agregar la demanda por celda o cluster y no expone la direccion exacta (spec 12).
+ALTER TABLE fact_ventas ADD COLUMN IF NOT EXISTS lat_aprox double precision;
+ALTER TABLE fact_ventas ADD COLUMN IF NOT EXISTS lon_aprox double precision;
+
+-- ---------------------------------------------------------------- resultados del ML (los escribe el rol dwh_ml)
+-- Tabla comparativa de modelos de pronostico de demanda: una fila por modelo x unidad espacial x procedencia de
+-- cada corrida del benchmark (backtest con origen movil). La leen el BI, Power BI y la plataforma web.
+CREATE TABLE IF NOT EXISTS ml_evaluacion_modelos (
+    sk bigserial PRIMARY KEY,
+    corrida_id text NOT NULL,
+    corrida_utc timestamptz NOT NULL DEFAULT now(),
+    modelo text NOT NULL,
+    familia text NOT NULL,          -- baseline, intermitente, estadistico, ml_lineal, ml_arboles, deep_learning, fundacional
+    libreria text,
+    unidad_espacial text NOT NULL,  -- h3:8, kmeans:10, dbscan, zona ...
+    procedencia text NOT NULL,      -- REAL, SIMULADO o TODAS
+    estado text NOT NULL DEFAULT 'ok',   -- ok, omitido (libreria no instalada) o error
+    detalle text,
+    cortes int,
+    horizonte_dias int,
+    series int,
+    mae numeric(14,4),
+    rmse numeric(14,4),
+    wape numeric(10,4),
+    wape_7d numeric(10,4),     -- error sobre el total de los 7 dias de cada serie (metrica principal)
+    mase numeric(10,4),
+    sesgo numeric(10,4),
+    seg_entrenar numeric(12,3),
+    seg_predecir numeric(12,3),
+    mb_dependencias numeric(10,1),
+    puesto int,
+    elegido boolean NOT NULL DEFAULT false,
+    UNIQUE (corrida_id, modelo, unidad_espacial, procedencia)
+);
+ALTER TABLE ml_evaluacion_modelos ADD COLUMN IF NOT EXISTS wape_7d numeric(10,4);
+-- Unidades espaciales con que se agrega la demanda (celdas H3, clusters o zonas): para dibujar el mapa.
+CREATE TABLE IF NOT EXISTS ml_unidad_espacial (
+    tipo text NOT NULL,             -- h3:8, kmeans:10, dbscan, zona
+    unidad_id text NOT NULL,
+    centro_lat double precision,
+    centro_lon double precision,
+    geojson text,                   -- poligono (H3) o casco convexo aproximado (clusters)
+    lineas int,
+    actualizado_utc timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (tipo, unidad_id)
+);
+-- Pronostico de demanda del modelo elegido. tipo_registro = 'pronostico' (dias futuros, unidades_real NULL) o
+-- 'backtest' (ultimo corte de prueba: lo pronosticado frente a lo real, para el grafico real vs pronostico).
+CREATE TABLE IF NOT EXISTS ml_pronostico_demanda (
+    sk bigserial PRIMARY KEY,
+    tipo_registro text NOT NULL DEFAULT 'pronostico' CHECK (tipo_registro IN ('pronostico','backtest')),
+    fecha_objetivo date NOT NULL,
+    producto_sk int REFERENCES dim_producto(sk),
+    tipo_unidad text NOT NULL,
+    unidad_id text NOT NULL,
+    unidades_pred numeric(12,3) NOT NULL,
+    unidades_real numeric(12,3),
+    p10 numeric(12,3),
+    p90 numeric(12,3),
+    modelo text NOT NULL,
+    model_version text NOT NULL,
+    generado_utc timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (tipo_registro, fecha_objetivo, producto_sk, tipo_unidad, unidad_id, model_version)
+);
+
 -- ---------------------------------------------------------------- control
 -- Una fila por corrida del ETL (copia de la bitacora de staging, para que el BI la lea con dwh_ro).
 CREATE TABLE IF NOT EXISTS etl_ejecucion (
@@ -210,3 +276,5 @@ CREATE INDEX IF NOT EXISTS ix_fact_par_ruta ON fact_paradas (ruta_id_odoo);
 CREATE INDEX IF NOT EXISTS ix_fact_ven_pedido ON fact_ventas (pedido_id_odoo);
 CREATE INDEX IF NOT EXISTS ix_fact_rec_ruta ON fact_recorridos (ruta_id_odoo);
 CREATE INDEX IF NOT EXISTS ix_fact_ent_recorrido ON fact_entregas (recorrido_sk);
+CREATE INDEX IF NOT EXISTS ix_fact_ven_fecha ON fact_ventas (fecha_pedido_utc);
+CREATE INDEX IF NOT EXISTS ix_ml_pron_fecha ON ml_pronostico_demanda (fecha_objetivo);

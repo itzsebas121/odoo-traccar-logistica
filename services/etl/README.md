@@ -218,3 +218,12 @@ tests/               174 pruebas; las de base de datos usan bases desechables
 ```
 
 Si se añaden columnas, hacerlo también con `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` (como las de `fact_recorridos`): así una base existente las recibe con `bootstrap`, sin `--reset`. Si cambia `sql/dwh_schema.sql` o `sql/dwh_views.sql`, hay que copiarlos a `services/bi/tests/` (una prueba del BI lo comprueba) y, si el cambio es incompatible, subir `SCHEMA_VERSION` en `etl/db.py`.
+
+
+## Ubicación de las ventas, vistas del ML/BI y rol `dwh_ml`
+
+- `fact_ventas.lat_aprox` y `lon_aprox`: ubicación de entrega del pedido redondeada a 3 decimales (~110 m).
+- Vistas nuevas: `v_ml_ventas_geo` y `v_ml_demanda_diaria_zona` (ML) y las `v_bi_*` de `sql/dwh_bi_views.sql` (dashboards; ver `docs/guia_dashboard_web_powerbi.md`).
+- Tablas `ml_evaluacion_modelos`, `ml_unidad_espacial` y `ml_pronostico_demanda`: las escribe el servicio ML.
+- Rol `dwh_ml` (`DWH_ML_PASSWORD`): lee todo el DWH y escribe solo las tablas `ml_*`. Sin clave, `bootstrap` no lo crea.
+- `ETL_TRACCAR_TIMEOUT_S` (30 por defecto): espera por informe de Traccar; súbala con mucho historial GPS.

@@ -417,7 +417,7 @@ def test_fuente_caida_se_omite_y_no_borra_nada(stg_con, dwh_con, odoo, traccar):
 
 def test_error_de_carga_marca_el_lote_y_no_avanza_marcas(stg_con, dwh_con, odoo, traccar):
     with dwh_con.cursor() as cur:
-        cur.execute("drop table fact_posicion_gps")      # fuerza un fallo en la carga del DWH
+        cur.execute("drop table fact_posicion_gps cascade")      # fuerza un fallo en la carga del DWH
     dwh_con.commit()
     with pytest.raises(psycopg2.Error):
         correr(stg_con, dwh_con, "full", odoo, traccar)

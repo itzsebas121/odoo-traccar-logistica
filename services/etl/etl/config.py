@@ -9,6 +9,8 @@ import os
 
 SQL_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sql")
 RO_ROLE = "dwh_ro"
+# Rol del servicio ML: lee todo el DWH y escribe solo sus tablas de resultados (ml_*).
+ML_ROLE = "dwh_ml"
 
 
 class ConfigError(RuntimeError):

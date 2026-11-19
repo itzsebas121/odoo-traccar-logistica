@@ -32,7 +32,8 @@ def _sources():
     try:
         from .extract.traccar import TraccarSource
         traccar = TraccarSource(config.env("TRACCAR_URL", "http://traccar:8082"),
-                                config.env("TRACCAR_USER", "admin@logistica.local"), traccar_password)
+                                config.env("TRACCAR_USER", "admin@logistica.local"), traccar_password,
+                                timeout=config.entero("ETL_TRACCAR_TIMEOUT_S", 30, minimo=1))
         traccar.comprobar()
     except Exception as exc:
         print("AVISO: Traccar no disponible, se omite (%s)" % exc, file=sys.stderr)
@@ -51,13 +52,15 @@ def cmd_bootstrap(a):
     if a.reset:
         print("Se borran y recrean las bases %s y %s." % (config.staging_db(), config.dwh_db()))
     hecho = db.bootstrap(stg_password=config.env("ETL_STG_PASSWORD"), dwh_password=config.env("DWH_ETL_PASSWORD"),
-                         ro_password=config.env("DWH_DB_PASSWORD"), reset=a.reset)
+                         ro_password=config.env("DWH_DB_PASSWORD"), ml_password=config.env("DWH_ML_PASSWORD"),
+                         reset=a.reset)
     for clave, rol, var, efecto in (
             ("staging_owner", config.staging_user(), "ETL_STG_PASSWORD",
              "no se crea el rol; la base queda a nombre del administrador"),
             ("dwh_owner", config.dwh_user(), "DWH_ETL_PASSWORD",
              "no se crea el rol; la base queda a nombre del administrador"),
-            ("ro", config.RO_ROLE, "DWH_DB_PASSWORD", "BI/ML no tendran usuario de lectura")):
+            ("ro", config.RO_ROLE, "DWH_DB_PASSWORD", "BI/ML no tendran usuario de lectura"),
+            ("ml", config.ML_ROLE, "DWH_ML_PASSWORD", "el ML no podra guardar la comparativa ni los pronosticos")):
         if not hecho[clave]:
             print("AVISO: %s no definida; no se crea el rol %s (%s)" % (var, rol, efecto), file=sys.stderr)
     print("Bases listas: %s, %s (esquema v%d)" % (config.staging_db(), config.dwh_db(), db.SCHEMA_VERSION))

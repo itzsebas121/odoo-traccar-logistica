@@ -129,3 +129,36 @@ Con el `etl-scheduler` en marcha, el DWH se actualiza cada `ETL_INTERVAL_MIN`. P
 - [ ] La matriz de confusión y el top-3 se presentan en el BI o en el informe.
 - [ ] `/predict` acepta todas las zonas que existen en `dim_zona` (M1).
 - [ ] No se usa como variable nada que solo se conoce al terminar el viaje.
+
+
+---
+
+## 6. Pronóstico de demanda de artículos por ubicación (implementado)
+
+Segunda pregunta del ML: **¿cuántas unidades de cada artículo se pedirán en cada ubicación en los próximos 7 días?** Código en `services/ml/mlsvc/demanda/`; no cambia `/predict` (destinos), que sigue usando Odoo.
+
+- **Datos:** `v_ml_ventas_geo` (una fila por línea de pedido, con la ubicación aproximada del pedido a ~110 m: `fact_ventas.lat_aprox/lon_aprox`). El histórico de demostración (Ambato, alimentos y uso doméstico) lo carga `seeds/historico.py` en Odoo y Traccar y el ETL lo lleva al DWH. **Ojo:** ese histórico entra por Odoo, así que el DWH lo marca `REAL`; solo los viajes de `etl simulate` son `SIMULADO`.
+- **Unidad espacial** (no solo la zona fija): celdas H3 (`h3:7/8/9`), KMeans (k por silueta), DBSCAN y la zona del DWH como referencia. `espacial.py`.
+- **Variables sin fuga del futuro:** rezagos de 7, 14, 21 y 28 días (≥ horizonte), medias desplazadas, calendario de Ecuador (feriados, quincena y fin de mes), producto, categoría y ubicación de la unidad. `features.py`.
+- **Evaluación:** backtest con origen móvil (3 cortes de 7 días al final), mismas series y cortes para todos los modelos. Métricas: WAPE (principal), MAE, RMSE, MASE y sesgo. Regla de elección en `benchmark.py`.
+- **Modelos comparados (24):** naive, estacional, medias móviles, Croston, SBA, TSB, ADIDA, AutoETS, AutoARIMA, Prophet, Ridge, Poisson, Random Forest, HistGB, XGBoost, LightGBM, CatBoost, MLP, LSTM, N-BEATS, N-HiTS, TFT y Chronos-Bolt (fundacional).
+
+```bash
+docker compose --profile etl run --rm etl bootstrap                  # tablas ml_*, vistas y rol dwh_ml
+docker compose --profile historico run --rm seed-historico           # histórico de Ambato en Odoo + GPS en Traccar
+docker compose --profile etl run --rm etl run --mode full
+docker compose --profile benchmark run --rm ml-benchmark            # tabla comparativa
+docker compose --profile analitica run --rm ml python -m mlsvc.demanda.train --source dwh
+```
+
+Resultados: `services/ml/analisis/comparativa_modelos.md` (también `.csv` y `.json`) y la tabla `ml_evaluacion_modelos`. Endpoints `/demanda/*` y vistas para dashboards: ver [guia_dashboard_web_powerbi.md](guia_dashboard_web_powerbi.md).
+
+**Pendientes M3 y M4 de la sección 2:** resueltos para el modelo de demanda (escritura atómica y conexión por partes con `psycopg2.connect(**kwargs)`); `DWH_DSN` ya no existe.
+
+**Poda:** tras revisar la tabla, dejar en `requirements.txt` solo lo que use el modelo ganador y borrar `requirements-benchmark.txt`, el target `benchmark` del `Dockerfile` y el servicio `ml-benchmark`. Conservar la tabla comparativa.
+
+### Modelo elegido (corrida `20261117T150751Z`, 14 788 líneas de venta, 180 días)
+
+**LightGBM con pérdida Tweedie + clusters DBSCAN** (298 series producto × cluster): WAPE 7d 0,517, MASE diario 0,879 (mejor MASE de la tabla), entrena en ~4 s y pesa 11 MB. Se publica con `python -m mlsvc.demanda.train --source dwh` y se sirve en `/demanda/predict`. Tabla completa: `services/ml/analisis/comparativa_modelos.md`.
+
+Lectura honesta de la tabla: en la misma unidad, los mejores modelos (AutoETS, AutoARIMA, LightGBM, medias por día de la semana, Ridge, CatBoost) quedan a menos de 2 % de WAPE 7d entre sí; los de deep learning (LSTM, N-BEATS, N-HiTS, TFT) y Chronos no superaron a los de árboles con estos datos, y cuestan ~1 GB de dependencias. Se eligió LightGBM por ser el mejor en error diario, rápido, ligero y porque usa ubicación, calendario y producto como variables (los estadísticos por serie no). La unidad de zona fija da menos error (agrega más), pero no describe dónde se pide de verdad; DBSCAN se adapta a los clientes.

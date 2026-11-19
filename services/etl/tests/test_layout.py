@@ -12,8 +12,16 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 TABLAS_STAGING = {"schema_version", "odoo_raw", "traccar_raw", "lote", "watermark", "rechazados"}
 TABLAS_DWH = {"schema_version", "dim_vehiculo", "dim_conductor", "dim_tiempo", "dim_zona", "dim_cliente",
               "dim_producto", "fact_recorridos", "fact_posicion_gps", "fact_rutas", "fact_paradas", "fact_entregas",
-              "fact_ventas", "etl_ejecucion"}
-VISTAS_DWH = {"v_viajes_entrenamiento", "v_ruta_plan_vs_real", "v_ml_viajes", "v_ml_transiciones_paradas"}
+              "fact_ventas", "etl_ejecucion", "ml_evaluacion_modelos", "ml_unidad_espacial", "ml_pronostico_demanda"}
+VISTAS_ML = {"v_viajes_entrenamiento", "v_ruta_plan_vs_real", "v_ml_viajes", "v_ml_transiciones_paradas",
+             "v_ml_ventas_geo", "v_ml_demanda_diaria_zona"}
+VISTAS_BI = {"v_bi_dim_fecha", "v_bi_dim_producto", "v_bi_dim_cliente", "v_bi_dim_zona", "v_bi_dim_vehiculo",
+             "v_bi_ventas_diarias", "v_bi_pedidos", "v_bi_ventas_mapa", "v_bi_top_productos_zona",
+             "v_bi_comparativa_modelos", "v_bi_corridas_modelo", "v_bi_unidades_espaciales",
+             "v_bi_demanda_real_vs_pronostico", "v_bi_recorridos", "v_bi_od_viajes", "v_bi_conductor_resumen",
+             "v_bi_entregas", "v_bi_vinculo_gps", "v_bi_ruta_plan_vs_real", "v_bi_paradas", "v_bi_posiciones_ruta",
+             "v_bi_etl_ejecuciones"}
+VISTAS_DWH = VISTAS_ML | VISTAS_BI
 
 
 def _tablas(conn):
@@ -41,8 +49,8 @@ def test_bootstrap_agrega_columnas_nuevas_a_una_base_existente(dbs, dwh_con):
     """Las columnas de fact_recorridos que se anadieron despues de la v2 llegan a una base v2 ya creada con un
     `bootstrap` normal (sin --reset): el cambio es aditivo."""
     with dwh_con.cursor() as cur:
-        cur.execute("drop view v_ml_viajes")
-        cur.execute("alter table fact_recorridos drop column ruta_id_odoo, drop column lat_destino")
+        cur.execute("drop view v_ml_viajes cascade")      # cascade: las vistas BI dependen de ella
+        cur.execute("alter table fact_recorridos drop column ruta_id_odoo cascade, drop column lat_destino cascade")
     dwh_con.commit()
     dbs.bootstrap()
     assert q1(dwh_con, "select count(*) from information_schema.columns where table_name='fact_recorridos' "
@@ -76,7 +84,7 @@ def test_contrato_de_columnas_para_bi_y_ml(dwh_con):
 # ---------------------------------------------------------------- roles
 def test_bootstrap_propietarios(dbs_roles):
     e = dbs_roles
-    assert e.result == {"staging_owner": True, "dwh_owner": True, "ro": True}
+    assert e.result == {"staging_owner": True, "dwh_owner": True, "ro": True, "ml": True}
     for base, rol, tablas in ((e.stg_db, e.stg_user, TABLAS_STAGING), (e.dwh_db, e.dwh_user, TABLAS_DWH)):
         conn = e.connect(base)
         try:
@@ -152,12 +160,12 @@ def test_dwh_ro_cubre_tablas_nuevas(dbs_roles):
 
 
 def test_bootstrap_idempotente_con_roles(dbs_roles):
-    assert dbs_roles.bootstrap() == {"staging_owner": True, "dwh_owner": True, "ro": True}
+    assert dbs_roles.bootstrap() == {"staging_owner": True, "dwh_owner": True, "ro": True, "ml": True}
 
 
 def test_bootstrap_sin_password_no_crea_roles(dbs):
     e = dbs
-    assert e.result == {"staging_owner": False, "dwh_owner": False, "ro": False}
+    assert e.result == {"staging_owner": False, "dwh_owner": False, "ro": False, "ml": False}
     a = psycopg2.connect(e.admin)
     try:
         for rol in (e.stg_user, e.dwh_user, e.ro_role):

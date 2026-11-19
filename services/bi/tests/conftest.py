@@ -1,6 +1,6 @@
 import os
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlsplit, urlunsplit
 
 import psycopg2
@@ -23,8 +23,12 @@ def _tsk(t):
 
 
 def _tiempo(cur, t):
-    cur.execute("INSERT INTO dim_tiempo (sk, fecha, anio, mes, dia, dia_semana, hora) VALUES (%s,%s,%s,%s,%s,%s,%s) "
-                "ON CONFLICT DO NOTHING", (_tsk(t), t.date(), t.year, t.month, t.day, t.isoweekday(), t.hour))
+    """Fila de dim_tiempo con la vista local (America/Guayaquil = UTC-5), como la carga el ETL."""
+    loc = t - timedelta(hours=5)
+    cur.execute("INSERT INTO dim_tiempo (sk, fecha, anio, mes, dia, dia_semana, hora, fecha_local, hora_local, "
+                "dia_semana_local, fin_de_semana) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
+                (_tsk(t), t.date(), t.year, t.month, t.day, t.isoweekday(), t.hour, loc.date(), loc.hour,
+                 loc.isoweekday(), loc.isoweekday() >= 6))
     return _tsk(t)
 
 
@@ -39,8 +43,8 @@ def _poblar(cur):
     cur.execute("INSERT INTO dim_conductor (conductor_id_odoo, nombre) VALUES (1,'Carlos')")
     cur.execute("INSERT INTO dim_cliente (cliente_id_odoo, nombre, zona_sk) VALUES "
                 "(1,'Cliente Uno',%s),(2,'Cliente Dos',%s)", (z["centro"], z["ficoa"]))
-    cur.execute("INSERT INTO dim_producto (producto_id_odoo, nombre, referencia) VALUES "
-                "(1,'Producto Uno','P1'),(2,'Producto Dos','P2')")
+    cur.execute("INSERT INTO dim_producto (producto_id_odoo, nombre, referencia, categoria) VALUES "
+                "(1,'Producto Uno','P1','All / Alimentos / Granos'),(2,'Producto Dos','P2','All / Hogar / Limpieza')")
 
     # (vehiculo, dia, hora, origen, destino, km, min, paradas, procedencia)
     rec = [(1, 3, 8, "centro", "ficoa", 10, 30, 1, "REAL"),
@@ -91,9 +95,23 @@ def _poblar(cur):
     for lid, ped, c, p, zona, d, cant, sub in ventas:
         t = _ts(d, 7)
         cur.execute("""INSERT INTO fact_ventas (linea_id_odoo, pedido_id_odoo, pedido_ref, cliente_sk, producto_sk,
-            zona_sk, tiempo_sk, fecha_pedido_utc, estado_pedido, cantidad, precio_unitario, subtotal, total)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'sale',%s,10,%s,%s)""",
+            zona_sk, tiempo_sk, fecha_pedido_utc, estado_pedido, cantidad, precio_unitario, subtotal, total,
+            lat_aprox, lon_aprox)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'sale',%s,10,%s,%s,-1.242,-78.62)""",
                     (lid, ped, "S%04d" % ped, c, p, z[zona], _tiempo(cur, t), t, cant, sub, sub))
+
+    # Resultados del ML: una corrida del benchmark, una unidad espacial y el pronostico con su backtest.
+    cur.execute("""INSERT INTO ml_evaluacion_modelos (corrida_id, modelo, familia, libreria, unidad_espacial,
+        procedencia, estado, wape, mae, mase, puesto, elegido) VALUES
+        ('c1','lightgbm_tweedie','ml_arboles','lightgbm','h3:8','TODAS','ok',0.40,0.8,0.7,1,true),
+        ('c1','estacional_7','baseline','propio','h3:8','TODAS','ok',0.60,1.2,1.0,2,false),
+        ('c1','tft','deep_learning','neuralforecast','h3:8','TODAS','omitido',NULL,NULL,NULL,NULL,false)""")
+    cur.execute("INSERT INTO ml_unidad_espacial (tipo, unidad_id, centro_lat, centro_lon, lineas) "
+                "VALUES ('h3:8','88abc',-1.242,-78.62,3)")
+    cur.execute("""INSERT INTO ml_pronostico_demanda (tipo_registro, fecha_objetivo, producto_sk, tipo_unidad, unidad_id,
+        unidades_pred, unidades_real, p10, p90, modelo, model_version) VALUES
+        ('backtest','2026-11-03',1,'h3:8','88abc',2.5,2,NULL,NULL,'lightgbm_tweedie','v1'),
+        ('pronostico','2026-11-05',1,'h3:8','88abc',3,NULL,1,5,'lightgbm_tweedie','v1')""")
 
     cur.execute("""INSERT INTO etl_ejecucion (lote_id, modo, inicio_utc, fin_utc, estado, cargados, rechazados,
                                               omitidos, error) VALUES
@@ -119,7 +137,7 @@ def dwh_env():
     try:
         conn = psycopg2.connect(dsn)
         with conn, conn.cursor() as cur:
-            for f in ("dwh_schema.sql", "dwh_views.sql"):
+            for f in ("dwh_schema.sql", "dwh_views.sql", "dwh_bi_views.sql"):
                 with open(os.path.join(HERE, f), encoding="utf-8") as fh:
                     cur.execute(fh.read())
             _poblar(cur)

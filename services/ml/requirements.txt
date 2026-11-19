@@ -5,3 +5,8 @@ pandas==2.2.3
 numpy==2.2.1
 joblib==1.4.2
 psycopg2-binary==2.9.10
+# Pronostico de demanda por ubicacion: celdas H3 y feriados de Ecuador (livianas, las usa produccion).
+h3==4.1.2
+holidays==0.62
+# Modelo ganador del benchmark de demanda (ver services/ml/analisis/comparativa_modelos.md)
+lightgbm==4.5.0
