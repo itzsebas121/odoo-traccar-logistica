@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from . import ZONAS
+from . import ZONAS, integridad
 from .features import build_features
 
 
@@ -45,10 +45,13 @@ class DemandaIn(BaseModel):
 
 
 class _Recargable:
-    """Recarga un joblib cuando cambia su firma (mtime, tamano): un reentrenamiento se ve sin reiniciar."""
+    """Recarga un joblib cuando cambia su firma (mtime, tamano): un reentrenamiento se ve sin reiniciar.
 
-    def __init__(self, ruta):
-        self.ruta, self.obj, self.firma = ruta, None, None
+    Con `verificar=True` (modelos que vienen en el repo) el archivo debe coincidir con su hash en SHA256SUMS antes de
+    cargarlo; si no, lanza ModeloNoVerificado y lo sigue lanzando hasta que el archivo cambie."""
+
+    def __init__(self, ruta, verificar=False):
+        self.ruta, self.verificar, self.obj, self.firma, self.error = ruta, verificar, None, None, None
 
     def __call__(self):
         try:
@@ -57,20 +60,29 @@ class _Recargable:
             return self.obj
         firma = (st.st_mtime_ns, st.st_size)
         if firma != self.firma:
+            if self.verificar:
+                try:
+                    integridad.verificar(self.ruta)
+                except integridad.ModeloNoVerificado as exc:
+                    self.firma, self.error = firma, exc
+                    raise
             self.obj = joblib.load(self.ruta)
-            self.firma = firma
+            self.firma, self.error = firma, None
+        if self.error is not None:
+            raise self.error
         return self.obj
 
 
 def create_app(model_dir=None, analisis_dir=None) -> FastAPI:
     mdir = pathlib.Path(model_dir or os.environ.get("MODEL_DIR", "models"))
     adir = pathlib.Path(analisis_dir or os.environ.get("ANALISIS_DIR", "analisis"))
-    demanda = _Recargable(mdir / "demanda.joblib")
+    demanda = _Recargable(mdir / "demanda.joblib", verificar=True)
     # Pronostico hecho en este servidor con sus datos (mlsvc.demanda.predecir, sin entrenar): manda sobre el del paquete.
+    # No va en SHA256SUMS: lo escribe el propio servidor al correr ml-predecir.
     prediccion = _Recargable(mdir / "demanda_prediccion.joblib")
     app = FastAPI(title="Prediccion de destinos")
     model_file = mdir / "model.joblib"
-    state = {"model": None, "firma": None}
+    state = {"model": None, "firma": None, "error": None}
 
     def cargar():
         # Recarga model.joblib cuando cambia su firma (mtime, tamano): un reentrenamiento
@@ -81,8 +93,12 @@ def create_app(model_dir=None, analisis_dir=None) -> FastAPI:
             return state["model"]
         firma = (st.st_mtime_ns, st.st_size)
         if firma != state["firma"]:
-            state["model"] = joblib.load(model_file)
-            state["firma"] = firma
+            try:
+                integridad.verificar(model_file)
+            except integridad.ModeloNoVerificado as exc:
+                state.update(model=None, firma=firma, error=str(exc))
+                return None
+            state.update(model=joblib.load(model_file), firma=firma, error=None)
         return state["model"]
 
     cargar()
@@ -95,7 +111,7 @@ def create_app(model_dir=None, analisis_dir=None) -> FastAPI:
     def predict(body: PredictIn):
         m = cargar()
         if m is None:
-            raise HTTPException(503, "No hay modelo entrenado")
+            raise HTTPException(503, state["error"] or "No hay modelo entrenado")
         pipe = m["pipeline"]
         # Un reference_datetime sin zona horaria (naive) se interpreta como UTC (R7).
         X = build_features([body.vehicle_code], [body.reference_datetime.isoformat()], [body.origin_zone])
@@ -117,7 +133,10 @@ def create_app(model_dir=None, analisis_dir=None) -> FastAPI:
 
     # ------------------------------------------------------------ pronostico de demanda por ubicacion
     def _paquete():
-        paq = demanda()
+        try:
+            paq = demanda()
+        except integridad.ModeloNoVerificado as exc:
+            raise HTTPException(503, str(exc))
         if paq is None:
             raise HTTPException(503, "No hay modelo de demanda entrenado (python -m mlsvc.demanda.train)")
         return paq

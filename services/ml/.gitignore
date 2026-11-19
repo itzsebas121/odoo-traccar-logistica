@@ -5,5 +5,7 @@ models/*
 !models/demanda_metrics.json
 !models/model.joblib
 !models/metrics.json
+# Hash de los modelos que el servidor carga (mlsvc/integridad.py); lo actualiza el entrenamiento en local.
+!models/SHA256SUMS
 data/*
 !data/.gitkeep

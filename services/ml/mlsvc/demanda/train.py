@@ -26,6 +26,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
+from .. import integridad
 from . import HORIZONTE, datos, espacial, metricas, panel
 from .modelos import POR_NOMBRE, servible
 
@@ -128,6 +129,7 @@ def entrenar(ventas, modelo, unidad, procedencia, model_dir, ctx=None):
     model_dir = pathlib.Path(model_dir)
     model_dir.mkdir(parents=True, exist_ok=True)
     _atomico(model_dir / "demanda.joblib", lambda t: joblib.dump(paquete, t))
+    integridad.registrar(model_dir / "demanda.joblib")      # el servidor solo carga lo que tiene hash registrado
     _atomico(model_dir / "demanda_metrics.json",
              lambda t: pathlib.Path(t).write_text(json.dumps(metrics, indent=2, ensure_ascii=False, default=str),
                                                   encoding="utf-8"))

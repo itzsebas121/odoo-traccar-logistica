@@ -20,12 +20,14 @@ import argparse
 import json
 import os
 import pathlib
+import sys
 from datetime import datetime, timezone
 
 import joblib
 import numpy as np
 import pandas as pd
 
+from .. import integridad
 from . import HORIZONTE, datos, panel
 from . import features as F
 from .modelos import POR_NOMBRE
@@ -171,6 +173,10 @@ def main(argv=None):
     ruta = pathlib.Path(a.model_dir) / "demanda.joblib"
     if not ruta.exists():
         raise SystemExit("No hay %s: entrene en local (mlsvc.demanda.train) y suba el archivo." % ruta)
+    try:
+        integridad.verificar(ruta)
+    except integridad.ModeloNoVerificado as exc:
+        raise SystemExit(str(exc))
     paquete = joblib.load(ruta)
     try:
         pred = predecir(paquete, datos.cargar(a.source))
@@ -184,7 +190,9 @@ def main(argv=None):
             print("predecir: %d filas en ml_pronostico_demanda" % guardar_dwh(pred))
             print("predecir: %d filas de la comparativa en ml_evaluacion_modelos" % publicar_comparativa(a.analisis_dir))
         else:
-            print("predecir: DWH_ML_PASSWORD no definida; el pronostico no se guarda en el DWH")
+            # Sin esto el tablero no muestra pronostico (lee ml_pronostico_demanda). El archivo local sí se escribe.
+            print("predecir: AVISO: DWH_ML_PASSWORD no definida; el pronostico NO se guardo en el DWH y el tablero "
+                  "no lo mostrara. Defina DWH_ML_PASSWORD en .env y corra `etl bootstrap`.", file=sys.stderr)
     return 0
 
 
