@@ -197,7 +197,7 @@ def create_app(model_dir=None, analisis_dir=None) -> FastAPI:
         if body.unidad_id is not None:
             unidad = body.unidad_id
         else:
-            unidad = str(paq["asignador"].asignar([body.lat], [body.lon])[0])
+            unidad = str(paq["asignador"].asignar_con_limite([body.lat], [body.lon])[0])
         uid = "%s|%s" % (int(fila["producto_sk"]), unidad)
         pron = pred["pronostico"] if pred is not None else paq["pronostico"]
         serie = pron[pron["unique_id"] == uid].sort_values("ds").head(body.horizonte)
@@ -208,7 +208,7 @@ def create_app(model_dir=None, analisis_dir=None) -> FastAPI:
         else:
             dias = [{"fecha": str(pd_fecha(r.ds)), "unidades": round(float(r.yhat), 2),
                      "p10": round(float(r.p10), 2), "p90": round(float(r.p90), 2)} for r in serie.itertuples()]
-        centro = next((u for u in paq["unidades"] if u["unidad_id"] == unidad), None)
+        centro = next((u for u in (pred or paq)["unidades"] if u["unidad_id"] == unidad), None)
         return {
             "producto_sk": int(fila["producto_sk"]), "producto_id": int(fila["producto_id_odoo"]),
             "producto": fila["producto"], "categoria": fila["categoria"],
@@ -237,10 +237,12 @@ def create_app(model_dir=None, analisis_dir=None) -> FastAPI:
     @app.get("/demanda/unidades")
     def demanda_unidades():
         paq = _paquete()
+        # Con prediccion del servidor: las unidades con los puntos exactos de este servidor (incluye las nuevas).
+        pred = _prediccion(paq)
         return {"type": "FeatureCollection", "tipo": paq["unidad"], "features": [
             {"type": "Feature", "geometry": json.loads(u["geojson"]) if u["geojson"] else None,
              "properties": {"unidad_id": u["unidad_id"], "centro_lat": u["centro_lat"], "centro_lon": u["centro_lon"],
-                            "lineas": u["lineas"]}} for u in paq["unidades"]]}
+                            "lineas": u["lineas"]}} for u in (pred or paq)["unidades"]]}
 
     return app
 

@@ -15,7 +15,7 @@ SECRETOS = ["ODOO_PASSWORD", "TRACCAR_PASSWORD", "ETL_STG_PASSWORD", "DWH_ETL_PA
 @pytest.fixture
 def entorno(monkeypatch):
     """Entorno minimo valido; el host es inalcanzable a proposito para detectar cualquier conexion."""
-    for k in ("DB_HOST", "DB_PORT", "STAGING_DB", "STAGING_USER", "DWH_DB", "DWH_ETL_USER", "ETL_INTERVAL_MIN",
+    for k in ("DB_HOST", "DB_PORT", "STAGING_DB", "STAGING_USER", "DWH_DB", "DWH_ETL_USER", "ETL_HORARIO",
               "ETL_RETENTION_DAYS", "ETL_TZ", "ETL_FULL_HOURS", "ETL_TRACCAR_DAYS"):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setenv("DB_HOST", "no-existe.invalid")
@@ -54,23 +54,32 @@ def test_valores_por_defecto_no_secretos(entorno):
     entorno.delenv("DB_HOST")
     p = config.dwh_params()
     assert (p["host"], str(p["port"]), p["dbname"], p["user"]) == ("db", "5432", "logistica_dwh", "dwh_etl")
-    assert (config.intervalo_min(), config.dias_retencion(), config.horas_entre_completas(),
-            config.dias_ventana_traccar(), config.zona_horaria()) == (15, 30, 24, 30, "America/Guayaquil")
+    assert (config.horario(), config.dias_retencion(), config.horas_entre_completas(),
+            config.dias_ventana_traccar(), config.zona_horaria()) == ([(3, 0), (12, 0)], 30, 20, 30, "America/Guayaquil")
 
 
 def test_variable_no_secreta_vacia_usa_el_valor_por_defecto(entorno):
     """Compose pasa las variables sin definir como cadena vacia."""
-    entorno.setenv("ETL_INTERVAL_MIN", "")
+    entorno.setenv("ETL_HORARIO", "")
     entorno.setenv("ETL_TZ", "")
-    assert config.intervalo_min() == 15 and config.zona_horaria() == "America/Guayaquil"
+    assert config.horario() == [(3, 0), (12, 0)] and config.zona_horaria() == "America/Guayaquil"
 
 
-@pytest.mark.parametrize("variable, valor", [("ETL_INTERVAL_MIN", "cinco"), ("ETL_INTERVAL_MIN", "0"),
-                                             ("ETL_RETENTION_DAYS", "-1"), ("ETL_FULL_HOURS", "1.5")])
+@pytest.mark.parametrize("variable, valor", [("ETL_HORARIO", "cinco"), ("ETL_HORARIO", "25:00"),
+                                             ("ETL_HORARIO", " , "), ("ETL_RETENTION_DAYS", "-1"),
+                                             ("ETL_FULL_HOURS", "1.5")])
 def test_numero_invalido_es_error_de_configuracion(entorno, variable, valor):
     entorno.setenv(variable, valor)
     with pytest.raises(config.ConfigError, match=variable):
-        (config.intervalo_min(), config.dias_retencion(), config.horas_entre_completas())
+        (config.horario(), config.dias_retencion(), config.horas_entre_completas())
+
+
+def test_horario_ordenado_y_mayor_hueco(entorno):
+    entorno.setenv("ETL_HORARIO", "12:00, 3")
+    assert config.horario() == [(3, 0), (12, 0)]
+    assert config.max_hueco_min() == 15 * 60              # de 12:00 a 03:00 del dia siguiente
+    entorno.setenv("ETL_HORARIO", "06:30")
+    assert config.max_hueco_min() == 24 * 60
 
 
 @pytest.mark.parametrize("faltante", SECRETOS)
@@ -99,3 +108,31 @@ def test_sin_credenciales_por_defecto_en_codigo():
         assert not re.search(r"env\(\s*[\"'][A-Z_]*(PASSWORD|DSN)[\"']\s*,", src), "secreto por defecto en " + path
         assert "odoo:odoo@" not in src, path
         assert "postgresql://" not in src, "DSN completo en " + path
+
+
+def test_serve_hace_bootstrap_una_vez_y_reintenta_si_falla(entorno, monkeypatch):
+    """`etl serve` (servicio del servidor): bootstrap sin --reset antes de la primera corrida; si falla (p. ej.
+    faltan claves) se reintenta en el ciclo siguiente y no se repite una vez hecho."""
+    from etl import __main__ as cli
+    from etl import scheduler
+    llamadas = []
+    entorno.delenv("DWH_ADMIN_DSN", raising=False)
+    monkeypatch.setattr(cli.db, "bootstrap", lambda **kw: llamadas.append(kw["reset"]) or {
+        "staging_owner": True, "dwh_owner": True, "ro": True, "ml": True})
+    monkeypatch.setattr(cli, "_corrida", lambda modo: "corrida %s" % modo)
+    salidas = []
+
+    def correr(ciclo):
+        for i in range(3):
+            if i == 1:
+                entorno.setenv("DWH_ADMIN_DSN", "x")
+            try:
+                salidas.append(ciclo())
+            except config.ConfigError as exc:
+                salidas.append("config: %s" % exc)
+        return 0
+    monkeypatch.setattr(scheduler, "run", correr)
+    assert main(["serve"]) == 0
+    assert "DWH_ADMIN_DSN" in salidas[0]
+    assert salidas[1:] == ["corrida auto", "corrida auto"]
+    assert llamadas == [False]          # una sola vez y nunca con --reset

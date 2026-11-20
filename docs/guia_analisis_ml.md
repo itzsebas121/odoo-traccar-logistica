@@ -122,7 +122,7 @@ curl -s -X POST localhost:8002/predict -H 'Content-Type: application/json' \
      -d '{"vehicle_code":"SIM-001","reference_datetime":"2026-11-10T14:30:00Z","origin_zone":"centro"}'
 ```
 
-Con el `etl-scheduler` en marcha, el DWH se actualiza cada `ETL_INTERVAL_MIN`. Para reentrenar de forma periódica hay dos opciones: un cron del host, o un servicio análogo al `etl-scheduler` que corra `mlsvc.train --source dwh`, por ejemplo una vez al día, después de la corrida completa.
+Con el `etl-scheduler` en marcha, el DWH se actualiza dos veces al día (`ETL_HORARIO`, por defecto 03:00 y 12:00). Para reentrenar de forma periódica hay dos opciones: un cron del host, o un servicio análogo al `etl-scheduler` que corra `mlsvc.train --source dwh`, por ejemplo una vez al día, después de la corrida completa.
 
 ## 5. Criterios de aceptación del análisis
 
@@ -141,7 +141,7 @@ Con el `etl-scheduler` en marcha, el DWH se actualiza cada `ETL_INTERVAL_MIN`. P
 
 Segunda pregunta del ML: **¿cuántas unidades de cada artículo se pedirán en cada ubicación en los próximos 7 días?** Código en `services/ml/mlsvc/demanda/`; no cambia `/predict` (destinos), que sigue usando Odoo.
 
-- **Datos:** `v_ml_ventas_geo` (una fila por línea de pedido, con la ubicación aproximada del pedido a ~110 m: `fact_ventas.lat_aprox/lon_aprox`). El historial de demostración (Ambato, 3 meses de pedidos) lo carga el módulo `logistica_demo` en Odoo (`seeds/seed.py`), `seeds/gps_historico.py` manda el GPS de sus rutas a Traccar y el ETL lo lleva al DWH. Ese historial es sintético: el ETL marca `SIMULADO` sus pedidos (`client_order_ref` `H-*`/`HOY-*`) y sus rutas (`historial-demo`), igual que los viajes de `etl simulate`. El benchmark elige con `REAL` si hay días suficientes; si no, con `TODAS` (y si tampoco, `SIMULADO`).
+- **Datos:** `v_ml_ventas_geo` (una fila por línea de pedido, con la ubicación exacta del pedido —o, si falta, la de su entrega o la del cliente—: `fact_ventas.lat_aprox/lon_aprox`). El historial de demostración (Ambato, 3 meses de pedidos) lo carga el módulo `logistica_demo` en Odoo (`seeds/seed.py`), `seeds/gps_historico.py` manda el GPS de sus rutas a Traccar y el ETL lo lleva al DWH. Ese historial es sintético: el ETL marca `SIMULADO` sus pedidos (`client_order_ref` `H-*`/`HOY-*`) y sus rutas (`historial-demo`), igual que los viajes de `etl simulate`. El benchmark elige con `REAL` si hay días suficientes; si no, con `TODAS` (y si tampoco, `SIMULADO`).
 - **Unidad espacial** (no solo la zona fija): celdas H3 (`h3:7/8/9`), KMeans (k por silueta), DBSCAN y la zona del DWH como referencia. `espacial.py`.
 - **Variables sin fuga del futuro:** rezagos de 7, 14, 21 y 28 días (≥ horizonte), medias desplazadas, calendario de Ecuador (feriados, quincena y fin de mes), producto, categoría y ubicación de la unidad. `features.py`.
 - **Evaluación:** backtest con origen móvil (3 cortes de 7 días al final), mismas series y cortes para todos los modelos. Métricas: **WAPE 7d (principal)**, WAPE 7d a nivel zona y total (las predicciones sumadas a producto × zona y a producto), mejora % frente al mejor baseline, WAPE diario, MAE, RMSE, MASE y sesgo.

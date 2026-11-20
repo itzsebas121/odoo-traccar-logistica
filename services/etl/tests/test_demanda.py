@@ -1,4 +1,4 @@
-"""Ubicacion aproximada de las ventas, vistas de demanda para el ML, vistas BI y rol dwh_ml."""
+"""Ubicacion exacta de las ventas, vistas de demanda para el ML, vistas BI y rol dwh_ml."""
 import psycopg2
 import pytest
 
@@ -6,12 +6,23 @@ from conftest import correr, q1, qall
 from test_layout import VISTAS_BI
 
 
-def test_ventas_guardan_ubicacion_aproximada(stg_con, dwh_con, odoo, traccar):
+def test_ventas_guardan_ubicacion_exacta(stg_con, dwh_con, odoo, traccar):
     correr(stg_con, dwh_con, "full", odoo, traccar)
     filas = dict((r[0], (r[1], r[2])) for r in qall(
         dwh_con, "select linea_id_odoo, lat_aprox, lon_aprox from fact_ventas order by 1"))
-    assert filas[501] == (-1.242, -78.62)          # -1.2417, -78.6197 redondeado a 3 decimales (~110 m)
+    assert filas[501] == (-1.2417, -78.6197)       # la de Odoo, sin redondear
     assert filas[504][0] is not None              # sin coordenadas en el pedido: usa las de su entrega
+
+
+def test_venta_sin_ubicacion_ni_entrega_usa_la_del_cliente(stg_con, dwh_con, odoo, traccar):
+    # S0003 (lineas 504/505) no trae coordenadas; sin su entrega, la venta toma el punto de entrega del cliente.
+    odoo.data["logistica.entrega"] = [e for e in odoo.data["logistica.entrega"] if e["sale_order_id"][0] != 13]
+    odoo.data["res.partner"] = odoo.data["res.partner"] + [
+        {"id": 202, "name": "Cliente C", "city": "Ambato", "is_driver": False, "delivery_latitude": -1.2654321,
+         "delivery_longitude": -78.6312345, "write_date": "2026-11-05 07:00:00"}]
+    correr(stg_con, dwh_con, "full", odoo, traccar)
+    assert qall(dwh_con, "select lat_aprox, lon_aprox from fact_ventas where linea_id_odoo = 504") == [
+        (-1.2654321, -78.6312345)]
 
 
 def test_v_ml_ventas_geo(stg_con, dwh_con, odoo, traccar):
@@ -19,7 +30,7 @@ def test_v_ml_ventas_geo(stg_con, dwh_con, odoo, traccar):
     fila = qall(dwh_con, "select producto, categoria, grupo, zona, cantidad, fecha_local, lat_aprox "
                          "from v_ml_ventas_geo where linea_id_odoo=501")[0]
     assert fila[0] == "[P1] Producto Uno" and fila[1] == "All" and fila[3] == "centro" and fila[4] == 2
-    assert fila[5] is not None and fila[6] == -1.242
+    assert fila[5] is not None and fila[6] == -1.2417
 
 
 def test_v_ml_demanda_diaria_rellena_con_ceros(stg_con, dwh_con, odoo, traccar):
@@ -105,3 +116,25 @@ def test_vista_de_lineas_de_venta_cuadra_con_las_ventas(stg_con, dwh_con, odoo, 
     assert q1(dwh_con, "select sum(unidades) from v_bi_lineas_venta") == q1(dwh_con, "select sum(unidades) from v_bi_ventas_diarias")
     assert q1(dwh_con, "select count(distinct pedido_id_odoo) from v_bi_lineas_venta") == q1(
         dwh_con, "select count(*) from v_bi_pedidos")
+
+
+def test_zona_aprox_del_pronostico_sigue_la_regla_del_etl(stg_con, dwh_con, odoo, traccar):
+    """La zona de una unidad del pronostico es la del ETL (zonas.zona_mas_cercana): haversine, sin competir con
+    'otra', y 'otra' a mas de 4 km de todo centroide."""
+    from etl.load.dimensions import leer_zonas
+    from etl.transform.zonas import zona_mas_cercana
+    correr(stg_con, dwh_con, "full", odoo, traccar)
+    puntos = {"u1": (-1.2417, -78.6197), "u2": (-1.40, -78.62), "u3": (-1.2235, -78.6325)}
+    with dwh_con.cursor() as cur:
+        zonas = leer_zonas(cur)
+        for uid, (la, lo) in puntos.items():
+            cur.execute("insert into ml_unidad_espacial (tipo, unidad_id, centro_lat, centro_lon) "
+                        "values ('dbscan', %s, %s, %s)", (uid, la, lo))
+            cur.execute("insert into ml_pronostico_demanda (tipo_registro, fecha_objetivo, tipo_unidad, unidad_id, "
+                        "unidades_pred, modelo, model_version) values ('pronostico', '2026-11-20', 'dbscan', %s, 1, "
+                        "'m', 'v1')", (uid,))
+    dwh_con.commit()
+    codigo = {z["sk"]: z["codigo"] for z in zonas}
+    esperado = {uid: codigo.get(zona_mas_cercana(zonas, la, lo)) for uid, (la, lo) in puntos.items()}
+    got = dict(qall(dwh_con, "select unidad_id, zona_aprox from v_bi_demanda_real_vs_pronostico"))
+    assert got == esperado and esperado["u2"] == "otra"

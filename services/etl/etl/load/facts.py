@@ -411,12 +411,24 @@ def load_entregas(dcur, scur, ctx, odoo, rutas, paradas, entregas):
     _podar(dcur, "fact_entregas", "entrega_id_odoo", cargadas)
 
 
-# Decimales con que se guarda la ubicacion de un pedido en fact_ventas (~110 m): ubicacion aproximada (spec 12).
-DECIMALES_UBICACION = 3
+# La ubicacion de un pedido se guarda en fact_ventas con la precision de Odoo (7 decimales, ~1 cm): el mapa del
+# tablero y el modelo de demanda usan el punto exacto. Las columnas conservan el nombre lat_aprox/lon_aprox (contrato
+# de las vistas). Solo las leen los roles del DWH (dwh_ro, dwh_ml); nunca salen de la red interna.
+def _coord(valor):
+    return None if valor is None else float(valor)
 
 
-def _aprox(valor):
-    return None if valor is None else round(float(valor), DECIMALES_UBICACION)
+def ubicacion_venta(pedido, entrega, partner):
+    """(lat, lon) de una venta: la del pedido; si no tiene, la de su entrega; si no, la de entrega del cliente."""
+    pedido, entrega, partner = pedido or {}, entrega or {}, partner or {}
+    candidatos = ((pedido.get("delivery_latitude"), pedido.get("delivery_longitude")),
+                  (entrega.get("lat"), entrega.get("lon")),
+                  (partner.get("delivery_latitude"), partner.get("delivery_longitude")))
+    for lat, lon in candidatos:
+        la, lo = n.coordenada(lat, lon)
+        if la is not None:
+            return la, lo
+    return None, None
 
 
 def load_ventas(dcur, scur, ctx, odoo, entregas):
@@ -424,6 +436,7 @@ def load_ventas(dcur, scur, ctx, odoo, entregas):
     if odoo.get("sale.order.line") is None or odoo.get("sale.order") is None:
         return
     pedidos = {o["id"]: o for o in odoo["sale.order"]}
+    clientes = {p["id"]: p for p in odoo.get("res.partner") or []}
     entrega_de = {e["pedido_id"]: e for e in entregas.values() if e["pedido_id"] is not None}
     prefijos = config.prefijos_simulados()
     cargadas = []
@@ -441,9 +454,7 @@ def load_ventas(dcur, scur, ctx, odoo, entregas):
             _rechazar(scur, ctx, "venta", linea.get("id"), motivo, linea)
             continue
         ent = entrega_de.get(pedido["id"]) or {}
-        lat, lon = n.coordenada(pedido.get("delivery_latitude"), pedido.get("delivery_longitude"))
-        if lat is None:
-            lat, lon = ent.get("lat"), ent.get("lon")
+        lat, lon = ubicacion_venta(pedido, ent, clientes.get(n.m2o_id(pedido.get("partner_id"))))
         fecha = n.parse_ts(pedido.get("date_order"))
         dcur.execute(
             """INSERT INTO fact_ventas
@@ -462,7 +473,7 @@ def load_ventas(dcur, scur, ctx, odoo, entregas):
             (v["id"], pedido["id"], n.texto(pedido.get("name")), ctx.cliente.get(n.m2o_id(pedido.get("partner_id"))),
              ctx.producto.get(v["producto_id"]), ctx.zona(lat, lon), ensure_tiempo(dcur, ctx, fecha), fecha,
              pedido.get("state"), v["cantidad"], v["precio"], v["subtotal"], v["total"], ent.get("id"), ctx.lote_id,
-             _aprox(lat), _aprox(lon), procedencia_pedido(pedido, prefijos)))
+             _coord(lat), _coord(lon), procedencia_pedido(pedido, prefijos)))
         cargadas.append(v["id"])
         ctx.contar("fact_ventas")
     _podar(dcur, "fact_ventas", "linea_id_odoo", cargadas)

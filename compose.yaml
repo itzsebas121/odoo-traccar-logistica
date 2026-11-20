@@ -32,6 +32,9 @@ services:
       ODOO_DB: ${ODOO_DB:-logistica_dev}
       ODOO_ADMIN_PASSWORD: ${ODOO_ADMIN_PASSWORD:?Configura ODOO_ADMIN_PASSWORD}
     volumes:
+      # El mismo filestore que `odoo`: lo que se crea al instalar (p. ej. el JSON de los Tableros de Odoo) es un
+      # adjunto. Sin este volumen quedaba en el disco del contenedor odoo-init y se perdia.
+      - odoo_data:/var/lib/odoo
       - ./odoo/addons:/mnt/extra-addons
       - ./odoo/init:/opt/logistica-init:ro
     # Instala los modulos solo en una base nueva y aplica ODOO_ADMIN_PASSWORD (ver odoo/init/odoo-init.sh).
@@ -61,6 +64,13 @@ services:
       ODOO_MASTER_PASSWORD: ${ODOO_MASTER_PASSWORD:?Configura ODOO_MASTER_PASSWORD}
       ODOO_PROXY_MODE: ${ODOO_PROXY_MODE:-False}
       ODOO_WORKERS: ${ODOO_WORKERS:-2}
+      # Tablero de indicadores dentro de Odoo (modulo logistica_tablero): lee las vistas v_bi_* del DWH con el rol
+      # de solo lectura dwh_ro. Vacia = el tablero de Odoo avisa que falta configurarlo.
+      DWH_HOST: db
+      DWH_PORT: "5432"
+      DWH_NAME: logistica_dwh
+      DWH_USER: dwh_ro
+      DWH_DB_PASSWORD: ${DWH_DB_PASSWORD:-}
     volumes:
       - odoo_data:/var/lib/odoo
       - ./odoo/addons:/mnt/extra-addons
@@ -124,7 +134,6 @@ services:
     build:
       context: ./services/ml
       target: produccion
-    profiles: ["analitica"]
     restart: unless-stopped
     environment: &ml-env
       MODEL_DIR: /app/models
@@ -139,6 +148,7 @@ services:
       DWH_DB_PASSWORD: ${DWH_DB_PASSWORD:-}
       DWH_ML_USER: dwh_ml
       DWH_ML_PASSWORD: ${DWH_ML_PASSWORD:-}
+      ETL_TZ: ${ETL_TZ:-America/Guayaquil}
     volumes:
       - ./services/ml/models:/app/models
       - ./services/ml/data:/app/data
@@ -152,11 +162,28 @@ services:
       retries: 5
 
   # Pronostico de demanda en el SERVIDOR con el modelo entrenado en local (models/demanda.joblib, va en el repo).
-  # No entrena: lee las ventas del DWH, predice los proximos 7 dias y escribe ml_pronostico_demanda (y la
-  # comparativa de analisis/ en ml_evaluacion_modelos). Correrlo despues de cada `etl run` (o con cron del host):
+  # No entrena: lee las ventas del DWH, predice los 7 dias desde hoy para TODAS las series del servidor (tambien
+  # productos y ubicaciones que el modelo no vio) y escribe ml_pronostico_demanda, ml_unidad_espacial y la
+  # comparativa de analisis/ en ml_evaluacion_modelos. Corre solo cada ML_PREDECIR_MIN minutos (60 por defecto);
+  # mientras el DWH no tenga ventas, lo registra y reintenta.
+  ml-programado:
+    <<: *ml
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      <<: *ml-env
+      ML_PREDECIR_MIN: ${ML_PREDECIR_MIN:-60}
+    ports: []
+    healthcheck:
+      disable: true
+    command: ["python", "-m", "mlsvc.demanda.programado"]
+
+  # Una corrida a mano del mismo pronostico (por ejemplo, justo despues de `etl run`):
   #   docker compose --profile analitica run --rm ml-predecir
   ml-predecir:
     <<: *ml
+    profiles: ["analitica"]
     restart: "no"
     depends_on:
       db:
@@ -231,20 +258,31 @@ services:
       DWH_ML_PASSWORD: ${DWH_ML_PASSWORD:-}
       # Operacion (no secretas; vacias = valor por defecto del ETL).
       ETL_TZ: ${ETL_TZ:-America/Guayaquil}
-      ETL_INTERVAL_MIN: ${ETL_INTERVAL_MIN:-15}
-      ETL_FULL_HOURS: ${ETL_FULL_HOURS:-24}
+      # Horas locales (ETL_TZ) de las corridas: madrugada y mediodia. Ademas corre una vez al arrancar.
+      ETL_HORARIO: ${ETL_HORARIO:-03:00,12:00}
+      ETL_FULL_HOURS: ${ETL_FULL_HOURS:-20}
       ETL_RETENTION_DAYS: ${ETL_RETENTION_DAYS:-30}
       ETL_TRACCAR_DAYS: ${ETL_TRACCAR_DAYS:-30}
       # Segundos de espera por cada informe de Traccar (subir con mucho historico GPS).
       ETL_TRACCAR_TIMEOUT_S: ${ETL_TRACCAR_TIMEOUT_S:-30}
 
-  # ETL periodico: una corrida cada ETL_INTERVAL_MIN minutos. Necesita las bases creadas (`etl bootstrap`).
-  # Un fallo de una corrida se registra y se reintenta en el siguiente ciclo; el contenedor no se reinicia.
+  # ETL periodico (se levanta con `docker compose up`, tambien en Dokploy): al arrancar corre `etl bootstrap`
+  # (crea o actualiza bases, roles, tablas y vistas; aditivo, nunca --reset), una corrida al arrancar y luego a las
+  # horas de ETL_HORARIO (03:00 y 12:00 hora de Ecuador; una de las dos es completa cada dia). Solo lee el Odoo y el
+  # Traccar de ESTE despliegue.
+  # Un fallo (faltan claves, una fuente caida) se registra y se reintenta en el siguiente ciclo; no se reinicia.
   etl-scheduler:
     <<: *etl
-    profiles: ["analitica"]
+    profiles: []
     restart: unless-stopped
-    command: ["schedule"]
+    depends_on:
+      db:
+        condition: service_healthy
+      odoo:
+        condition: service_healthy
+      traccar:
+        condition: service_healthy
+    command: ["serve"]
     environment:
       <<: *etl-env
     healthcheck:
@@ -252,7 +290,7 @@ services:
       interval: 60s
       timeout: 10s
       retries: 3
-      start_period: 120s
+      start_period: 900s
 
   seed:
     image: python:3.12-slim
@@ -277,7 +315,9 @@ services:
       INTEGRATION_TRACCAR_EMAIL: ${INTEGRATION_TRACCAR_EMAIL:?Configura INTEGRATION_TRACCAR_EMAIL}
       INTEGRATION_TRACCAR_PASSWORD: ${INTEGRATION_TRACCAR_PASSWORD:?Configura INTEGRATION_TRACCAR_PASSWORD}
       DEMO_CONDUCTOR_PASSWORD: ${DEMO_CONDUCTOR_PASSWORD:?Configura DEMO_CONDUCTOR_PASSWORD}
-      SEED_HISTORIAL: ${SEED_HISTORIAL:-true}
+      # Historial de demostracion (3 meses de pedidos sinteticos). Por defecto NO: en el servidor se mezclaria con
+      # los datos reales. En local se activa con SEED_HISTORIAL=true en .env (asi viene en .env.example).
+      SEED_HISTORIAL: ${SEED_HISTORIAL:-false}
     command: ["python", "seeds/seed.py"]
 
   # Asistente del administrador (chat con GPT de OpenAI + interfaz React). Lee Odoo con permisos de solo consulta.

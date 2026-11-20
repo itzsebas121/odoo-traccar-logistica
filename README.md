@@ -152,15 +152,23 @@ npm run dev        # http://localhost:5173; la API va por proxy a 127.0.0.1:8003
 
 El ETL (`services/etl`) copia Odoo y Traccar a un Data Warehouse en PostgreSQL (`logistica_dwh`), que leen el panel BI (http://localhost:8501) y el modelo de destinos. Detalle, modelo dimensional y reglas de calidad en [services/etl/README.md](services/etl/README.md).
 
-Con las claves `ETL_STG_PASSWORD`, `DWH_ETL_PASSWORD` y `DWH_DB_PASSWORD` definidas en `.env`:
+Con las cuatro claves `ETL_STG_PASSWORD`, `DWH_ETL_PASSWORD`, `DWH_DB_PASSWORD` y `DWH_ML_PASSWORD` definidas en `.env`, `docker compose up -d` ya levanta todo:
+
+- `etl-scheduler`: al arrancar corre `etl bootstrap` (crea o actualiza bases, roles, tablas y vistas; es aditivo y nunca borra) y luego carga el DWH al arrancar y dos veces al día, a las 03:00 y a las 12:00 hora de Ecuador (`ETL_HORARIO`); una de las dos es completa.
+- `ml-programado`: cada `ML_PREDECIR_MIN` minutos (60 por defecto) calcula el pronóstico de demanda con el modelo entrenado en local (no entrena) y lo deja en el DWH para los tableros.
 
 ```bash
-docker compose --profile etl run --rm etl bootstrap          # crea bases, roles y tablas
-docker compose --profile analitica up -d etl-scheduler       # carga inicial y una corrida cada 15 min
 docker compose --profile etl run --rm etl report             # estado de las corridas y rechazos
+docker compose logs -f etl-scheduler ml-programado           # qué está haciendo cada uno
 ```
 
-También se puede lanzar a mano: `etl run --mode full` o `etl run`. `etl simulate` agrega histórico marcado como SIMULADO para entrenar el modelo. Si las bases vienen de la versión anterior del ETL, usar `etl bootstrap --reset` (recrea las dos bases; sus datos son derivados).
+También se puede lanzar a mano: `etl run --mode full` o `etl run`. `etl simulate` agrega histórico marcado como SIMULADO para entrenar el modelo (**solo en local**). Si las bases vienen de la versión anterior del ETL, usar `etl bootstrap --reset` (recrea las dos bases; sus datos son derivados). **Nunca** lo use en el servidor sin un respaldo.
+
+### Tableros
+
+- **Asistente → Tablero** (servicio `agente`) y **Odoo → Tableros → Indicadores logísticos** (módulo `logistica_tablero`, también en *Logística → Indicadores*) muestran lo mismo: resumen de ventas, demanda con mapa (ubicación exacta de cada pedido), pronóstico por producto y zona, y operación. Ambos leen las vistas `v_bi_*` del DWH con el rol de solo lectura `dwh_ro`.
+- La API del tablero en Odoo es `POST /logistica/tablero/api/<sección>` (JSON-RPC; secciones `resumen`, `demanda`, `pronostico`, `pronostico_detalle`, `operacion`, `opciones`), solo para gerentes de ventas o de flota.
+- Los tableros estándar de Odoo (Sales, Product, Invoicing) guardan su contenido en el filestore. `odoo-init` repara en cada arranque los que hayan perdido su archivo.
 
 Pruebas del backend:
 
@@ -264,7 +272,14 @@ docker compose run --rm --no-deps routing python -m pytest -q
    ODOO_URL=https://odoo.sebasdev.shop        TRACCAR_URL=https://traccar.sebasdev.shop
    TRACCAR_INTERNAL_URL=http://traccar:8082   ODOO_DB=logistica_dev   ODOO_USER=admin
    TRACCAR_ADMIN_EMAIL=<correo real>          INTEGRATION_TRACCAR_EMAIL=integracion@sebasdev.shop
+   # Data Warehouse, tableros y pronóstico (obligatorias; openssl rand -hex 24 cada una)
+   DWH_DB_PASSWORD=...             DWH_ETL_PASSWORD=...           ETL_STG_PASSWORD=...
+   DWH_ML_PASSWORD=...
    ```
+
+   **No** defina `SEED_HISTORIAL` en el servidor (o déjela en `false`): el historial de demostración se mezclaría con
+   los pedidos reales. Tampoco corra allí `etl simulate` ni `gps-historico`. El modelo de demanda se entrena en local y
+   se sube con el repo; el servidor solo lo usa.
 
 3. **Dominios** (*Domains*), todos con HTTPS:
 
@@ -286,7 +301,12 @@ docker compose run --rm --no-deps routing python -m pytest -q
 4. **Puertos y firewall:** abra solo 80/443 (Traefik). No publique 5432 (PostgreSQL) ni 8069 directamente. Con el
    dominio `gps` no hace falta abrir el 5055; ábralo solo si algún rastreador GPS físico no admite HTTPS, y en ese caso
    use un registro «DNS only» (nube gris), porque por el proxy de Cloudflare el 5055 no pasa.
-5. **Deploy.** El primer despliegue instala los módulos (varios minutos). Los siguientes no reinstalan nada.
+5. **Deploy.** El primer despliegue instala los módulos (varios minutos). Los siguientes solo instalan los módulos
+   nuevos y actualizan los que cambiaron de versión. En cada despliegue, `etl-scheduler` crea o actualiza el DWH sin
+   borrar nada y lo vuelve a cargar desde el Odoo y el Traccar del servidor, y `ml-programado` recalcula el
+   pronóstico. Para comprobarlo: registros de `etl-scheduler` (`ETL full: extraidos=...`) y de `ml-programado`
+   (`predecir: ... filas en ml_pronostico_demanda`). Si el tablero dice «Los datos del tablero no están
+   disponibles», el motivo exacto está en los registros de `agente` (línea `tablero_sin_datos`) o de `odoo`.
 6. **GPS:** en la app Traccar Client, *Server URL* `https://gps.sebasdev.shop` (sin puerto) e *Device identifier*
    igual al «ID Rastreo GPS» del vehículo que conduce (Odoo → Flota → vehículo).
    **No** use `http://traccar.sebasdev.shop:5055`: ese dominio pasa por Cloudflare y el teléfono no llega al servidor.
@@ -303,6 +323,13 @@ docker compose run --rm --no-deps routing python -m pytest -q
   psql -U odoo -d postgres -c "ALTER ROLE traccar WITH PASSWORD '<TRACCAR_DB_PASSWORD>';"
   ```
 
+- **Odoo → Tableros: «Un error ha ocurrido mientras el tablero estaba cargando» (`Unexpected end of JSON input`):** el
+  JSON del tablero no está en el filestore. Redespliegue: `odoo-init` lo vuelve a cargar desde el módulo
+  (`reparar_tableros.py`) y avisa en sus registros si faltan otros adjuntos (esos solo vuelven con un respaldo ZIP
+  que incluya el filestore).
+- **En la consola del navegador: `static.cloudflareinsights.com/beacon.min.js` bloqueado por la política de
+  seguridad:** es el contador de Cloudflare Web Analytics, que la CSP del asistente no permite. Es inofensivo; para
+  quitar el aviso desactive *Web Analytics* (o el *Automatic Setup*) en Cloudflare para ese dominio.
 - **`Temporary failure in name resolution` hacia `traccar` en los registros de Odoo:** Traccar no está corriendo; revise los registros del contenedor `traccar` (casi siempre es el punto anterior).
 - **Falta una variable obligatoria** (`Configura ...`): el despliegue se detiene a propósito; agréguela en *Environment*.
 - **Traccar no registra la ubicación del conductor:** siga el camino de la posición, de la app hacia Odoo:

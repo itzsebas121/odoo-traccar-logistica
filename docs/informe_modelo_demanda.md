@@ -153,13 +153,18 @@ docker compose --profile benchmark run --rm ml-benchmark python -m mlsvc.demanda
 # se suben services/ml/models/demanda.joblib, demanda_metrics.json, SHA256SUMS y services/ml/analisis/comparativa_modelos.*
 # (el entrenamiento actualiza SHA256SUMS; el servidor no carga un .joblib cuyo hash no coincida con él)
 
-# Servidor: solo predice, después de cada `etl run`
+# Servidor: solo predice. Lo hace solo el servicio ml-programado (cada ML_PREDECIR_MIN minutos); a mano:
 docker compose --profile analitica run --rm ml-predecir
 ```
 
-- **El servidor no entrena.** `ml-predecir` carga el paquete, comprueba que las versiones de las librerías coincidan,
-  lee las ventas de su propio DWH y calcula los 7 días siguientes. Con un baseline la regla es fija; con un modelo
-  tabular sería `predict`, sin `fit`. Hay una prueba automática que falla si en ese camino se llama a `fit`.
+- **El servidor no entrena.** `ml-programado` (o `ml-predecir` a mano) carga el paquete, comprueba que las versiones
+  de las librerías coincidan, lee las ventas de su propio DWH y calcula los 7 días desde hoy. Con un baseline la regla
+  es fija; con un modelo tabular sería `predict`, sin `fit`. Hay una prueba automática que falla si en ese camino se
+  llama a `fit`.
+- **Pronostica todo lo del servidor**, no solo lo que vio al entrenar. Un producto nuevo (id de Odoo que el modelo no
+  conoce) se pronostica con su propia historia. Una venta lejos de todo lo que el modelo conoció (más de 1,5 km del
+  punto de entrenamiento más cercano en `dbscan`) no se fuerza a una unidad lejana: forma una unidad nueva
+  (`s<lat>_<lon>`) con el centro y el contorno de sus pedidos. Las coordenadas son las exactas de Odoo, sin redondear.
 - **El pronóstico se ve en tres sitios:**
   - el **Tablero** del asistente, pestaña *Pronóstico* (real frente a pronóstico, con la banda);
   - `/demanda/predict` del servicio `ml`;
@@ -173,14 +178,18 @@ docker compose --profile analitica run --rm ml-predecir
 
 ## 7. Despliegue en el servidor (en este orden)
 
-El modelo ya viene entrenado en el repo. En el servidor no se entrena nada. En el `.env` del servidor deben estar
-`DWH_DB_PASSWORD` (rol `dwh_ro`, para el tablero) y `DWH_ML_PASSWORD` (rol `dwh_ml`, para que `ml-predecir` guarde el
-pronóstico en el DWH).
+El modelo ya viene entrenado en el repo. En el servidor no se entrena nada. En el entorno del servidor (Dokploy:
+*Environment*) deben estar `DWH_DB_PASSWORD`, `DWH_ETL_PASSWORD`, `ETL_STG_PASSWORD` y `DWH_ML_PASSWORD`. Con eso
+basta un redespliegue:
+
+- `etl-scheduler` corre `etl bootstrap` (sin `--reset`: agrega tablas `ml_*`, vistas `v_bi_*` y roles) y carga el DWH;
+- `ml-programado` calcula el pronóstico con el modelo entrenado y lo guarda en el DWH.
+
+A mano, si hiciera falta:
 
 ```bash
-git pull                                                      # trae el modelo, su SHA256SUMS y el código
-docker compose --profile etl run --rm etl bootstrap           # SIN --reset: agrega tablas ml_*, vistas v_bi_* y el rol dwh_ml
-docker compose --profile etl run --rm etl run                 # ETL (la primera vez: --mode full)
+docker compose --profile etl run --rm etl bootstrap           # SIN --reset
+docker compose --profile etl run --rm etl run --mode full
 docker compose --profile analitica run --rm ml-predecir       # pronóstico con el modelo entrenado; no entrena
 ```
 
@@ -189,12 +198,12 @@ Comprobaciones:
 - `curl -s http://127.0.0.1:8002/demanda/health`: `"status": "ok"` y `prediccion_servidor` con fecha. Si dice `error`,
   el archivo `demanda.joblib` no coincide con `SHA256SUMS` y el servicio no lo carga: vuelva a subir el par completo.
 - `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8002/demanda/comparativa`: `200`.
-- Tablero, pestaña *Pronóstico*: con datos. Si sale vacía, falta `ml-predecir` o `DWH_ML_PASSWORD`; `ml-predecir`
-  avisa en la consola si no puede guardar en el DWH.
+- Tablero, pestaña *Pronóstico* (asistente y Odoo): con datos. Si sale vacía, revise los registros de
+  `ml-programado`: avisan si falta `DWH_ML_PASSWORD` o si el DWH aún no tiene ventas.
 
 Notas:
 
-- `ml-predecir` vuelve a correrse después de cada `etl run`.
+- `ml-programado` recalcula el pronóstico cada `ML_PREDECIR_MIN` minutos (60 por defecto).
 - `models/demanda_prediccion.joblib` lo genera el servidor con sus propios datos. No va en el repo y no está en
   `SHA256SUMS`, porque no sale de una revisión.
 - Reentrenar o cambiar de modelo se hace en local. Hay que subir juntos `demanda.joblib`, `demanda_metrics.json` y

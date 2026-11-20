@@ -84,7 +84,7 @@ FROM fact_ventas s
 LEFT JOIN dim_tiempo t ON t.sk = s.tiempo_sk
 GROUP BY s.pedido_id_odoo;
 
--- Puntos de demanda para el mapa de calor (ubicacion aproximada a ~110 m) por dia y categoria.
+-- Puntos de demanda para el mapa de calor (ubicacion exacta del pedido, precision de Odoo) por dia y categoria.
 CREATE OR REPLACE VIEW v_bi_ventas_mapa AS
 SELECT g.fecha_local AS fecha, g.lat_aprox AS latitud, g.lon_aprox AS longitud, COALESCE(g.zona, '(sin zona)') AS zona,
        g.categoria, g.grupo, g.procedencia,
@@ -141,16 +141,27 @@ SELECT f.tipo_registro, f.fecha_objetivo AS fecha, f.producto_sk, p.nombre AS pr
        f.unidades_pred, f.unidades_real, f.p10, f.p90,
        f.unidades_pred - f.unidades_real AS error, ABS(f.unidades_pred - f.unidades_real) AS error_abs,
        f.modelo, f.model_version, f.generado_utc,
-       za.codigo AS zona_aprox   -- zona cuyo centro queda mas cerca del centro de la unidad (para filtrar por zona)
+       za.codigo AS zona_aprox   -- zona del centro de la unidad, con la misma regla del ETL (para filtrar por zona)
 FROM ml_pronostico_demanda f
 LEFT JOIN dim_producto p ON p.sk = f.producto_sk
 LEFT JOIN ml_unidad_espacial u ON u.tipo = f.tipo_unidad AND u.unidad_id = f.unidad_id
 JOIN ultima ON ultima.tipo_registro = f.tipo_registro AND ultima.model_version = f.model_version
+-- Misma regla que el ETL (etl/transform/zonas.py): centroide activo mas cercano por distancia haversine, sin contar la
+-- zona residual 'otra'; a mas de 4 km de todos, 'otra'.
 LEFT JOIN LATERAL (
-    SELECT z.codigo FROM dim_zona z
-    WHERE z.activa AND z.latitud IS NOT NULL AND z.longitud IS NOT NULL AND u.centro_lat IS NOT NULL
-    ORDER BY power(z.latitud - u.centro_lat, 2) + power(z.longitud - u.centro_lon, 2)
-    LIMIT 1
+    SELECT CASE WHEN c.km <= 4.0 THEN c.codigo
+                ELSE (SELECT o.codigo FROM dim_zona o WHERE o.codigo = 'otra' LIMIT 1) END AS codigo
+    FROM (
+        SELECT z.codigo,
+               2 * 6371.0 * asin(LEAST(1.0, sqrt(power(sin(radians(z.latitud - u.centro_lat) / 2), 2)
+                   + cos(radians(u.centro_lat)) * cos(radians(z.latitud))
+                     * power(sin(radians(z.longitud - u.centro_lon) / 2), 2)))) AS km
+        FROM dim_zona z
+        WHERE z.activa AND z.codigo <> 'otra' AND z.latitud IS NOT NULL AND z.longitud IS NOT NULL
+          AND u.centro_lat IS NOT NULL
+        ORDER BY 2
+        LIMIT 1
+    ) c
 ) za ON true;
 
 -- ================================================================= operacion: recorridos, rutas y entregas

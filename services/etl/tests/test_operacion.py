@@ -162,3 +162,23 @@ def test_cli_modo_auto_del_programador(cli_env, monkeypatch, odoo, traccar):
     monkeypatch.setattr(cli, "_sources", lambda: (odoo, traccar))
     assert cli._corrida("auto").startswith("ETL full")
     assert cli._corrida("auto").startswith("ETL incremental")
+
+
+def test_proxima_corrida_madrugada_y_mediodia():
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo("America/Guayaquil")
+    horas = [(3, 0), (12, 0)]
+    assert scheduler.proxima(datetime(2026, 11, 19, 1, 0, tzinfo=tz), horas) == datetime(2026, 11, 19, 3, 0, tzinfo=tz)
+    assert scheduler.proxima(datetime(2026, 11, 19, 3, 0, tzinfo=tz), horas) == datetime(2026, 11, 19, 12, 0, tzinfo=tz)
+    assert scheduler.proxima(datetime(2026, 11, 19, 18, 30, tzinfo=tz), horas) == datetime(2026, 11, 20, 3, 0,
+                                                                                            tzinfo=tz)
+
+
+def test_el_programador_espera_hasta_el_horario():
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo("America/Guayaquil")
+    mensajes = []
+    espera = scheduler.espera_hasta_horario([(3, 0), (12, 0)], "America/Guayaquil",
+                                            registrar=lambda m, error=False: mensajes.append(m),
+                                            reloj=lambda: datetime(2026, 11, 19, 11, 30, tzinfo=tz))
+    assert espera() == 30 * 60 and "2026-11-19 12:00" in mensajes[0]

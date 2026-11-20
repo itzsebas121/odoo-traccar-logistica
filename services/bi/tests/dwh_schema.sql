@@ -189,8 +189,9 @@ CREATE TABLE IF NOT EXISTS fact_ventas (
     lote_id int
 );
 
--- Ubicacion aproximada del punto de entrega del pedido (la que marca el cliente en el mapa de Odoo), redondeada a
--- 3 decimales (~110 m): basta para agregar la demanda por celda o cluster y no expone la direccion exacta (spec 12).
+-- Ubicacion del punto de entrega del pedido (la que marca el cliente en el mapa de Odoo; si falta, la de su entrega o
+-- la de entrega del cliente), con la precision de Odoo: el mapa y el modelo de demanda usan el punto exacto. El nombre
+-- *_aprox se conserva por compatibilidad de las vistas. Solo la leen los roles del DWH (dwh_ro, dwh_ml).
 ALTER TABLE fact_ventas ADD COLUMN IF NOT EXISTS lat_aprox double precision;
 ALTER TABLE fact_ventas ADD COLUMN IF NOT EXISTS lon_aprox double precision;
 

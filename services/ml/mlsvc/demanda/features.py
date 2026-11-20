@@ -51,9 +51,11 @@ def _codigos(info):
     }
 
 
-def tabla(historia, objetivo, info, centros=None, h=HORIZONTE):
+def tabla(historia, objetivo, info, centros=None, h=HORIZONTE, codigos=None):
     """historia: panel (unique_id, ds, y) conocido; objetivo: (unique_id, ds) a describir (puede solaparse con la
-    historia, en entrenamiento). Devuelve X alineado con `objetivo` (mismo orden)."""
+    historia, en entrenamiento). Devuelve X alineado con `objetivo` (mismo orden).
+    codigos: los de las series del entrenamiento (`_codigos(info_entreno)`); en el servidor un producto, unidad o
+    categoria que el modelo no vio queda en -1. Sin codigos se calculan de `info` (entrenamiento)."""
     obj = objetivo[["unique_id", "ds"]].reset_index(drop=True).copy()
     obj["_orden"] = np.arange(len(obj))
     hist = historia[["unique_id", "ds", "y"]]
@@ -80,7 +82,7 @@ def tabla(historia, objetivo, info, centros=None, h=HORIZONTE):
         dia = t.groupby([col, "ds"], as_index=False)["_base"].mean()
         dia[nombre] = dia.groupby(col)["_base"].transform(lambda s: s.rolling(28, min_periods=1).mean())
         m = m.merge(dia[[col, "ds", nombre]], on=[col, "ds"], how="left")
-    cods = _codigos(info)
+    cods = codigos or _codigos(info)
     for col, src in (("cod_producto", "producto_sk"), ("cod_unidad", "unidad_id"), ("cod_categoria", "categoria")):
         m[col] = m[src].map(cods[col]).fillna(-1).astype(int)
     if centros:
