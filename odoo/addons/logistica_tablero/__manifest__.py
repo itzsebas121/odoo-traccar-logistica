@@ -1,16 +1,17 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Logística - Tablero de indicadores',
-    'version': '16.0.1.0.0',
+    'version': '16.0.1.1.0',
     'category': 'Productivity/Dashboard',
     'summary': 'Ventas, demanda por ubicación, pronóstico y operación desde el DWH, dentro de Odoo',
     'description': """
 Tablero de indicadores
 ======================
-- Las mismas secciones que el tablero del asistente: Resumen, Demanda (con mapa), Pronóstico y Operación.
-- Filtros por periodo, zona, categoría, procedencia y conductor.
+- El MISMO tablero del asistente (React + shadcn): Resumen, Demanda (con mapa), Pronóstico (con el modelo de
+  demanda) y Operación, compilado en static/app desde services/agente/web (`bash scripts/build_tablero_odoo.sh`).
 - Lee el DWH (vistas v_bi_*) con el rol de solo lectura dwh_ro: no toca los datos de Odoo.
-- API JSON en /logistica/tablero/api/<sección> para gerentes de ventas o de flota.
+- API JSON en /logistica/tablero/api/<sección> (GET, mismos filtros y mismo JSON que la del asistente), para
+  gerentes de ventas o de flota.
     """,
     'author': 'Equipo Logística Inteligente',
     'license': 'LGPL-3',
