@@ -23,8 +23,9 @@ TTL_S = 60
 MAX_PUNTOS_MAPA = 1500
 MAX_TEXTO = 80
 
-AYUDA = ('Corra `docker compose --profile etl run --rm etl bootstrap` y '
-         '`docker compose --profile etl run --rm etl run --mode full`.')
+AYUDA = ('Revise que DWH_DB_PASSWORD, DWH_ETL_PASSWORD, ETL_STG_PASSWORD y DWH_ML_PASSWORD esten definidas y los '
+         'registros del servicio etl-scheduler (crea el DWH y lo carga al arrancar). A mano: '
+         '`docker compose --profile etl run --rm etl bootstrap` y `... etl run --mode full`.')
 # Lo que ve el usuario del tablero cuando el DWH falla. El detalle técnico (con AYUDA) solo va al log del servidor.
 MENSAJE_USUARIO = ('Los datos del tablero no están disponibles por ahora. Inténtalo de nuevo en unos minutos; '
                    'si sigue igual, avisa a quien administra el sistema.')
@@ -278,7 +279,8 @@ def pronostico(dwh, f):
     if not celdas:
         aviso = ('No hay pronóstico para esa zona y categoría.' if f.zona or f.categoria else
                  'Todavía no hay pronóstico disponible. Se publica automáticamente cuando el sistema lo calcula.')
-        return {'rango': _rango(f), 'zonas': [], 'celdas': [], 'actualizado_utc': None, 'aviso': aviso}
+        return {'rango': _rango(f), 'zonas': [], 'unidades': [], 'celdas': [], 'actualizado_utc': None,
+                'aviso': aviso}
     for c in celdas:
         for k in ('unidades', 'unidades_con_margen', 'vendido_semana', 'pronostico_semana'):
             c[k] = _num(c.get(k))
@@ -287,8 +289,32 @@ def pronostico(dwh, f):
     zonas = dwh.consultar('pronostico_zonas_geo', """
         SELECT zona AS codigo, nombre, latitud, longitud FROM v_bi_dim_zona
         WHERE activa AND latitud IS NOT NULL AND longitud IS NOT NULL ORDER BY nombre""")
+    # Unidades de ubicación del modelo con su centro real (el de los pedidos) y lo esperado en 7 días.
+    unidades = dwh.consultar('pronostico_unidades_geo', f"""
+        SELECT unidad_id, COALESCE(zona_aprox, '(sin zona)') AS zona, latitud, longitud,
+               SUM(unidades_pred) AS unidades
+        FROM v_bi_demanda_real_vs_pronostico
+        WHERE tipo_registro = 'pronostico' AND latitud IS NOT NULL AND longitud IS NOT NULL
+          AND {ZONA_APROX} AND {CATEGORIA}
+        GROUP BY unidad_id, COALESCE(zona_aprox, '(sin zona)'), latitud, longitud
+        ORDER BY unidades DESC""", p)
+    for u in unidades:
+        u['unidades'] = _num(u.get('unidades'))
+    # Cada zona se dibuja donde de verdad se vende: el centro de sus unidades, pesado por lo esperado (la zona
+    # residual «otra», por ejemplo, no tiene un lugar fijo). Sin unidades, su centroide de Odoo.
+    peso = {}
+    for u in unidades:
+        w = max(u['unidades'], 1e-6)
+        acc = peso.setdefault(u['zona'], [0.0, 0.0, 0.0])
+        acc[0] += w * u['latitud']
+        acc[1] += w * u['longitud']
+        acc[2] += w
+    for z in zonas:
+        if z['codigo'] in peso:
+            lat, lon, w = peso[z['codigo']]
+            z['latitud'], z['longitud'] = round(lat / w, 7), round(lon / w, 7)
     fecha = dwh.consultar('pronostico_actualizado', 'SELECT max(generado_utc) AS actualizado FROM v_bi_demanda_real_vs_pronostico')
-    return {'rango': _rango(f), 'zonas': zonas, 'celdas': celdas,
+    return {'rango': _rango(f), 'zonas': zonas, 'unidades': unidades, 'celdas': celdas,
             'actualizado_utc': fecha[0]['actualizado'] if fecha else None}
 
 

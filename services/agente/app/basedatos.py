@@ -276,6 +276,13 @@ def restaurar(config, cual, ruta, quien):
         if tipo == 'pgdump':
             _ejecutar(config, ['pg_restore', '--no-owner', f'--role={propietario}', '--exit-on-error',
                                '--single-transaction', '-d', temporal, str(ruta)], 'Restauración')
+            if cual == 'odoo':
+                # Un .dump no trae adjuntos (filestore): se conserva una copia del filestore actual. Sin esto la base
+                # restaurada queda sin archivos y Odoo falla al abrir lo que vive ahí (p. ej. los Tableros:
+                # "Unexpected end of JSON input").
+                actual = _filestore(config, base)
+                if actual.is_dir():
+                    shutil.copytree(actual, filestore_temporal)
         else:
             with zipfile.ZipFile(ruta) as z, tempfile.TemporaryDirectory(prefix='restaurar_') as tmp:
                 dump = Path(tmp) / 'dump.sql'

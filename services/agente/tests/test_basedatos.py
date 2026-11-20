@@ -129,3 +129,21 @@ def test_sin_sesion_no_hay_acceso(config, monkeypatch):
     c = TestClient(main.app)
     assert c.get('/api/bd').status_code == 401
     assert c.get('/api/bd/respaldos/odoo_copia.zip').status_code == 401
+
+
+def test_restaurar_dump_de_odoo_conserva_el_filestore(config, monkeypatch, tmp_path):
+    """Un .dump no trae adjuntos: la base restaurada debe quedar con una copia del filestore actual (si no, Odoo
+    falla al abrir los Tableros: 'Unexpected end of JSON input')."""
+    actual = config.dir_datos_odoo / 'filestore' / 'logistica_dev'
+    (actual / 'ab').mkdir(parents=True)
+    (actual / 'ab' / 'abc123').write_text('{"version": 1}')
+    dump = tmp_path / 'copia.dump'
+    dump.write_bytes(b'PGDMP\x01\x0e')
+    monkeypatch.setattr(basedatos, 'respaldar', lambda *a, **k: Path('previo.zip'))
+    monkeypatch.setattr(basedatos, '_existe', lambda config, base: True)
+    monkeypatch.setattr(basedatos, '_sql', lambda *a, **k: None)
+    monkeypatch.setattr(basedatos, '_ejecutar', lambda *a, **k: None)
+    monkeypatch.setattr(basedatos, '_verificar', lambda *a, **k: None)
+    basedatos.restaurar(config, 'odoo', dump, 'admin')
+    assert (actual / 'ab' / 'abc123').read_text() == '{"version": 1}'
+    assert (config.dir_datos_odoo / 'filestore' / 'logistica_dev_anterior' / 'ab' / 'abc123').exists()

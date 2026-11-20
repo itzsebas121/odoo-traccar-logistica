@@ -190,6 +190,22 @@ def test_pronostico_general_por_producto_y_zona(cliente):
     assert 'modelo' not in j and 'model_version' not in str(j)             # nada del modelo llega al navegador
 
 
+def test_pronostico_zonas_en_el_centro_real_de_sus_unidades(monkeypatch, cliente):
+    """Una zona se dibuja donde se vende (centro de sus unidades, pesado por lo esperado), no en su centroide fijo;
+    la que no tiene unidades conserva el suyo. Las unidades viajan con sus coordenadas exactas."""
+    import copy
+    unidades = [{'unidad_id': 'd01', 'zona': 'atocha', 'latitud': -1.30, 'longitud': -78.70, 'unidades': 3.0},
+                {'unidad_id': 's-1.340_-78.650', 'zona': 'atocha', 'latitud': -1.34, 'longitud': -78.65,
+                 'unidades': 1.0}]
+    monkeypatch.setattr(main, 'dwh', DwhFalso(dict(copy.deepcopy(RESPUESTAS), pronostico_unidades_geo=unidades)))
+    main.cache_tablero.limpiar()
+    j = cliente.get('/api/tablero/pronostico').json()
+    zonas = {z['codigo']: z for z in j['zonas']}
+    assert zonas['centro']['latitud'] == -1.2417                            # sin unidades: su centroide
+    assert zonas['atocha']['latitud'] == -1.31 and zonas['atocha']['longitud'] == -78.6875
+    assert [u['unidad_id'] for u in j['unidades']] == ['d01', 's-1.340_-78.650']
+
+
 def test_pronostico_detalle_de_un_producto(cliente, dwh_falso):
     j = cliente.get('/api/tablero/pronostico_detalle', params={'producto_sk': 1, 'zona': 'centro'}).json()
     assert [p['tipo'] for p in j['serie']] == ['historia', 'backtest', 'pronostico']
@@ -366,3 +382,18 @@ def test_filtros_reales_de_operacion(dwh_real):
     cond = tablero.operacion(dwh_real, tablero.Filtros(conductor='Carlos'))
     assert cond['kpi']['entregas'] <= total
     assert all(c['conductor'] == 'Carlos' for c in cond['conductores'])
+
+
+def test_consultas_iguales_al_tablero_de_odoo():
+    """El modulo de Odoo logistica_tablero copia textualmente las consultas de este archivo (desde «utilidades
+    SQL»): si se cambia una aqui, hay que copiarla alli. Se omite donde el repo no esta completo (imagen Docker)."""
+    from pathlib import Path
+    raiz = Path(__file__).resolve().parents[3]
+    odoo = raiz / 'odoo' / 'addons' / 'logistica_tablero' / 'tablero.py'
+    if not odoo.exists():
+        pytest.skip('sin el modulo de Odoo en esta copia del repo')
+    marca = '# ------------------------------------------------------------------ utilidades SQL'
+    propio = (Path(tablero.__file__)).read_text(encoding='utf-8')
+    copia = odoo.read_text(encoding='utf-8')
+    assert propio[propio.index(marca):] == copia[copia.index(marca):], \
+        'Las consultas del tablero de Odoo difieren de las del asistente: copie el tramo desde «utilidades SQL».'

@@ -32,6 +32,10 @@ almacen = Almacen()
 _cliente_ia = None
 config_bd = basedatos.ConfigBD.desde_entorno()
 dwh = tablero.Dwh.desde_entorno()
+if not dwh.params['password']:
+    # Sin esto el tablero responde 503 y el motivo solo aparece al abrirlo: se avisa desde el arranque.
+    _logger.warning('tablero_sin_configurar: falta DWH_DB_PASSWORD (rol dwh_ro). Definala en el entorno (Dokploy: '
+                    'Environment) y redespliegue; etl-scheduler crea el DWH y sus vistas al arrancar.')
 cache_tablero = tablero.Cache()
 operacion_bd = asyncio.Lock()
 MAX_SUBIDA_BYTES = int(os.environ.get('AGENTE_MAX_SUBIDA_MB') or 2048) * 1024 * 1024
