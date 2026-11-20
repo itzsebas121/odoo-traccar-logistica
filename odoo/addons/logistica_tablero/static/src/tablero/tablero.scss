@@ -1,0 +1,156 @@
+// Tablero de indicadores con la paleta «Bitácora» de logistica_base (variables --bitacora-*), con valores de respaldo.
+.o_lt_tablero {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    overflow: auto;
+    height: 100%;
+    padding: 20px 24px 40px;
+    color: var(--bitacora-ink, #141D2B);
+
+    .o_lt_cabecera {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    .o_lt_antetitulo {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--bitacora-senal, #E06D2B);
+    }
+    .o_lt_titulo {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 22px;
+        font-weight: 700;
+        margin: 2px 0 0;
+    }
+
+    .o_lt_filtros {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 12px 0 16px;
+        border-bottom: 1px solid var(--bitacora-border, #DDD7CA);
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 170px;
+            margin: 0;
+            > span {
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 10px;
+                letter-spacing: 0.14em;
+                text-transform: uppercase;
+                color: var(--bitacora-ink-muted, #5C677A);
+            }
+        }
+    }
+
+    .o_lt_pestanas {
+        display: flex;
+        gap: 4px;
+        margin: 16px 0;
+        .o_lt_pestana {
+            border: 1px solid transparent;
+            background: transparent;
+            border-radius: var(--bitacora-radius, 6px);
+            padding: 5px 12px;
+            font-weight: 500;
+            color: var(--bitacora-ink-muted, #5C677A);
+            &:hover { color: var(--bitacora-ink, #141D2B); }
+            &.o_lt_activa {
+                background: var(--bitacora-card, #FDFBF7);
+                border-color: var(--bitacora-border, #DDD7CA);
+                color: var(--bitacora-ink, #141D2B);
+                box-shadow: var(--bitacora-shadow-sm, none);
+            }
+        }
+    }
+
+    .o_lt_rango, .o_lt_nota {
+        font-size: 12px;
+        color: var(--bitacora-ink-muted, #5C677A);
+        margin-bottom: 12px;
+    }
+
+    .o_lt_aviso {
+        display: flex;
+        align-items: flex-start;
+        padding: 16px;
+        border: 1px solid var(--bitacora-border, #DDD7CA);
+        border-radius: var(--bitacora-radius-lg, 10px);
+        background: var(--bitacora-card, #FDFBF7);
+        &.o_lt_error { border-color: #E3B5A5; background: #FBEFEA; }
+    }
+
+    .o_lt_kpis {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    .o_lt_kpi {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 14px 16px;
+        border: 1px solid var(--bitacora-border, #DDD7CA);
+        border-radius: var(--bitacora-radius-lg, 10px);
+        background: var(--bitacora-card, #FDFBF7);
+        > span { font-size: 12px; color: var(--bitacora-ink-muted, #5C677A); }
+        > strong { font-family: 'JetBrains Mono', monospace; font-size: 22px; font-variant-numeric: tabular-nums; }
+        > small { font-size: 11px; color: var(--bitacora-ink-muted, #5C677A); }
+    }
+
+    .o_lt_rejilla {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+        .o_lt_ancho { grid-column: span 2; }
+        .o_lt_completo { grid-column: 1 / -1; }
+    }
+    @media (max-width: 1100px) {
+        .o_lt_rejilla { grid-template-columns: minmax(0, 1fr); .o_lt_ancho { grid-column: auto; } }
+    }
+
+    .o_lt_panel {
+        padding: 14px 16px;
+        border: 1px solid var(--bitacora-border, #DDD7CA);
+        border-radius: var(--bitacora-radius-lg, 10px);
+        background: var(--bitacora-card, #FDFBF7);
+        min-width: 0;
+        h3 { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
+    }
+    .o_lt_panel_cab {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 10px;
+        h3 { margin: 0; }
+        select { max-width: 280px; }
+    }
+    .o_lt_grafico { position: relative; height: 280px; }
+    .o_lt_mapa { height: 420px; border-radius: var(--bitacora-radius, 6px); z-index: 0; }
+    .o_lt_mapa_chico { height: 300px; }
+    .o_lt_vacio { padding: 24px 0; text-align: center; color: var(--bitacora-ink-muted, #5C677A); }
+
+    .o_lt_top {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 12px;
+        h4 { font-size: 13px; font-weight: 600; margin: 0 0 6px; }
+        ol { padding-left: 18px; margin: 0; font-size: 12px; }
+        li small { color: var(--bitacora-ink-muted, #5C677A); }
+    }
+    .o_lt_tabla {
+        font-size: 12px;
+        th { font-weight: 600; color: var(--bitacora-ink-muted, #5C677A); }
+        td { font-variant-numeric: tabular-nums; }
+    }
+}
