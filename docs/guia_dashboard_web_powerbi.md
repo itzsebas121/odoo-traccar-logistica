@@ -61,7 +61,7 @@ Las vistas las crea `etl bootstrap` (es aditivo, no borra datos). Fechas y horas
 | `v_bi_ventas_diarias` | fecha × producto × zona | Línea de tendencia, barras por categoría. |
 | `v_bi_lineas_venta` | línea de pedido | Filtros por zona y categoría sin contar dos veces un pedido: pedidos = `COUNT(DISTINCT pedido_id_odoo)`. |
 | `v_bi_pedidos` | pedido | Ticket promedio, pedidos por hora. |
-| `v_bi_ventas_mapa` | fecha × punto (≈110 m) × categoría | Mapa de calor de demanda. |
+| `v_bi_ventas_mapa` | fecha × punto (ubicación exacta del pedido) × categoría | Mapa de calor de demanda. |
 | `v_bi_top_productos_zona` | mes × zona × producto, con `puesto` | Ranking: filtrar `puesto <= 5`. |
 | `v_bi_demanda_real_vs_pronostico` | fecha × producto × unidad | Líneas real y pronóstico con banda p10–p90. `zona_aprox` = zona más cercana al centro de la unidad (para filtrar por zona). |
 | `v_bi_comparativa_modelos` | modelo × unidad × procedencia (última corrida) | **Tabla comparativa de modelos**. |
@@ -80,7 +80,7 @@ Las vistas las crea `etl bootstrap` (es aditivo, no borra datos). Fechas y horas
 ## 2. Power BI
 
 1. **Obtener datos → Base de datos PostgreSQL.** Servidor `localhost:5432` (publique el puerto de `db` o use un túnel), base `logistica_dwh`, credenciales de **base de datos** con usuario `dwh_ro` y la clave `DWH_DB_PASSWORD`.
-2. Elija las vistas `v_bi_*`. Para las tablas de hechos use **Import** (programar actualización cada 15 min, como el ETL); `v_bi_posiciones_ruta` en **DirectQuery** con filtro de ruta.
+2. Elija las vistas `v_bi_*`. Para las tablas de hechos use **Import** (programar la actualización después de las corridas del ETL: 03:00 y 12:00); `v_bi_posiciones_ruta` en **DirectQuery** con filtro de ruta.
 3. **Relaciones** (muchos a uno, un solo sentido):
    - `v_bi_ventas_diarias[fecha]`, `v_bi_pedidos[fecha]`, `v_bi_entregas[fecha]`, `v_bi_recorridos[fecha]`, `v_bi_demanda_real_vs_pronostico[fecha]` → `v_bi_dim_fecha[fecha]`
    - `v_bi_ventas_diarias[producto_sk]`, `v_bi_demanda_real_vs_pronostico[producto_sk]` → `v_bi_dim_producto[producto_sk]`
