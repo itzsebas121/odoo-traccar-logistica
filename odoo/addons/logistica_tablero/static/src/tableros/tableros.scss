@@ -1,0 +1,13 @@
+// Indicadores logísticos dentro de Tableros: ocupan todo el área principal (a la derecha del panel de tableros).
+.o_spreadsheet_dashboard_action .o_lt_en_tableros {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+
+    .o_lt_marco {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 0;
+    }
+}

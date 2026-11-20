@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!-- App «Tableros» de Odoo: grupo LOGÍSTICA con los indicadores (tablero shadcn) junto a los tableros estándar. -->
+    <t t-inherit="spreadsheet_dashboard.DashboardAction" t-inherit-mode="extension" owl="1">
+        <!-- Panel izquierdo: LOGÍSTICA primero -->
+        <xpath expr="//section[@t-as='group']" position="before">
+            <section t-if="logistica.visible" class="o_search_panel_section o_search_panel_category o_lt_grupo">
+                <header class="o_search_panel_section_header pt-4 pb-2 text-uppercase o_cursor_default user-select-none">
+                    <b>Logística</b>
+                </header>
+                <ul class="list-group d-block o_search_panel_field">
+                    <li t-on-click="() => this.abrirIndicadores()"
+                        data-name="Indicadores logísticos" title="Indicadores logísticos"
+                        class="o_search_panel_category_value list-group-item cursor-pointer border-0"
+                        t-att-class="{'active': logistica.activo}">Indicadores logísticos</li>
+                </ul>
+            </section>
+        </xpath>
+        <!-- Un tablero estándar solo se marca como activo si no están abiertos los indicadores -->
+        <xpath expr="//li[@t-as='dashboard']" position="attributes">
+            <attribute name="t-att-class">{'active': !logistica.activo and state.activeDashboard and dashboard.id === state.activeDashboard.id}</attribute>
+        </xpath>
+        <!-- Área principal: los indicadores en vez de la hoja de cálculo -->
+        <xpath expr="//h3[@t-if='!dashboard']" position="before">
+            <div t-if="logistica.activo" class="o_lt_en_tableros">
+                <iframe class="o_lt_marco" src="/logistica/tablero/app" title="Indicadores logísticos"/>
+            </div>
+        </xpath>
+        <xpath expr="//h3[@t-if='!dashboard']" position="attributes">
+            <attribute name="t-if"></attribute>
+            <attribute name="t-elif">!dashboard</attribute>
+        </xpath>
+    </t>
+
+</templates>

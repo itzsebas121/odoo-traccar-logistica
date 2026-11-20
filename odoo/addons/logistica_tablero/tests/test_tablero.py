@@ -81,5 +81,7 @@ class TestTablero(TransactionCase):
     def test_menus_y_accion(self):
         accion = self.env.ref('logistica_tablero.action_tablero_indicadores')
         self.assertEqual(accion.tag, 'logistica_tablero.tablero')
-        menu = self.env.ref('logistica_tablero.menu_tablero_indicadores_dashboards')
-        self.assertEqual(menu.parent_id, self.env.ref('spreadsheet_dashboard.spreadsheet_dashboard_menu_root'))
+        # Los indicadores estan dentro de la app Tableros; Logistica -> Indicadores abre esa app.
+        menu = self.env.ref('logistica_tablero.menu_tablero_indicadores_logistica')
+        self.assertEqual(menu.action, self.env.ref('spreadsheet_dashboard.ir_actions_dashboard_action'))
+        self.assertFalse(self.env.ref('logistica_tablero.menu_tablero_indicadores_dashboards', raise_if_not_found=False))
