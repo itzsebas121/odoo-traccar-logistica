@@ -6,9 +6,12 @@
    de las librerias no coinciden con las del entrenamiento, se detiene: un estimador guardado con otra version de
    scikit-learn o lightgbm no carga bien.
 2. Lee las ventas del DWH de este servidor (rol dwh_ro) y traduce cada producto al del modelo por su id de Odoo
-   (el producto_sk del DWH local y el del servidor no tienen por que coincidir). Asigna cada venta a una unidad
-   espacial con el asignador guardado y arma las series conocidas por el modelo.
-3. Pronostica los 7 dias siguientes al ultimo dia con ventas: estimador.predict sobre las variables (rezagos,
+   (el producto_sk del DWH local y el del servidor no tienen por que coincidir); un producto nuevo se pronostica con
+   su propia clave. Asigna cada venta a una unidad espacial con el asignador guardado y su ubicacion exacta: una
+   venta lejos de todo lo que el modelo conocio forma una unidad nueva (no se fuerza a la mas cercana). Arma TODAS
+   las series del servidor.
+3. Pronostica los 7 dias desde hoy (ETL_TZ; o desde el ultimo dia con ventas con --hasta-ultima-venta):
+   estimador.predict sobre las variables (rezagos,
    calendario, ubicacion) o, si el elegido es un baseline, su regla. Las bandas p10/p90 son las del entrenamiento.
    Ademas, un backtest de los ultimos 7 dias con el mismo estimador (sin reentrenar) para el grafico real vs
    pronostico.
@@ -38,6 +41,10 @@ class VersionIncompatible(RuntimeError):
     """El modelo se guardo con otras versiones de las librerias."""
 
 
+class SinVentas(RuntimeError):
+    """El DWH aun no tiene ventas (servidor recien desplegado): no es un error del modelo."""
+
+
 def comprobar_versiones(paquete, actuales=None):
     """Lista de diferencias 'lib: entrenado X, instalado Y' (vacia si todo coincide)."""
     actuales = actuales or versiones()
@@ -47,47 +54,53 @@ def comprobar_versiones(paquete, actuales=None):
 
 
 def _traducir(ventas, paquete):
-    """Ventas del servidor con producto_sk del modelo (por producto_id_odoo). Devuelve (ventas, {sk_modelo: sk_srv},
-    productos del servidor sin historial en el modelo)."""
+    """Ventas del servidor con la clave de producto del modelo. Un producto que el modelo conoce (mismo id de Odoo)
+    toma su producto_sk del entrenamiento; uno nuevo toma una clave propia negativa (-sk del servidor), para que sus
+    series se pronostiquen igual sin chocar con las del modelo. Devuelve (ventas, {clave: sk_servidor}, ids de Odoo
+    de los productos nuevos)."""
     prods = paquete["productos"][["producto_sk", "producto_id_odoo"]].rename(columns={"producto_sk": "sk_modelo"})
-    v = ventas.merge(prods, on="producto_id_odoo", how="left")
-    desconocidos = sorted(v.loc[v["sk_modelo"].isna(), "producto_id_odoo"].unique().tolist())
-    v = v[v["sk_modelo"].notna()].copy()
-    a_servidor = (v.groupby("sk_modelo")["producto_sk"].first().astype(int).to_dict())
-    v["producto_sk"] = v["sk_modelo"].astype(int)
+    v = ventas.merge(prods.drop_duplicates("producto_id_odoo"), on="producto_id_odoo", how="left")
+    nuevos = v["sk_modelo"].isna()
+    desconocidos = sorted(v.loc[nuevos, "producto_id_odoo"].unique().tolist())
+    v["sk_modelo"] = np.where(nuevos, -v["producto_sk"].astype(int), v["sk_modelo"].fillna(0)).astype(int)
+    a_servidor = v.groupby("sk_modelo")["producto_sk"].first().astype(int).to_dict()
+    v["producto_sk"] = v["sk_modelo"]
     return v.drop(columns="sk_modelo"), {int(k): int(x) for k, x in a_servidor.items()}, desconocidos
 
 
-def _panel(v, unidad, info, fin=None):
-    """Panel diario (unique_id, ds, y) de las series que conoce el modelo, relleno con ceros hasta `fin`."""
+def _panel(v, unidad, fin=None):
+    """Panel diario (unique_id, ds, y) e info de TODAS las series de este servidor (producto x unidad), relleno con
+    ceros hasta `fin` (por defecto, el ultimo dia con ventas)."""
     v = v.assign(unidad_id=np.asarray(unidad, dtype=object).astype(str))
     v["unique_id"] = v["producto_sk"].astype(str) + "|" + v["unidad_id"]
     diario = v.groupby(["unique_id", "fecha_local"], as_index=False)["cantidad"].sum()
-    fin = pd.Timestamp(fin) if fin is not None else v["fecha_local"].max()
+    fin = max(pd.Timestamp(fin), v["fecha_local"].max()) if fin is not None else v["fecha_local"].max()
     dias = pd.date_range(v["fecha_local"].min(), fin, freq="D")
-    ids = np.sort(info["unique_id"].unique())
+    ids = np.sort(diario["unique_id"].unique())
     completo = pd.MultiIndex.from_product([ids, dias], names=["unique_id", "ds"]).to_frame(index=False)
     pnl = completo.merge(diario.rename(columns={"fecha_local": "ds", "cantidad": "y"}), how="left",
                          on=["unique_id", "ds"])
     pnl["y"] = pnl["y"].fillna(0.0).astype(float)
-    nuevas = int(len(set(diario["unique_id"]) - set(ids)))
-    return pnl.sort_values(["unique_id", "ds"], kind="stable").reset_index(drop=True), nuevas
+    info = (v.groupby("unique_id", as_index=False)
+             .agg(producto_sk=("producto_sk", "first"), unidad_id=("unidad_id", "first"),
+                  categoria=("categoria", "first"), producto=("producto", "first")))
+    return pnl.sort_values(["unique_id", "ds"], kind="stable").reset_index(drop=True), info
 
 
-def _pronosticar(paquete, historia, fechas):
-    """yhat para todas las series de `historia` en `fechas`, sin ajustar nada."""
-    info = paquete["info"]
+def _pronosticar(paquete, historia, fechas, info, centros):
+    """yhat para todas las series de `historia` en `fechas`, sin ajustar nada. `info`: series de este servidor;
+    los codigos de producto/unidad/categoria son los del entrenamiento (lo nuevo queda en -1)."""
     if paquete.get("estimador") is not None:
         ids = np.sort(historia["unique_id"].unique())
         objetivo = pd.DataFrame({"unique_id": np.repeat(ids, len(fechas)),
                                  "ds": np.tile(pd.to_datetime(fechas), len(ids))})
-        X = F.tabla(historia, objetivo, info, paquete.get("centros"))[paquete["columnas"]]
+        X = F.tabla(historia, objetivo, info, centros, codigos=F._codigos(paquete["info"]))[paquete["columnas"]]
         return objetivo.assign(yhat=np.clip(paquete["estimador"].predict(X), 0, None))
     m = POR_NOMBRE.get(paquete["modelo"])
     if m is None or m.familia != "baseline":
         raise SystemExit("El paquete no trae estimador y %s no es un baseline: reentrene en local con un modelo "
                          "tabular o un baseline." % paquete["modelo"])
-    return m.fn(historia, fechas, info, {"centros": paquete.get("centros"), "semilla": 42})
+    return m.fn(historia, fechas, info, {"centros": centros, "semilla": 42})
 
 
 def _bandas(pron, bandas, inicio):
@@ -100,8 +113,18 @@ def _bandas(pron, bandas, inicio):
     return pron
 
 
+def hoy_local():
+    """Ultimo dia completo en la zona horaria de la operacion (ayer): el pronostico empieza hoy aunque los ultimos
+    dias no hayan tenido ventas."""
+    tz = os.environ.get("ETL_TZ") or "America/Guayaquil"
+    return (pd.Timestamp.now(tz=tz).normalize() - pd.Timedelta(days=1)).tz_localize(None)
+
+
 def predecir(paquete, ventas, hoy=None):
-    """Pronostico y backtest con los datos de este servidor. Devuelve el paquete de prediccion (dict)."""
+    """Pronostico y backtest con los datos de este servidor, sin entrenar. Pronostica TODAS las series del servidor
+    (producto x unidad espacial), tambien productos y ubicaciones que el modelo no vio: el baseline no necesita
+    ajuste y el modelo tabular las describe con sus rezagos y la ubicacion real de su unidad. `hoy`: ultimo dia del
+    historial (el pronostico cubre los HORIZONTE dias siguientes); None = ultimo dia con ventas."""
     difs = comprobar_versiones(paquete)
     if difs:
         raise VersionIncompatible("El modelo se entreno con otras versiones: %s. Reentrene en local con la imagen "
@@ -110,19 +133,28 @@ def predecir(paquete, ventas, hoy=None):
     v = ventas if proc == "TODAS" else ventas[ventas["procedencia"] == proc]
     if v.empty:
         v = ventas      # p. ej. el modelo se entreno con el historial del demo (SIMULADO) y aqui solo hay REAL
-    v, a_servidor, desconocidos = _traducir(v, paquete)
     if v.empty:
-        raise SystemExit("Ninguna venta del DWH corresponde a un producto conocido por el modelo.")
-    unidad = paquete["asignador"].asignar(v["lat_aprox"], v["lon_aprox"], v["zona"])
-    info = paquete["info"]
-    pnl, nuevas = _panel(v, unidad, info, fin=hoy)
+        raise SinVentas("El DWH todavia no tiene ventas confirmadas: no hay nada que pronosticar.")
+    v, a_servidor, desconocidos = _traducir(v, paquete)
+    asign = paquete["asignador"]
+    unidad = asign.asignar_con_limite(v["lat_aprox"], v["lon_aprox"], v["zona"])
+    pnl, info = _panel(v, unidad, fin=hoy)
+    # Geometria de las unidades con los puntos exactos de este servidor; para el modelo, el centro del entrenamiento
+    # en las unidades que conoce y el real en las nuevas.
+    unidades = asign.unidades(v["lat_aprox"], v["lon_aprox"], unidad)
+    centros = {g["unidad_id"]: (g["centro_lat"], g["centro_lon"]) for g in unidades}
+    centros.update(paquete.get("centros") or {})
+    conocidas = set(paquete["info"]["unique_id"])
 
     fechas = panel.futuro(pnl)
-    pron = _bandas(_pronosticar(paquete, pnl, fechas), paquete.get("bandas") or {}, fechas[0])
+    pron = _bandas(_pronosticar(paquete, pnl, fechas, info, centros), paquete.get("bandas") or {}, fechas[0])
     inicio = pnl["ds"].max() - pd.Timedelta(days=HORIZONTE - 1)
     entreno, prueba = panel.partir(pnl, inicio)
-    bt = prueba.merge(_pronosticar(paquete, entreno, pd.date_range(inicio, periods=HORIZONTE, freq="D")),
-                      on=["unique_id", "ds"], how="left").fillna({"yhat": 0.0})
+    if entreno.empty:       # menos de una semana de historia: sin backtest
+        bt = prueba.assign(yhat=0.0).iloc[0:0]
+    else:
+        bt = prueba.merge(_pronosticar(paquete, entreno, pd.date_range(inicio, periods=HORIZONTE, freq="D"), info,
+                                       centros), on=["unique_id", "ds"], how="left").fillna({"yhat": 0.0})
 
     def al_servidor(df):
         df = df.merge(info[["unique_id", "producto_sk", "unidad_id"]], on="unique_id", how="left")
@@ -135,11 +167,13 @@ def predecir(paquete, ventas, hoy=None):
         "model_version_entreno": paquete["model_version"], "modelo": paquete["modelo"], "unidad": paquete["unidad"],
         "generado_utc": datetime.now(timezone.utc).isoformat(), "ultimo_dia": str(ultimo),
         "pronostico": al_servidor(pron), "backtest": al_servidor(bt),
-        "unidades": paquete["unidades"], "a_servidor": a_servidor,
+        "unidades": unidades, "a_servidor": a_servidor,
         "resumen": {"series": int(info.shape[0]), "lineas_venta": int(len(v)),
-                    "productos_sin_modelo": len(desconocidos), "series_nuevas_sin_modelo": nuevas,
+                    "series_que_el_modelo_conocia": int(info["unique_id"].isin(conocidas).sum()),
+                    "productos_nuevos": len(desconocidos),
+                    "unidades_nuevas": int(sum(1 for g in unidades if str(g["unidad_id"]).startswith("s"))),
                     "wape_backtest": float(np.abs(bt["yhat"] - bt["y"]).sum() / bt["y"].sum())
-                    if bt["y"].sum() > 0 else None},
+                    if len(bt) and bt["y"].sum() > 0 else None},
     }
 
 
@@ -169,6 +203,8 @@ def main(argv=None):
     p.add_argument("--model-dir", default=os.environ.get("MODEL_DIR", "models"))
     p.add_argument("--analisis-dir", default=os.environ.get("ANALISIS_DIR", "analisis"))
     p.add_argument("--sin-dwh", action="store_true", help="no escribe en el DWH")
+    p.add_argument("--hasta-ultima-venta", action="store_true",
+                   help="pronostica desde el ultimo dia con ventas (por defecto, desde hoy en ETL_TZ)")
     a = p.parse_args(argv)
     ruta = pathlib.Path(a.model_dir) / "demanda.joblib"
     if not ruta.exists():
@@ -179,9 +215,12 @@ def main(argv=None):
         raise SystemExit(str(exc))
     paquete = joblib.load(ruta)
     try:
-        pred = predecir(paquete, datos.cargar(a.source))
+        pred = predecir(paquete, datos.cargar(a.source), hoy=None if a.hasta_ultima_venta else hoy_local())
     except VersionIncompatible as exc:
         raise SystemExit(str(exc))
+    except SinVentas as exc:
+        print("predecir: %s" % exc)
+        return 0
     _atomico(pathlib.Path(a.model_dir) / "demanda_prediccion.joblib", lambda t: joblib.dump(pred, t))
     print("predecir: sin entrenar; modelo %s (%s), hasta %s: %s" % (
         pred["modelo"], pred["model_version_entreno"], pred["ultimo_dia"], json.dumps(pred["resumen"])))

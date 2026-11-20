@@ -334,3 +334,72 @@ def test_api_sin_modelo_avisa(tmp_path):
     h = c.get("/demanda/health").json()
     assert h["model_loaded"] is False and "entrena en local" in h["aviso"]
     assert c.post("/demanda/predict", json={"producto_sk": 1, "lat": -1.24, "lon": -78.62}).status_code == 503
+
+
+# ---------------------------------------------------------------- servidor: datos que el modelo no vio
+def _ventas_nuevas(ventas):
+    """Ventas del servidor: un producto que el modelo no conoce (id de Odoo nuevo) y una ubicacion lejana (~25 km)."""
+    base = ventas[ventas["fecha_local"] >= ventas["fecha_local"].max() - pd.Timedelta(days=40)]
+    nuevo = base[base["producto_sk"] == 1].assign(producto_sk=99, producto_id_odoo=9999, producto="Nuevo")
+    lejos = base[base["producto_sk"] == 2].assign(lat_aprox=lambda d: d["lat_aprox"] - 0.23,
+                                                  lon_aprox=lambda d: d["lon_aprox"] + 0.0001)
+    return pd.concat([ventas, nuevo, lejos], ignore_index=True)
+
+
+@pytest.fixture(scope="module")
+def entrenado_dbscan(ventas, tmp_path_factory):
+    d = tmp_path_factory.mktemp("modelos_dbscan")
+    return entrenar(ventas, "media_dia_semana_8", "dbscan", "TODAS", d)
+
+
+def test_asignador_no_fuerza_puntos_lejanos_a_una_unidad_local(entrenado_dbscan, ventas):
+    asign = entrenado_dbscan["asignador"]
+    cerca = asign.asignar_con_limite(ventas["lat_aprox"].head(50), ventas["lon_aprox"].head(50))
+    assert set(cerca) == set(asign.asignar(ventas["lat_aprox"].head(50), ventas["lon_aprox"].head(50)))
+    lejos = asign.asignar_con_limite([-1.47, -1.4701, 0.5], [-78.62, -78.6201, -79.0])
+    assert lejos[0] == lejos[1] and lejos[0].startswith("s") and lejos[2] != lejos[0]
+
+
+def test_predecir_pronostica_productos_y_ubicaciones_nuevas(entrenado_dbscan, ventas):
+    from mlsvc.demanda import predecir as P
+    srv = _ventas_nuevas(ventas).assign(producto_sk=lambda d: d["producto_sk"] + 100)
+    pred = P.predecir(entrenado_dbscan, srv)
+    pron = pred["pronostico"]
+    assert 199 in set(pron["producto_sk"])                               # producto nuevo, con su sk del servidor
+    nuevas = [u for u in pred["unidades"] if str(u["unidad_id"]).startswith("s")]
+    assert nuevas and pron["unidad_id"].isin([u["unidad_id"] for u in nuevas]).any()
+    # la unidad nueva esta donde estan sus ventas (coordenadas exactas, no la unidad local mas cercana)
+    assert all(abs(u["centro_lat"] - (-1.24 - 0.23)) < 0.05 for u in nuevas)
+    assert pred["resumen"]["productos_nuevos"] == 1 and pred["resumen"]["unidades_nuevas"] >= 1
+
+
+def test_predecir_desde_hoy_rellena_dias_sin_ventas(entrenado_dbscan, ventas):
+    from mlsvc.demanda import predecir as P
+    hoy = ventas["fecha_local"].max() + pd.Timedelta(days=10)
+    pred = P.predecir(entrenado_dbscan, ventas, hoy=hoy)
+    assert pred["pronostico"]["ds"].min() == hoy + pd.Timedelta(days=1)
+    assert pred["ultimo_dia"] == str(hoy.date())
+
+
+def test_predecir_sin_ventas_no_es_error(entrenado_dbscan, ventas):
+    from mlsvc.demanda import predecir as P
+    with pytest.raises(P.SinVentas):
+        P.predecir(entrenado_dbscan, ventas.iloc[0:0])
+
+
+def test_predecir_tabular_con_productos_nuevos(entrenado, ventas):
+    from mlsvc.demanda import predecir as P
+    _, paq = entrenado
+    pred = P.predecir(paq, _ventas_nuevas(ventas))
+    assert 99 in set(pred["pronostico"]["producto_sk"]) and pred["pronostico"]["yhat"].notna().all()
+
+
+def test_programado_no_termina_por_un_fallo(monkeypatch):
+    from mlsvc.demanda import predecir as P
+    from mlsvc.demanda import programado
+    monkeypatch.setattr(P, "main", lambda argv: (_ for _ in ()).throw(RuntimeError("sin DWH")))
+    assert programado.ciclo() == 1
+    monkeypatch.setattr(P, "main", lambda argv: (_ for _ in ()).throw(SystemExit("No hay modelo")))
+    assert programado.ciclo() == 1
+    monkeypatch.setattr(P, "main", lambda argv: 0)
+    assert programado.ciclo() == 0

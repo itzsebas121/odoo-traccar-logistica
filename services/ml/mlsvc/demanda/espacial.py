@@ -7,6 +7,7 @@ Tipos (texto del parametro --unidades):
   - "zona"       la zona del DWH (centroide mas cercano de logistica.zona): referencia, no depende de lat/lon.
 
 Un pedido sin coordenadas cae en la unidad "(sin ubicacion)" (salvo en "zona", que ya viene resuelta).
+Las coordenadas llegan con la precision de Odoo (sin redondear): centros y cascos son los de los puntos reales.
 Un Asignador entrenado se guarda con el modelo para ubicar coordenadas nuevas en /demanda/predict."""
 import json
 import math
@@ -140,6 +141,39 @@ class Asignador:
             xy = _km_xy(lat[ok], lon[ok], *self._ref)
             idx = self._modelo["nn"].kneighbors(xy, return_distance=False)[:, 0]
             out[ok] = ["d%02d" % e for e in self._modelo["etiquetas"][idx]]
+        return out
+
+    def asignar_con_limite(self, lat, lon, zona=None, lejos_km=None):
+        """Como `asignar`, pero en el servidor: un punto a mas de `lejos_km` de lo que el modelo conocio (punto de
+        entrenamiento mas cercano en dbscan, centro del cluster en kmeans) no se fuerza a una unidad lejana. Esos
+        puntos forman unidades nuevas (DBSCAN haversine sobre ellos mismos) con id estable 's<lat>_<lon>' del centro.
+        h3 y zona no lo necesitan: la celda o la zona ya es la del punto exacto."""
+        out = self.asignar(lat, lon, zona)
+        if self.base not in ("kmeans", "dbscan") or self._modelo is None or self._ref is None:
+            return out
+        lat, lon = np.asarray(lat, float), np.asarray(lon, float)
+        ok = ~(np.isnan(lat) | np.isnan(lon))
+        if not ok.any():
+            return out
+        idx = np.where(ok)[0]
+        xy = _km_xy(lat[ok], lon[ok], *self._ref)
+        if self.base == "dbscan":
+            lejos_km = lejos_km or max(3 * (float(self.arg) if self.arg else 0.6), 1.5)
+            dist = self._modelo["nn"].kneighbors(xy, return_distance=True)[0][:, 0]
+        else:
+            lejos_km = lejos_km or 5.0
+            dist = np.min(np.linalg.norm(xy[:, None, :] - self._modelo.cluster_centers_[None, :, :], axis=2), axis=1)
+        lejos = idx[dist > lejos_km]
+        if len(lejos) == 0:
+            return out
+        from sklearn.cluster import DBSCAN
+        eps_km = float(self.arg) if (self.base == "dbscan" and self.arg) else 0.6
+        rad = np.radians(np.column_stack([lat[lejos], lon[lejos]]))
+        etiquetas = DBSCAN(eps=eps_km / RADIO_TIERRA_KM, min_samples=1, metric="haversine",
+                           algorithm="ball_tree").fit_predict(rad)
+        for e in np.unique(etiquetas):
+            m = lejos[etiquetas == e]
+            out[m] = "s%.3f_%.3f" % (float(lat[m].mean()), float(lon[m].mean()))
         return out
 
     # ---------------------------------------------------------------- geometria
