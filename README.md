@@ -166,7 +166,7 @@ También se puede lanzar a mano: `etl run --mode full` o `etl run`. `etl simulat
 
 ### Tableros
 
-- **Asistente → Tablero** (servicio `agente`) y **Odoo → Tableros → Indicadores logísticos** (módulo `logistica_tablero`, también en *Logística → Indicadores*) son **el mismo tablero** (React + shadcn): resumen de ventas, demanda con mapa (ubicación exacta de cada pedido), pronóstico del modelo por producto y zona, y operación. Ambos leen las vistas `v_bi_*` del DWH con el rol de solo lectura `dwh_ro`.
+- **Asistente → Tablero** (servicio `agente`) y **Odoo → Tableros**, grupo *LOGÍSTICA → Indicadores logísticos* (módulo `logistica_tablero`; se abre por defecto, junto a Sales, Product e Invoicing; *Logística → Indicadores* lleva al mismo lugar) son **el mismo tablero** (React + shadcn): resumen de ventas, demanda con mapa (ubicación exacta de cada pedido), pronóstico del modelo por producto y zona, y operación. Ambos leen las vistas `v_bi_*` del DWH con el rol de solo lectura `dwh_ro`.
 - En Odoo, el tablero compilado vive en `odoo/addons/logistica_tablero/static/app` (la imagen de Odoo no tiene Node). Tras cambiar el tablero en `services/agente/web`, recompílelo con `bash scripts/build_tablero_odoo.sh` (usa Docker) y suba `static/app` en el mismo commit.
 - La API del tablero en Odoo es `GET /logistica/tablero/api/<sección>` con los mismos filtros y el mismo JSON que la del asistente (secciones `resumen`, `demanda`, `pronostico`, `pronostico_detalle`, `operacion`, `opciones`), solo para gerentes de ventas o de flota.
 - Los tableros estándar de Odoo (Sales, Product, Invoicing) guardan su contenido en el filestore. `odoo-init` repara en cada arranque los que hayan perdido su archivo.
