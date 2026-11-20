@@ -39,8 +39,8 @@ Códigos de salida: `0` correcto, `1` fallo, `2` falta configuración, `3` ya ha
 | `ETL_STG_PASSWORD`, `DWH_ETL_PASSWORD` | obligatorias | Roles `etl_stg` y `dwh_etl`. |
 | `DWH_DB_PASSWORD` | vacía | Rol de solo lectura `dwh_ro` (BI y ML). Vacía: no se crea. |
 | `DWH_ADMIN_DSN` | obligatoria para `bootstrap` | Administrador del servidor PostgreSQL. |
-| `ETL_INTERVAL_MIN` | 15 | Minutos entre corridas del programador. |
-| `ETL_FULL_HOURS` | 24 | Cada cuántas horas el programador hace una corrida completa. |
+| `ETL_HORARIO` | `03:00,12:00` | Horas locales (`ETL_TZ`) de las corridas del programador (`etl serve`/`schedule`); además corre una vez al arrancar. |
+| `ETL_FULL_HOURS` | 20 | Una corrida es completa si la última completa tiene más de estas horas (con dos corridas al día, una es completa). |
 | `ETL_RETENTION_DAYS` | 30 | Días que se conserva el crudo de staging. 0 = no se borra. |
 | `ETL_TRACCAR_DAYS` | 30 | Días hacia atrás de la primera lectura de Traccar. |
 | `ETL_TZ` | America/Guayaquil | Zona horaria de la operación. |
@@ -226,7 +226,7 @@ Si se añaden columnas, hacerlo también con `ALTER TABLE ... ADD COLUMN IF NOT 
 
 ## Ubicación de las ventas, vistas del ML/BI y rol `dwh_ml`
 
-- `fact_ventas.lat_aprox` y `lon_aprox`: ubicación de entrega del pedido redondeada a 3 decimales (~110 m).
+- `fact_ventas.lat_aprox` y `lon_aprox`: ubicación de entrega del pedido con la precisión de Odoo (sin redondear; el nombre se conserva por las vistas). Si el pedido no la tiene, la de su entrega y luego la de entrega del cliente (`res.partner.delivery_latitude/longitude`).
 - Vistas nuevas: `v_ml_ventas_geo` y `v_ml_demanda_diaria_zona` (ML) y las `v_bi_*` de `sql/dwh_bi_views.sql` (dashboards; ver `docs/guia_dashboard_web_powerbi.md`).
 - Tablas `ml_evaluacion_modelos`, `ml_unidad_espacial` y `ml_pronostico_demanda`: las escribe el servicio ML.
 - Rol `dwh_ml` (`DWH_ML_PASSWORD`): lee todo el DWH y escribe solo las tablas `ml_*`. Sin clave, `bootstrap` no lo crea.

@@ -4,6 +4,7 @@
   python -m etl run [--mode full|incremental]    una corrida
   python -m etl simulate [--dias N] [--seed S]   historico SIMULADO
   python -m etl schedule                         corre periodicamente (servicio)
+  python -m etl serve                            bootstrap (sin --reset) y luego schedule (servicio del servidor)
   python -m etl report [--lotes N]               ultimas corridas y rechazos
   python -m etl purge [--dias N]                 retencion del crudo de staging
   python -m etl health [--max-min M]             0 si hubo una corrida correcta reciente
@@ -94,6 +95,23 @@ def cmd_run(a):
 
 def cmd_schedule(_a):
     return scheduler.run(lambda: _corrida("auto"))
+
+
+def cmd_serve(_a):
+    """Servicio del servidor: `bootstrap` (idempotente y aditivo, nunca --reset) y luego una corrida por ciclo.
+    Si el bootstrap falla (faltan claves, la base aun no responde) se registra y se reintenta en el siguiente ciclo:
+    asi un despliegue nuevo deja el DWH creado y cargado sin pasos manuales."""
+    estado = {"bootstrap": False}
+
+    def ciclo():
+        if not estado["bootstrap"]:
+            # Sin estas claves el ETL no puede correr: mejor un aviso claro que bases a nombre del administrador.
+            for var in ("ETL_STG_PASSWORD", "DWH_ETL_PASSWORD", "DWH_ADMIN_DSN"):
+                config.require(var)
+            cmd_bootstrap(argparse.Namespace(reset=False))
+            estado["bootstrap"] = True
+        return _corrida("auto")
+    return scheduler.run(ciclo)
 
 
 def cmd_simulate(a):
@@ -196,7 +214,8 @@ def cmd_purge(a):
 
 
 def cmd_health(a):
-    limite = a.max_min if a.max_min is not None else 3 * config.intervalo_min()
+    # sano si la ultima corrida correcta es mas reciente que el mayor hueco del horario (+2 h de margen)
+    limite = a.max_min if a.max_min is not None else config.max_hueco_min() + 120
     conn = db.conectar_dwh()
     try:
         with conn.cursor() as cur:
@@ -226,7 +245,9 @@ def main(argv=None):
     s.add_argument("--dias", type=int, default=30)
     s.add_argument("--seed", type=int, default=42)
     s.set_defaults(fn=cmd_simulate)
-    sub.add_parser("schedule", help="corre periodicamente (ETL_INTERVAL_MIN)").set_defaults(fn=cmd_schedule)
+    sub.add_parser("schedule", help="corre a las horas de ETL_HORARIO (por defecto 03:00 y 12:00)").set_defaults(fn=cmd_schedule)
+    sub.add_parser("serve", help="bootstrap (sin --reset) y luego schedule; el servicio del servidor"
+                   ).set_defaults(fn=cmd_serve)
     rep = sub.add_parser("report", help="ultimas corridas, rechazos y marcas de agua")
     rep.add_argument("--lotes", type=int, default=10)
     rep.add_argument("--sin-conteos", action="store_true", help="no compara el DWH con Odoo")
@@ -235,7 +256,7 @@ def main(argv=None):
     p.add_argument("--dias", type=int, default=None, help="por defecto ETL_RETENTION_DAYS")
     p.set_defaults(fn=cmd_purge)
     h = sub.add_parser("health", help="0 si hubo una corrida correcta reciente")
-    h.add_argument("--max-min", type=int, default=None, help="por defecto 3 x ETL_INTERVAL_MIN")
+    h.add_argument("--max-min", type=int, default=None, help="por defecto el mayor hueco de ETL_HORARIO + 2 h")
     h.set_defaults(fn=cmd_health)
     a = ap.parse_args(argv)
     try:

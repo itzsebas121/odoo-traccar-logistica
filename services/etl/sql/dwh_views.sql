@@ -91,9 +91,9 @@ LEFT JOIN dim_zona z ON z.sk = p.zona_sk
 WHERE p.estado IN ('entregado', 'no_entregado')
 WINDOW w AS (PARTITION BY p.ruta_id_odoo ORDER BY COALESCE(p.cierre_utc, p.llegada_utc), p.orden, p.parada_id_odoo);
 
--- Ventas con su ubicacion aproximada para el pronostico de demanda por ubicacion. Una fila por linea de pedido
+-- Ventas con su ubicacion para el pronostico de demanda por ubicacion. Una fila por linea de pedido
 -- confirmado. Fecha y hora en la zona horaria de la operacion (ETL_TZ). lat_aprox/lon_aprox: punto de entrega del
--- pedido redondeado a ~110 m (puede ser NULL si el pedido no tiene ubicacion). categoria: ultimo nivel de la
+-- pedido con la precision de Odoo (puede ser NULL si ni el pedido, ni su entrega, ni el cliente tienen ubicacion). categoria: ultimo nivel de la
 -- categoria de Odoo ("Todos / Alimentos / Granos y cereales" -> "Granos y cereales"); grupo: el nivel anterior.
 CREATE OR REPLACE VIEW v_ml_ventas_geo AS
 SELECT s.linea_id_odoo,

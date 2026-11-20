@@ -161,9 +161,10 @@ def load_dimensions(cur, ctx, odoo, traccar):
         upsert_zonas(cur, odoo["logistica.zona"])
     ctx.zonas = leer_zonas(cur)
 
-    ciudad = {}
+    ciudad, punto = {}, {}
     for p in odoo.get("res.partner") or []:
         ciudad[p["id"]] = n.texto(p.get("city"))
+        punto[p["id"]] = n.coordenada(p.get("delivery_latitude"), p.get("delivery_longitude"))
         if p.get("is_driver"):
             upsert_conductor(cur, ctx, p["id"], n.texto(p.get("name")))
     _vehiculos(cur, ctx, odoo, traccar)
@@ -176,6 +177,8 @@ def load_dimensions(cur, ctx, odoo, traccar):
     for o in odoo.get("sale.order") or []:
         cid = n.m2o_id(o.get("partner_id"))
         lat, lon = n.coordenada(o.get("delivery_latitude"), o.get("delivery_longitude"))
+        if lat is None:         # pedido sin ubicacion: la de entrega del cliente
+            lat, lon = punto.get(cid) or (None, None)
         upsert_cliente(cur, ctx, cid, n.m2o_nombre(o.get("partner_id")), ciudad.get(cid), ctx.zona(lat, lon))
     for e in odoo.get("logistica.entrega") or []:
         cid = n.m2o_id(e.get("partner_id"))

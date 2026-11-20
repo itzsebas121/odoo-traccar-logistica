@@ -86,14 +86,38 @@ def zona_horaria():
     return env("ETL_TZ", "America/Guayaquil")
 
 
-def intervalo_min():
-    """Minutos entre corridas del programador."""
-    return entero("ETL_INTERVAL_MIN", 15, minimo=1)
+def horario():
+    """Horas locales (ETL_TZ) de las corridas del programador, ordenadas: [(hora, minuto), ...].
+    ETL_HORARIO="03:00,12:00" por defecto: una en la madrugada y otra al mediodia (cada ~12 h)."""
+    crudo = env("ETL_HORARIO", "03:00,12:00")
+    horas = set()
+    for parte in crudo.split(","):
+        parte = parte.strip()
+        if not parte:
+            continue
+        try:
+            h, _, m = parte.partition(":")
+            h, m = int(h), int(m or 0)
+        except ValueError:
+            raise ConfigError("ETL_HORARIO debe ser una lista de horas HH:MM separadas por comas (valor: %r)." % crudo)
+        if not (0 <= h <= 23 and 0 <= m <= 59):
+            raise ConfigError("ETL_HORARIO tiene una hora fuera de rango: %r." % parte)
+        horas.add((h, m))
+    if not horas:
+        raise ConfigError("ETL_HORARIO no tiene ninguna hora (valor: %r)." % crudo)
+    return sorted(horas)
+
+
+def max_hueco_min():
+    """Mayor espera (minutos) entre dos corridas seguidas del horario, contando el paso de un dia al siguiente."""
+    minutos = [h * 60 + m for h, m in horario()]
+    return max((b - a) % 1440 or 1440 for a, b in zip(minutos, minutos[1:] + minutos[:1]))
 
 
 def horas_entre_completas():
-    """El programador hace una corrida completa cuando la ultima tiene mas de estas horas (detecta borrados)."""
-    return entero("ETL_FULL_HOURS", 24, minimo=1)
+    """El programador hace una corrida completa cuando la ultima tiene mas de estas horas (detecta borrados).
+    20 por defecto: con dos corridas al dia, una de ellas es completa."""
+    return entero("ETL_FULL_HOURS", 20, minimo=1)
 
 
 def dias_retencion():

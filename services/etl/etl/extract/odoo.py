@@ -8,7 +8,10 @@ import xmlrpc.client
 MODELS = {
     "logistica.zona": dict(fields=["id", "code", "name", "latitude", "longitude", "active", "write_date"],
                            inactivos=True),
-    "res.partner": dict(fields=["id", "name", "city", "is_driver", "write_date"],
+    # delivery_latitude/longitude (logistica_base): punto de entrega del cliente, respaldo de la ubicacion de una
+    # venta cuando el pedido no la trae. Son coordenadas, no datos de contacto.
+    "res.partner": dict(fields=["id", "name", "city", "is_driver", "delivery_latitude", "delivery_longitude",
+                                "write_date"],
                         domain=["|", ("is_driver", "=", True), ("sale_order_ids", "!=", False)],
                         need=["is_driver", "sale_order_ids"], inactivos=True),
     "traccar.device": dict(fields=["id", "name", "unique_id", "traccar_id", "write_date"]),
