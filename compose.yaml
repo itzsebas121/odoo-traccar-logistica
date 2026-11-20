@@ -164,8 +164,9 @@ services:
   # Pronostico de demanda en el SERVIDOR con el modelo entrenado en local (models/demanda.joblib, va en el repo).
   # No entrena: lee las ventas del DWH, predice los 7 dias desde hoy para TODAS las series del servidor (tambien
   # productos y ubicaciones que el modelo no vio) y escribe ml_pronostico_demanda, ml_unidad_espacial y la
-  # comparativa de analisis/ en ml_evaluacion_modelos. Corre solo cada ML_PREDECIR_MIN minutos (60 por defecto);
-  # mientras el DWH no tenga ventas, lo registra y reintenta.
+  # comparativa de analisis/ en ml_evaluacion_modelos. Va detras del ETL: cada ML_REVISAR_MIN minutos (5 por
+  # defecto) mira si hubo una corrida nueva del ETL (o cambio el dia) y entonces recalcula; mientras el DWH no tenga
+  # ventas, lo registra y reintenta.
   ml-programado:
     <<: *ml
     depends_on:
@@ -173,7 +174,7 @@ services:
         condition: service_healthy
     environment:
       <<: *ml-env
-      ML_PREDECIR_MIN: ${ML_PREDECIR_MIN:-60}
+      ML_REVISAR_MIN: ${ML_REVISAR_MIN:-5}
     ports: []
     healthcheck:
       disable: true

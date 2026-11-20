@@ -155,7 +155,7 @@ El ETL (`services/etl`) copia Odoo y Traccar a un Data Warehouse en PostgreSQL (
 Con las cuatro claves `ETL_STG_PASSWORD`, `DWH_ETL_PASSWORD`, `DWH_DB_PASSWORD` y `DWH_ML_PASSWORD` definidas en `.env`, `docker compose up -d` ya levanta todo:
 
 - `etl-scheduler`: al arrancar corre `etl bootstrap` (crea o actualiza bases, roles, tablas y vistas; es aditivo y nunca borra) y luego carga el DWH al arrancar y dos veces al día, a las 03:00 y a las 12:00 hora de Ecuador (`ETL_HORARIO`); una de las dos es completa.
-- `ml-programado`: cada `ML_PREDECIR_MIN` minutos (60 por defecto) calcula el pronóstico de demanda con el modelo entrenado en local (no entrena) y lo deja en el DWH para los tableros.
+- `ml-programado`: después de cada corrida del ETL (lo revisa cada `ML_REVISAR_MIN` minutos, 5 por defecto) calcula el pronóstico de demanda con el modelo entrenado en local (no entrena) y lo deja en el DWH para los tableros. Un cálculo nuevo del mismo día reemplaza al anterior.
 
 ```bash
 docker compose --profile etl run --rm etl report             # estado de las corridas y rechazos
@@ -166,8 +166,9 @@ También se puede lanzar a mano: `etl run --mode full` o `etl run`. `etl simulat
 
 ### Tableros
 
-- **Asistente → Tablero** (servicio `agente`) y **Odoo → Tableros → Indicadores logísticos** (módulo `logistica_tablero`, también en *Logística → Indicadores*) muestran lo mismo: resumen de ventas, demanda con mapa (ubicación exacta de cada pedido), pronóstico por producto y zona, y operación. Ambos leen las vistas `v_bi_*` del DWH con el rol de solo lectura `dwh_ro`.
-- La API del tablero en Odoo es `POST /logistica/tablero/api/<sección>` (JSON-RPC; secciones `resumen`, `demanda`, `pronostico`, `pronostico_detalle`, `operacion`, `opciones`), solo para gerentes de ventas o de flota.
+- **Asistente → Tablero** (servicio `agente`) y **Odoo → Tableros → Indicadores logísticos** (módulo `logistica_tablero`, también en *Logística → Indicadores*) son **el mismo tablero** (React + shadcn): resumen de ventas, demanda con mapa (ubicación exacta de cada pedido), pronóstico del modelo por producto y zona, y operación. Ambos leen las vistas `v_bi_*` del DWH con el rol de solo lectura `dwh_ro`.
+- En Odoo, el tablero compilado vive en `odoo/addons/logistica_tablero/static/app` (la imagen de Odoo no tiene Node). Tras cambiar el tablero en `services/agente/web`, recompílelo con `bash scripts/build_tablero_odoo.sh` (usa Docker) y suba `static/app` en el mismo commit.
+- La API del tablero en Odoo es `GET /logistica/tablero/api/<sección>` con los mismos filtros y el mismo JSON que la del asistente (secciones `resumen`, `demanda`, `pronostico`, `pronostico_detalle`, `operacion`, `opciones`), solo para gerentes de ventas o de flota.
 - Los tableros estándar de Odoo (Sales, Product, Invoicing) guardan su contenido en el filestore. `odoo-init` repara en cada arranque los que hayan perdido su archivo.
 
 Pruebas del backend:

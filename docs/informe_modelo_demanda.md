@@ -153,7 +153,7 @@ docker compose --profile benchmark run --rm ml-benchmark python -m mlsvc.demanda
 # se suben services/ml/models/demanda.joblib, demanda_metrics.json, SHA256SUMS y services/ml/analisis/comparativa_modelos.*
 # (el entrenamiento actualiza SHA256SUMS; el servidor no carga un .joblib cuyo hash no coincida con él)
 
-# Servidor: solo predice. Lo hace solo el servicio ml-programado (cada ML_PREDECIR_MIN minutos); a mano:
+# Servidor: solo predice. Lo hace solo el servicio ml-programado (despues de cada corrida del ETL); a mano:
 docker compose --profile analitica run --rm ml-predecir
 ```
 
@@ -203,7 +203,7 @@ Comprobaciones:
 
 Notas:
 
-- `ml-programado` recalcula el pronóstico cada `ML_PREDECIR_MIN` minutos (60 por defecto).
+- `ml-programado` recalcula el pronóstico después de cada corrida del ETL (03:00, 12:00 y al desplegar) y al cambiar el día; el cálculo nuevo reemplaza al anterior.
 - `models/demanda_prediccion.joblib` lo genera el servidor con sus propios datos. No va en el repo y no está en
   `SHA256SUMS`, porque no sale de una revisión.
 - Reentrenar o cambiar de modelo se hace en local. Hay que subir juntos `demanda.joblib`, `demanda_metrics.json` y
