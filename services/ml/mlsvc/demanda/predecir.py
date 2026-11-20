@@ -45,6 +45,11 @@ class SinVentas(RuntimeError):
     """El DWH aun no tiene ventas (servidor recien desplegado): no es un error del modelo."""
 
 
+# Codigo de salida de main() cuando el DWH aun no tiene ventas: no es un fallo, pero no hay pronostico nuevo
+# (ml-programado vuelve a intentarlo en la siguiente revision).
+SIN_VENTAS = 3
+
+
 def comprobar_versiones(paquete, actuales=None):
     """Lista de diferencias 'lib: entrenado X, instalado Y' (vacia si todo coincide)."""
     actuales = actuales or versiones()
@@ -220,7 +225,7 @@ def main(argv=None):
         raise SystemExit(str(exc))
     except SinVentas as exc:
         print("predecir: %s" % exc)
-        return 0
+        return SIN_VENTAS
     _atomico(pathlib.Path(a.model_dir) / "demanda_prediccion.joblib", lambda t: joblib.dump(pred, t))
     print("predecir: sin entrenar; modelo %s (%s), hasta %s: %s" % (
         pred["modelo"], pred["model_version_entreno"], pred["ultimo_dia"], json.dumps(pred["resumen"])))

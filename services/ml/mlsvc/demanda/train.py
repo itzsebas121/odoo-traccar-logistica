@@ -148,6 +148,10 @@ def guardar_dwh(paquete):
                           round(float(getattr(r, "p10", np.nan)), 3) if not real else None,
                           round(float(getattr(r, "p90", np.nan)), 3) if not real else None, mod, ver))
     with closing(datos.conectar(escritura=True)) as con, con, con.cursor() as cur:
+        # Reemplaza lo de esta misma version (en el servidor, mismo modelo y mismo ultimo dia): si el ETL trajo
+        # pedidos nuevos ese dia, el pronostico nuevo sustituye al anterior en vez de descartarse. Todo en una
+        # transaccion: el tablero nunca ve la version a medias.
+        cur.execute("DELETE FROM ml_pronostico_demanda WHERE model_version = %s", (ver,))
         execute_values(cur, "INSERT INTO ml_pronostico_demanda (tipo_registro, fecha_objetivo, producto_sk, "
                             "tipo_unidad, unidad_id, unidades_pred, unidades_real, p10, p90, modelo, model_version) "
                             "VALUES %s ON CONFLICT DO NOTHING", filas, page_size=2000)
