@@ -333,16 +333,23 @@ const CLAVES = {
 } as const
 export type SeccionTablero = keyof typeof CLAVES
 
+/** Raíz de la API del tablero: la del asistente por defecto; dentro de Odoo, la del módulo logistica_tablero
+ * (mismas secciones y mismo JSON, ver odoo/addons/logistica_tablero). */
+let baseTablero = '/api/tablero'
+export function configurarApiTablero(base: string) {
+  baseTablero = base.replace(/\/+$/, '')
+}
+
 /** URL de una sección con solo los filtros que le sirven (así cambiar uno que no usa no la vuelve a pedir). */
 export function urlTablero(seccion: SeccionTablero, f: FiltrosTablero, extra: { producto_sk?: number } = {}) {
   const p = new URLSearchParams()
   for (const k of CLAVES[seccion]) if (f[k]) p.set(k, String(f[k]))
   if (extra.producto_sk !== undefined) p.set('producto_sk', String(extra.producto_sk))
   const s = p.toString()
-  return `/api/tablero/${seccion}${s ? `?${s}` : ''}`
+  return `${baseTablero}/${seccion}${s ? `?${s}` : ''}`
 }
 
 export const apiTablero = {
   obtener: <T,>(url: string) => pedir<T>(url),
-  opciones: () => pedir<OpcionesTablero>('/api/tablero/opciones'),
+  opciones: () => pedir<OpcionesTablero>(`${baseTablero}/opciones`),
 }
