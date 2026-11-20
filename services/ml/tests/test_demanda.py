@@ -403,3 +403,75 @@ def test_programado_no_termina_por_un_fallo(monkeypatch):
     assert programado.ciclo() == 1
     monkeypatch.setattr(P, "main", lambda argv: 0)
     assert programado.ciclo() == 0
+
+
+def test_programado_sigue_al_etl():
+    """Recalcula con cada corrida nueva del ETL o al cambiar el dia; no repite si nada cambio; reintenta si el DWH
+    aun no tiene ventas (codigo 3) o no existe."""
+    from mlsvc.demanda import programado
+    estado = {"marca": None, "dia": "2026-11-19", "resultado": 0, "error": None}
+    corridas, avisos = [], []
+
+    def marca():
+        if estado["error"]:
+            raise estado["error"]
+        return estado["marca"]
+
+    def correr():
+        corridas.append(estado["marca"])
+        return estado["resultado"]
+
+    s = programado.Seguimiento(marca=marca, dia=lambda: estado["dia"], correr=correr,
+                               registrar=lambda m, error=False: avisos.append(m) if error else None)
+    estado["error"] = RuntimeError("password authentication failed for user dwh_ro")
+    assert not s.revisar() and not s.revisar() and len(avisos) == 1      # el mismo aviso una sola vez
+    estado["error"] = None
+    assert not s.revisar() and corridas == []                           # aun sin corrida del ETL
+    estado.update(marca="etl-1", resultado=3)
+    assert not s.revisar() and not s.revisar() and corridas == ["etl-1", "etl-1"]   # sin ventas: reintenta
+    estado["resultado"] = 0
+    assert s.revisar() and not s.revisar() and corridas == ["etl-1"] * 3
+    estado["marca"] = "etl-2"
+    assert s.revisar() and corridas[-1] == "etl-2"                      # corrida nueva del ETL
+    estado["dia"] = "2026-11-20"
+    assert s.revisar() and len(corridas) == 5                           # cambio de dia
+
+
+def test_guardar_dwh_reemplaza_la_misma_version(monkeypatch, entrenado):
+    """Un pronostico nuevo con la misma version (mismo modelo y mismo ultimo dia, p. ej. tras la corrida de las
+    12:00) reemplaza al anterior: antes se descartaba por ON CONFLICT DO NOTHING y el tablero quedaba viejo."""
+    import psycopg2.extras
+    from mlsvc.demanda import train
+    sql = []
+
+    class Cursor:
+        def execute(self, q, p=None):
+            sql.append((q, p))
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    class Con:
+        def cursor(self):
+            return Cursor()
+
+        def close(self):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(train.datos, "conectar", lambda escritura=False: Con())
+    monkeypatch.setattr(psycopg2.extras, "execute_values", lambda cur, q, filas, page_size=100: sql.append((q, filas)))
+    _, paq = entrenado
+    assert train.guardar_dwh(paq) > 0
+    consultas = [q for q, _ in sql]
+    borrar = next(i for i, q in enumerate(consultas) if q.startswith("DELETE FROM ml_pronostico_demanda"))
+    insertar = next(i for i, q in enumerate(consultas) if q.startswith("INSERT INTO ml_pronostico_demanda"))
+    assert borrar < insertar and sql[borrar][1] == (paq["model_version"],)
