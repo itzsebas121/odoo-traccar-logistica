@@ -1,4 +1,20 @@
 /* ==========================================================================
+   Menús desplegables del panel de control (Imprimir, Acción, Filtros,
+   Agrupar por, Favoritos...)
+   Odoo 16 los coloca con position:fixed y coordenadas de la ventana
+   (web/static/src/core/position_hook.js). shadcn_backend.css le pone
+   backdrop-filter a .o_control_panel, y un backdrop-filter distinto de none
+   convierte al elemento en el bloque contenedor de sus hijos fixed (Filter
+   Effects Level 2): el menú se medía desde el panel y quedaba recortado,
+   como una franja vacía bajo el botón. Se quita el desenfoque; el fondo del
+   panel ya es casi opaco.
+   ========================================================================== */
+.o_control_panel {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* ==========================================================================
    Menús de la bandeja (mensajes y actividades) con la barra lateral
    Odoo los abre alineados a la derecha del botón (dropdown-menu-end), pensado
    para una barra superior. En la barra lateral el botón queda abajo a la
