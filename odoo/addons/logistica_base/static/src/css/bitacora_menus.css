@@ -1,0 +1,51 @@
+/* ==========================================================================
+   Menús desplegables del panel de control (Imprimir, Acción, Filtros,
+   Agrupar por, Favoritos...)
+   Odoo 16 los coloca con position:fixed y coordenadas de la ventana
+   (web/static/src/core/position_hook.js). shadcn_backend.css le pone
+   backdrop-filter a .o_control_panel, y un backdrop-filter distinto de none
+   convierte al elemento en el bloque contenedor de sus hijos fixed (Filter
+   Effects Level 2): el menú se medía desde el panel y quedaba recortado,
+   como una franja vacía bajo el botón. Se quita el desenfoque; el fondo del
+   panel ya es casi opaco.
+   ========================================================================== */
+.o_control_panel {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* ==========================================================================
+   Menús de la bandeja (mensajes y actividades) con la barra lateral
+   Odoo los abre alineados a la derecha del botón (dropdown-menu-end), pensado
+   para una barra superior. En la barra lateral el botón queda abajo a la
+   izquierda, así que el menú se salía de la pantalla por la izquierda
+   («evo mensaje» cortado). Aquí se abren a la derecha de la barra lateral
+   (240 px) y pegados al borde inferior. Solo escritorio: en móvil Odoo ya
+   los muestra a pantalla completa.
+   ========================================================================== */
+@media (min-width: 768px) {
+    .o_main_navbar .o_menu_systray .o_MessagingMenu_dropdownMenu,
+    .o_main_navbar .o_menu_systray .o_ActivityMenuView_dropdownMenu {
+        position: fixed !important;
+        top: auto !important;
+        right: auto !important;
+        bottom: 12px !important;
+        left: 252px !important;
+        margin: 0 !important;
+        transform: none !important;
+        max-width: calc(100vw - 264px) !important;
+        max-height: min(calc(100vh - 24px), 630px) !important;
+        overflow-y: auto !important;
+        border: 1px solid var(--bitacora-border, rgba(0, 0, 0, 0.12)) !important;
+        border-radius: 10px !important;
+        box-shadow: 0 12px 32px rgba(19, 27, 41, 0.18) !important;
+    }
+
+    .o_main_navbar .o_menu_systray .o_MessagingMenu_dropdownMenu {
+        width: min(450px, calc(100vw - 264px)) !important;
+    }
+
+    .o_main_navbar .o_menu_systray .o_ActivityMenuView_dropdownMenu {
+        width: min(350px, calc(100vw - 264px)) !important;
+    }
+}

@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Página de inicio de la tienda. Reemplaza el «Bienvenido a su página de inicio» vacío de Odoo.
+         El nombre y el logo salen de la empresa del sitio (nada quemado). Sigue siendo editable con el editor
+         del sitio web: el contenedor conserva id="wrap" y la clase oe_structure. -->
+    <template id="homepage_logistica" inherit_id="website.homepage" name="Inicio - Logística">
+        <xpath expr="//div[@id='wrap']" position="replace">
+            <div id="wrap" class="oe_structure o_bitacora_home">
+                <t t-set="empresa" t-value="website.company_id"/>
+
+                <!-- Portada -->
+                <section class="o_bh_hero">
+                    <div class="container">
+                        <div class="row align-items-center g-5">
+                            <div class="col-lg-7">
+                                <span class="o_bh_kicker">Compras a domicilio</span>
+                                <h1 class="o_bh_title">
+                                    Haz tu pedido en línea y recíbelo en la puerta de tu casa
+                                </h1>
+                                <p class="o_bh_lead">
+                                    En <strong t-esc="empresa.name"/> eliges tus productos, marcas en el mapa dónde
+                                    quieres recibirlos y sigues a tu repartidor en tiempo real hasta que llega.
+                                </p>
+                                <div class="o_bh_actions">
+                                    <a href="/shop" class="btn btn-primary btn-lg">
+                                        <i class="fa fa-shopping-basket me-2"/>Ver la tienda
+                                    </a>
+                                    <a href="/contactus" class="btn btn-outline-primary btn-lg">Contáctanos</a>
+                                </div>
+                            </div>
+                            <div class="col-lg-5 d-none d-lg-block">
+                                <div class="o_bh_card_brand">
+                                    <img t-att-src="'/web/image/website/%s/logo' % website.id" t-att-alt="empresa.name"
+                                         class="o_bh_logo" loading="lazy"/>
+                                    <div class="o_bh_ruta" aria-hidden="true">
+                                        <span class="o_bh_ruta_punto o_bh_ruta_inicio"><i class="fa fa-home"/></span>
+                                        <span class="o_bh_ruta_linea"/>
+                                        <span class="o_bh_ruta_punto o_bh_ruta_camion"><i class="fa fa-truck"/></span>
+                                        <span class="o_bh_ruta_linea"/>
+                                        <span class="o_bh_ruta_punto o_bh_ruta_fin"><i class="fa fa-map-marker"/></span>
+                                    </div>
+                                    <p class="o_bh_card_nota">De nuestra bodega a tu puerta, con la ruta a la vista.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Cómo funciona -->
+                <section class="o_bh_pasos">
+                    <div class="container">
+                        <span class="o_bh_kicker">Cómo funciona</span>
+                        <h2 class="o_bh_subtitle">Tres pasos y tu pedido va en camino</h2>
+                        <div class="row g-4 mt-1">
+                            <div class="col-md-4">
+                                <div class="o_bh_paso">
+                                    <span class="o_bh_icono"><i class="fa fa-shopping-cart"/></span>
+                                    <span class="o_bh_num">01</span>
+                                    <h3>Elige tus productos</h3>
+                                    <p>Recorre el catálogo, agrega al carrito y confirma tu pedido.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="o_bh_paso">
+                                    <span class="o_bh_icono"><i class="fa fa-map-marker"/></span>
+                                    <span class="o_bh_num">02</span>
+                                    <h3>Marca tu ubicación</h3>
+                                    <p>Señala en el mapa el punto exacto de entrega: sin direcciones confusas.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="o_bh_paso">
+                                    <span class="o_bh_icono"><i class="fa fa-truck"/></span>
+                                    <span class="o_bh_num">03</span>
+                                    <h3>Sigue tu entrega</h3>
+                                    <p>Con el enlace de tu pedido ves en el mapa por dónde va tu repartidor.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Ventajas -->
+                <section class="o_bh_ventajas">
+                    <div class="container">
+                        <div class="row g-4">
+                            <div class="col-sm-6 col-lg-3">
+                                <div class="o_bh_ventaja">
+                                    <i class="fa fa-road"/>
+                                    <div><strong>Rutas optimizadas</strong><span>Entregas agrupadas por zona.</span></div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-lg-3">
+                                <div class="o_bh_ventaja">
+                                    <i class="fa fa-location-arrow"/>
+                                    <div><strong>GPS en vivo</strong><span>Rastreo del vehículo en ruta.</span></div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-lg-3">
+                                <div class="o_bh_ventaja">
+                                    <i class="fa fa-check-circle"/>
+                                    <div><strong>Entrega confirmada</strong><span>El repartidor registra cada entrega.</span></div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-lg-3">
+                                <div class="o_bh_ventaja">
+                                    <i class="fa fa-leaf"/>
+                                    <div><strong>Productos frescos</strong><span>Del mercado a tu mesa.</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Llamado final y crédito académico -->
+                <section class="o_bh_cta">
+                    <div class="container">
+                        <div class="o_bh_cta_caja">
+                            <div>
+                                <h2>¿Listo para tu primer pedido?</h2>
+                                <p>Entra a la tienda y recibe tu compra hoy mismo.</p>
+                            </div>
+                            <a href="/shop" class="btn btn-light btn-lg">Comprar ahora <i class="fa fa-arrow-right ms-2"/></a>
+                        </div>
+                        <p class="o_bh_credito">
+                            <i class="fa fa-graduation-cap me-1"/>
+                            Proyecto académico de la Universidad Técnica de Ambato (UTA).
+                        </p>
+                    </div>
+                </section>
+            </div>
+        </xpath>
+    </template>
+</odoo>

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Logística Base - Coordenadas y Zonas',
-    'version': '16.0.1.2.0',
+    'version': '16.0.1.3.0',
     'category': 'Inventory/Logistics',
     'summary': 'Geolocalización de contactos, zonas de entrega y pedidos de venta',
     'description': """
@@ -33,6 +33,7 @@ Módulo Base de Logística
     'assets': {
         'web.assets_backend': [
             'logistica_base/static/src/css/shadcn_backend.css',
+            'logistica_base/static/src/css/bitacora_menus.css',
             'logistica_base/static/src/js/bitacora_sidebar.js',
             'logistica_base/static/src/xml/bitacora_navbar.xml',
         ],
