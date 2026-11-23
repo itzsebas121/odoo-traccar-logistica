@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Logística - Checkout y seguimiento público',
-    'version': '16.0.1.1.0',
+    'version': '16.0.1.2.0',
     'category': 'Website/Website',
     'summary': 'Selector de destino en mapa, confirmación automática de prueba y seguimiento por token',
     'author': 'Equipo Logística Inteligente',
@@ -12,6 +12,7 @@
         'views/checkout_templates.xml',
         'views/confirmation_templates.xml',
         'views/tracking_templates.xml',
+        'views/homepage_templates.xml',
     ],
     'assets': {
         'web.assets_frontend': [

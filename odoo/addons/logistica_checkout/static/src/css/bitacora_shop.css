@@ -284,3 +284,99 @@ footer#bottom h4 {
     text-transform: uppercase;
     letter-spacing: 0.08em;
 }
+
+/* ==========================================================================
+   Página de inicio (views/homepage_templates.xml)
+   ========================================================================== */
+.o_bitacora_home section { padding: 56px 0; }
+.o_bitacora_home .o_bh_kicker {
+    display: inline-block;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--bitacora-shop-senal);
+    margin-bottom: 12px;
+}
+.o_bitacora_home .o_bh_hero { padding: 72px 0 56px; }
+.o_bitacora_home .o_bh_title {
+    font-size: clamp(30px, 4.2vw, 48px);
+    font-weight: 700;
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    color: var(--bitacora-shop-ink);
+    margin-bottom: 18px;
+}
+.o_bitacora_home .o_bh_lead {
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--bitacora-shop-ink-muted);
+    max-width: 38rem;
+}
+.o_bitacora_home .o_bh_actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+.o_bitacora_home .o_bh_card_brand {
+    background: var(--bitacora-shop-card);
+    border: 1px solid var(--bitacora-shop-border);
+    border-radius: 16px;
+    padding: 32px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(20, 29, 43, 0.06);
+}
+.o_bitacora_home .o_bh_logo { max-width: 220px; max-height: 90px; object-fit: contain; }
+.o_bitacora_home .o_bh_ruta { display: flex; align-items: center; justify-content: center; margin: 28px 0 14px; }
+.o_bitacora_home .o_bh_ruta_punto {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--bitacora-shop-muted); color: var(--bitacora-shop-primary); font-size: 18px;
+}
+.o_bitacora_home .o_bh_ruta_camion { background: var(--bitacora-shop-senal); color: #FDFBF7; }
+.o_bitacora_home .o_bh_ruta_fin { background: var(--bitacora-shop-primary); color: #FDFBF7; }
+.o_bitacora_home .o_bh_ruta_linea {
+    flex: 1 1 auto; max-width: 70px; height: 0; margin: 0 6px;
+    border-top: 2px dashed var(--bitacora-shop-border);
+}
+.o_bitacora_home .o_bh_card_nota { font-size: 14px; color: var(--bitacora-shop-ink-muted); margin: 0; }
+.o_bitacora_home .o_bh_subtitle {
+    font-size: clamp(24px, 3vw, 32px); font-weight: 700; letter-spacing: -0.01em; color: var(--bitacora-shop-ink);
+}
+.o_bitacora_home .o_bh_paso {
+    position: relative; height: 100%;
+    background: var(--bitacora-shop-card);
+    border: 1px solid var(--bitacora-shop-border);
+    border-radius: 14px;
+    padding: 26px;
+}
+.o_bitacora_home .o_bh_paso h3 { font-size: 18px; font-weight: 600; margin: 16px 0 8px; color: var(--bitacora-shop-ink); }
+.o_bitacora_home .o_bh_paso p { margin: 0; color: var(--bitacora-shop-ink-muted); }
+.o_bitacora_home .o_bh_icono {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 46px; height: 46px; border-radius: 12px;
+    background: var(--bitacora-shop-senal-suave); color: var(--bitacora-shop-senal); font-size: 20px;
+}
+.o_bitacora_home .o_bh_num {
+    position: absolute; top: 22px; right: 24px;
+    font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--bitacora-shop-ink-muted);
+}
+.o_bitacora_home .o_bh_ventajas { padding-top: 8px; }
+.o_bitacora_home .o_bh_ventaja { display: flex; gap: 14px; align-items: flex-start; }
+.o_bitacora_home .o_bh_ventaja > i { font-size: 22px; color: var(--bitacora-shop-ok); margin-top: 2px; }
+.o_bitacora_home .o_bh_ventaja strong { display: block; color: var(--bitacora-shop-ink); }
+.o_bitacora_home .o_bh_ventaja span { font-size: 14px; color: var(--bitacora-shop-ink-muted); }
+.o_bitacora_home .o_bh_cta_caja {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px;
+    background: var(--bitacora-shop-primary); color: #FDFBF7;
+    border-radius: 16px; padding: 34px 36px;
+}
+.o_bitacora_home .o_bh_cta_caja h2 { font-size: 26px; font-weight: 700; margin: 0 0 6px; color: #FDFBF7; }
+.o_bitacora_home .o_bh_cta_caja p { margin: 0; color: rgba(253, 251, 247, 0.75); }
+.o_bitacora_home .o_bh_credito {
+    text-align: center; margin: 22px 0 0;
+    font-size: 13px; color: var(--bitacora-shop-ink-muted);
+}
+@media (max-width: 767.98px) {
+    .o_bitacora_home section { padding: 36px 0; }
+    .o_bitacora_home .o_bh_hero { padding: 40px 0 28px; }
+    .o_bitacora_home .o_bh_actions .btn { width: 100%; }
+    .o_bitacora_home .o_bh_cta_caja { padding: 26px 22px; }
+}
