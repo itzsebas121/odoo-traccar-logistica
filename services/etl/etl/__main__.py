@@ -42,6 +42,18 @@ def _sources():
     return odoo, traccar
 
 
+def tabla_calidad(calidad):
+    """Lineas de texto del informe de calidad de una corrida (entrada, validos, transformados, rechazados, cargados)."""
+    if not calidad:
+        return []
+    columnas = ("entrada", "duplicados", "validos", "rechazados", "transformados", "cargados")
+    lineas = ["calidad: %-10s" % "entidad" + "".join("%14s" % c for c in columnas)]
+    for entidad in sorted(calidad):
+        fila = calidad[entidad]
+        lineas.append("         %-10s" % entidad + "".join("%14s" % fila.get(c, 0) for c in columnas))
+    return lineas
+
+
 def _resumen(modo, conteos):
     if conteos.get("motivo_full"):
         modo = "full (pedida %s; cambio en Odoo: %s)" % (modo, conteos["motivo_full"])
@@ -156,6 +168,8 @@ def cmd_report(a):
                     print("       rechazados: %s" % conteos["rechazados"])
                 if conteos.get("omitidos"):
                     print("       omitidos:   %s" % conteos["omitidos"])
+                for linea in tabla_calidad(conteos.get("calidad")):
+                    print("       " + linea)
                 if error:
                     print("       error:      %s" % error)
             cur.execute("SELECT entidad, motivo, count(*) FROM rechazados WHERE resuelto_utc IS NULL "

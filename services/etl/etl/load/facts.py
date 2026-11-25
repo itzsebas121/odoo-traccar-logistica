@@ -35,6 +35,7 @@ MAX_EN_CURSO = timedelta(hours=12)
 def _rechazar(scur, ctx, entidad, fuente_id, motivo, payload):
     staging.reject(scur, ctx.lote_id, entidad, fuente_id, motivo, payload)
     ctx.rechazados[motivo] = ctx.rechazados.get(motivo, 0) + 1
+    ctx.rechazado(entidad)
 
 
 def procedencia_pedido(pedido, prefijos=None):
@@ -78,7 +79,10 @@ def load_posiciones(dcur, scur, ctx, traccar):
     """fact_posicion_gps. Devuelve la fecha mas reciente vista (candidata a marca de agua)."""
     marca, filas = None, []
     crudas = [_norm_position(x) for x in traccar.get("positions") or []]
-    for p in n.dedupe(crudas, key=lambda x: (x["device"], x["id"] if x["id"] is not None else x["time"])):
+    unicas = n.dedupe(crudas, key=lambda x: (x["device"], x["id"] if x["id"] is not None else x["time"]))
+    ctx.entrada("posicion", len(crudas))
+    ctx.duplicados("posicion", len(crudas) - len(unicas))
+    for p in unicas:
         fid = "pos:%s:%s" % (p["device"], p["id"] if p["id"] is not None
                              else p["time"].isoformat() if p["time"] else "?")
         motivo = q.check_position(p, ctx.now)
@@ -89,8 +93,10 @@ def load_posiciones(dcur, scur, ctx, traccar):
         if motivo:
             _rechazar(scur, ctx, "posicion", fid, motivo, p)
             continue
+        ctx.valido("posicion")
         filas.append((ctx.dispositivo[p["device"]][0], ensure_tiempo(dcur, ctx, p["time"]), p["time"], p["lat"],
                       p["lon"], p["speed_kmh"], fid, ctx.lote_id))
+        ctx.transformado("posicion")
     staging.resolver_rechazos_cargados(scur, "posicion", [f[6] for f in filas])
     if filas:
         execute_values(
@@ -131,7 +137,10 @@ def load_recorridos(dcur, scur, ctx, traccar):
     marca, en_curso, tramos, tope, cargados, reemplazados = None, 0, 0, None, [], 0
     paradas = [(s.get("deviceId"), n.parse_ts(s.get("startTime"))) for s in traccar.get("stops") or []]
     viajes = [_norm_trip(x) for x in traccar.get("trips") or []]
-    for t in n.dedupe(viajes, key=lambda x: (x["device"], x["inicio"])):
+    unicos = n.dedupe(viajes, key=lambda x: (x["device"], x["inicio"]))
+    ctx.entrada("recorrido", len(viajes))
+    ctx.duplicados("recorrido", len(viajes) - len(unicos))
+    for t in unicos:
         fid = "trip:%s:%s" % (t["device"], t["inicio"].isoformat() if t["inicio"] else "?")
         motivo = q.check_trip(t, ctx.now)
         if motivo == "fechas_incoherentes":    # fin antes del inicio o en el futuro: ni marca ni tope
@@ -139,6 +148,8 @@ def load_recorridos(dcur, scur, ctx, traccar):
             continue
         if motivo is None and t["device"] not in ctx.dispositivo:
             motivo = "dispositivo_sin_vehiculo"
+        if motivo is None:
+            ctx.valido("recorrido")            # un viaje en curso es valido: se transforma cuando termine
         if t["fin"] is not None and t["fin"] > ctx.now - CIERRE_RECORRIDO:
             en_curso += 1
             # retiene la marca solo un viaje que se va a cargar y que empezo hace poco
@@ -175,6 +186,7 @@ def load_recorridos(dcur, scur, ctx, traccar):
              ctx.lote_id, t["lat_ini"], t["lon_ini"], t["lat_fin"], t["lon_fin"]))
         reemplazados += _quitar_trozos(dcur, vsk, fid)
         cargados.append(fid)
+        ctx.transformado("recorrido")
         ctx.contar("fact_recorridos")
     staging.resolver_rechazos_cargados(scur, "recorrido", cargados)
     if en_curso:
@@ -213,19 +225,23 @@ def _norm_parada(p):
 def preparar_rutas(scur, ctx, odoo):
     """Normaliza y valida rutas y paradas. Devuelve (rutas, paradas) validas, indexadas por id."""
     rutas, paradas = {}, {}
+    ctx.entrada("ruta", len(odoo.get("logistica.ruta") or []))
     for r in odoo.get("logistica.ruta") or []:
         v = _norm_ruta(r, ctx.tz)
         motivo = q.check_ruta(v)
         if motivo:
             _rechazar(scur, ctx, "ruta", r.get("id"), motivo, r)
             continue
+        ctx.valido("ruta")
         rutas[v["id"]] = v
+    ctx.entrada("parada", len(odoo.get("logistica.ruta.parada") or []))
     for p in odoo.get("logistica.ruta.parada") or []:
         v = _norm_parada(p)
         motivo = q.check_parada(v)
         if motivo:
             _rechazar(scur, ctx, "parada", p.get("id"), motivo, p)
             continue
+        ctx.valido("parada")
         paradas[v["id"]] = v
     return rutas, paradas
 
@@ -261,6 +277,7 @@ def load_rutas(dcur, ctx, odoo, rutas, paradas):
              r["inicio"], r["fin"], r["km_plan"], r["min_plan"], r["fuente_distancia"],
              n.minutos(r["inicio"], r["fin"]), len(estados), estados.count("entregado"),
              estados.count("no_entregado"), estados.count("pendiente"), r["procedencia"], ctx.lote_id))
+        ctx.transformado("ruta")
         ctx.contar("fact_rutas")
     _podar(dcur, "fact_rutas", "ruta_id_odoo", rutas)
 
@@ -324,6 +341,7 @@ def load_paradas(dcur, ctx, odoo, rutas, paradas, entregas):
              n.minutos(p["llegada"], p["cierre"]), n.minutos(ruta["inicio"], p["cierre"] or p["llegada"]),
              p["motivo"] if p["estado"] == "no_entregado" else None, ruta["procedencia"], ctx.lote_id))
         cargadas.append(p["id"])
+        ctx.transformado("parada")
         ctx.contar("fact_paradas")
     _podar(dcur, "fact_paradas", "parada_id_odoo", cargadas)
 
@@ -356,6 +374,7 @@ def load_entregas(dcur, scur, ctx, odoo, rutas, paradas, entregas):
         eventos.setdefault(n.m2o_id(ev.get("entrega_id")), []).append(ev)
 
     cargadas = []
+    ctx.entrada("entrega", len(entregas))
     for e in entregas.values():
         intentos = paradas_de.get(e["id"], [])
         par = intentos[-1] if intentos else None
@@ -378,6 +397,7 @@ def load_entregas(dcur, scur, ctx, odoo, rutas, paradas, entregas):
         if problema is not None:
             _rechazar(scur, ctx, "entrega", e["id"], problema, e["crudo"])
             continue
+        ctx.valido("entrega")
         resultado = ESTADO_RESULTADO.get(e["estado"], "pendiente")
         if resultado != "no_entregado":
             motivo = None
@@ -407,6 +427,7 @@ def load_entregas(dcur, scur, ctx, odoo, rutas, paradas, entregas):
              e["id"], ruta_id, resultado, motivo, planificado, completado, e["pedido_id"], e["estado"], e["creado"],
              limite, a_tiempo, len(intentos), procedencia_pedido(pedidos.get(e["pedido_id"]), prefijos), ctx.lote_id))
         cargadas.append(e["id"])
+        ctx.transformado("entrega")
         ctx.contar("fact_entregas")
     _podar(dcur, "fact_entregas", "entrega_id_odoo", cargadas)
 
@@ -446,6 +467,7 @@ def load_ventas(dcur, scur, ctx, odoo, entregas):
         pedido = pedidos.get(n.m2o_id(linea.get("order_id")))
         if pedido is None or pedido.get("state") not in PEDIDOS_VENTA:
             continue                       # borrador, cotizacion o cancelado: no es un rechazo, aun no es venta
+        ctx.entrada("venta", 1)
         v = dict(id=linea.get("id"), pedido_id=pedido["id"], producto_id=n.m2o_id(linea.get("product_id")),
                  cantidad=n.numero(linea.get("product_uom_qty")), precio=n.numero(linea.get("price_unit")),
                  subtotal=n.numero(linea.get("price_subtotal")), total=n.numero(linea.get("price_total")))
@@ -453,6 +475,7 @@ def load_ventas(dcur, scur, ctx, odoo, entregas):
         if motivo:
             _rechazar(scur, ctx, "venta", linea.get("id"), motivo, linea)
             continue
+        ctx.valido("venta")
         ent = entrega_de.get(pedido["id"]) or {}
         lat, lon = ubicacion_venta(pedido, ent, clientes.get(n.m2o_id(pedido.get("partner_id"))))
         fecha = n.parse_ts(pedido.get("date_order"))
@@ -475,5 +498,6 @@ def load_ventas(dcur, scur, ctx, odoo, entregas):
              pedido.get("state"), v["cantidad"], v["precio"], v["subtotal"], v["total"], ent.get("id"), ctx.lote_id,
              _coord(lat), _coord(lon), procedencia_pedido(pedido, prefijos)))
         cargadas.append(v["id"])
+        ctx.transformado("venta")
         ctx.contar("fact_ventas")
     _podar(dcur, "fact_ventas", "linea_id_odoo", cargadas)

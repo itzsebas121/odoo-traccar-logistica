@@ -20,7 +20,7 @@ VISTAS_BI = {"v_bi_dim_fecha", "v_bi_dim_producto", "v_bi_dim_cliente", "v_bi_di
              "v_bi_comparativa_modelos", "v_bi_corridas_modelo", "v_bi_unidades_espaciales",
              "v_bi_demanda_real_vs_pronostico", "v_bi_recorridos", "v_bi_od_viajes", "v_bi_conductor_resumen",
              "v_bi_entregas", "v_bi_vinculo_gps", "v_bi_ruta_plan_vs_real", "v_bi_paradas", "v_bi_posiciones_ruta",
-             "v_bi_etl_ejecuciones"}
+             "v_bi_etl_ejecuciones", "v_bi_etl_calidad"}
 VISTAS_DWH = VISTAS_ML | VISTAS_BI
 
 
