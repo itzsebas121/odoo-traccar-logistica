@@ -275,6 +275,8 @@ CREATE TABLE IF NOT EXISTS etl_ejecucion (
     omitidos jsonb NOT NULL DEFAULT '[]'::jsonb,
     error text
 );
+-- Informe de calidad por entidad: {entidad: {entrada, duplicados, validos, rechazados, transformados, cargados}}.
+ALTER TABLE etl_ejecucion ADD COLUMN IF NOT EXISTS calidad jsonb NOT NULL DEFAULT '{}'::jsonb;
 
 CREATE INDEX IF NOT EXISTS ix_fact_rec_veh_ini ON fact_recorridos (vehiculo_sk, inicio_utc, fin_utc);
 CREATE INDEX IF NOT EXISTS ix_fact_pos_veh_t ON fact_posicion_gps (vehiculo_sk, gps_time_utc);

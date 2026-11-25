@@ -2,6 +2,13 @@
 from ..transform import normalize as n
 from ..transform import zonas as z
 
+ETAPAS_CALIDAD = ("entrada", "duplicados", "validos", "rechazados", "transformados")
+# Tabla de hechos donde se carga cada entidad del informe de calidad.
+TABLA_DE_ENTIDAD = {
+    "posicion": "fact_posicion_gps", "recorrido": "fact_recorridos", "ruta": "fact_rutas",
+    "parada": "fact_paradas", "entrega": "fact_entregas", "venta": "fact_ventas",
+}
+
 
 class Contexto:
     """Estado de una corrida: lote, reloj, zona horaria, conteos y los mapas id de origen -> clave del DWH."""
@@ -19,9 +26,42 @@ class Contexto:
         self.dispositivo = {}          # id del dispositivo en Traccar -> (vehiculo_sk, vehiculo_id_odoo)
         self.conductor_de_vehiculo = {}
         self._tiempos = set()
+        # Informe de calidad por entidad (spec 5.4.7): entrada, duplicados, validos, rechazados, transformados.
+        self._calidad = {}
 
     def contar(self, tabla, cantidad=1):
         self.cargados[tabla] = self.cargados.get(tabla, 0) + cantidad
+
+    def _sumar(self, entidad, clave, cantidad):
+        fila = self._calidad.setdefault(entidad, dict.fromkeys(ETAPAS_CALIDAD, 0))
+        fila[clave] += cantidad
+
+    def entrada(self, entidad, cantidad):
+        """Filas que llegan a la carga desde staging (antes de quitar duplicados)."""
+        self._sumar(entidad, "entrada", cantidad)
+
+    def duplicados(self, entidad, cantidad):
+        """Filas repetidas dentro del lote: se queda la ultima version de cada registro."""
+        self._sumar(entidad, "duplicados", cantidad)
+
+    def valido(self, entidad, cantidad=1):
+        """Filas que pasaron las reglas de calidad (transform/quality.py)."""
+        self._sumar(entidad, "validos", cantidad)
+
+    def rechazado(self, entidad, cantidad=1):
+        self._sumar(entidad, "rechazados", cantidad)
+
+    def transformado(self, entidad, cantidad=1):
+        """Filas validas ya normalizadas y enriquecidas (UTC, unidades, zona, claves del DWH) listas para cargar.
+        Una valida que no se transforma queda para otra corrida (p. ej. un viaje todavia en curso)."""
+        self._sumar(entidad, "transformados", cantidad)
+
+    def calidad(self):
+        """{entidad: {entrada, duplicados, validos, rechazados, transformados, cargados}} de la corrida."""
+        out = {}
+        for entidad, fila in self._calidad.items():
+            out[entidad] = dict(fila, cargados=self.cargados.get(TABLA_DE_ENTIDAD.get(entidad), 0))
+        return out
 
     def zona(self, lat, lon):
         return z.zona_mas_cercana(self.zonas, lat, lon)

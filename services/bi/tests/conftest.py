@@ -114,10 +114,14 @@ def _poblar(cur):
         ('pronostico','2026-11-05',1,'h3:8','88abc',3,NULL,1,5,'lightgbm_tweedie','v1')""")
 
     cur.execute("""INSERT INTO etl_ejecucion (lote_id, modo, inicio_utc, fin_utc, estado, cargados, rechazados,
-                                              omitidos, error) VALUES
-        (1,'full',%s,%s,'ok','{"fact_entregas": 4, "fact_rutas": 2}','{"coordenadas_invalidas": 2}','[]',NULL),
+                                              omitidos, error, calidad) VALUES
+        (1,'full',%s,%s,'ok','{"fact_entregas": 4, "fact_rutas": 2}','{"coordenadas_invalidas": 2}','[]',NULL,
+         '{"entrega": {"entrada": 6, "duplicados": 0, "validos": 4, "rechazados": 2, "transformados": 4,
+                       "cargados": 4},
+           "ruta": {"entrada": 2, "duplicados": 0, "validos": 2, "rechazados": 0, "transformados": 2,
+                    "cargados": 2}}'),
         (2,'incremental',%s,%s,'error','{}','{"coordenadas_invalidas": 1, "velocidad_anomala": 1}','["traccar"]',
-         'Traccar no responde')""", (_ts(4, 16), _ts(4, 16, 1), _ts(4, 17), _ts(4, 17, 2)))
+         'Traccar no responde', '{}')""", (_ts(4, 16), _ts(4, 16, 1), _ts(4, 17), _ts(4, 17, 2)))
 
 
 @pytest.fixture

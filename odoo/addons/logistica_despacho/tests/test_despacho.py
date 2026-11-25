@@ -287,3 +287,40 @@ class TestDespacho(TransactionCase):
         otro = self.env['res.users'].create({'name': 'Otro', 'login': 'otro_despacho_test'})
         with self.assertRaises(AccessError):
             ruta.assert_driver(otro)
+
+    # ------------------------------------------------- pedido ↔ vehículo y conductor
+    def test_pedido_y_entrega_muestran_vehiculo_y_conductor(self):
+        entrega = self._entrega()
+        pedido = entrega.sale_order_id
+        self.assertFalse(entrega.vehicle_id)
+        self.assertFalse(pedido.logistica_vehicle_id)
+        vehiculo = self._vehiculo()
+        ruta = self._ruta([entrega], vehiculo)
+        ruta.action_aprobar_plan()
+        self.assertEqual(entrega.ruta_id, ruta)
+        self.assertEqual(entrega.vehicle_id, vehiculo)
+        self.assertEqual(entrega.driver_id, vehiculo.driver_id)
+        self.assertEqual(pedido.logistica_ruta_id, ruta)
+        self.assertEqual(pedido.logistica_vehicle_id, vehiculo)
+        self.assertEqual(pedido.logistica_driver_id, vehiculo.driver_id)
+
+    def test_asignacion_guardada_permite_buscar_y_agrupar(self):
+        entrega = self._entrega()
+        vehiculo = self._vehiculo()
+        self._ruta([entrega], vehiculo).action_aprobar_plan()
+        Pedido = self.env['sale.order']
+        self.assertIn(entrega.sale_order_id, Pedido.search([('logistica_vehicle_id', '=', vehiculo.id)]))
+        grupos = Pedido.read_group([('logistica_driver_id', '=', vehiculo.driver_id.id)],
+                                   ['logistica_driver_id'], ['logistica_driver_id'])
+        self.assertEqual(grupos[0]['logistica_driver_id_count'], 1)
+        self.assertIn(entrega, self.env['logistica.entrega'].search([('vehicle_id', '=', vehiculo.id)]))
+
+    def test_cancelar_ruta_libera_vehiculo_y_conductor(self):
+        entrega = self._entrega()
+        ruta = self._ruta([entrega])
+        ruta.action_aprobar_plan()
+        ruta.action_cancelar('Prueba')
+        self.assertFalse(entrega.ruta_id)
+        self.assertFalse(entrega.vehicle_id)
+        self.assertFalse(entrega.sale_order_id.logistica_vehicle_id)
+        self.assertFalse(entrega.sale_order_id.logistica_driver_id)

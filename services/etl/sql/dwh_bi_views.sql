@@ -262,5 +262,24 @@ SELECT x.lote_id, x.modo, x.estado, x.inicio_utc, x.fin_utc,
        ROUND(EXTRACT(EPOCH FROM (x.fin_utc - x.inicio_utc))::numeric, 1) AS segundos,
        (SELECT COALESCE(SUM(v::numeric), 0) FROM jsonb_each_text(x.cargados) AS c(k, v)) AS filas_cargadas,
        (SELECT COALESCE(SUM(v::numeric), 0) FROM jsonb_each_text(x.rechazados) AS c(k, v)) AS filas_rechazadas,
-       jsonb_array_length(x.omitidos) AS omitidos, x.error
+       jsonb_array_length(x.omitidos) AS omitidos, x.error,
+       -- Totales del informe de calidad (columnas nuevas al final: CREATE OR REPLACE solo permite agregar)
+       (SELECT COALESCE(SUM((c.v->>'entrada')::numeric), 0) FROM jsonb_each(x.calidad) AS c(k, v)) AS filas_entrada,
+       (SELECT COALESCE(SUM((c.v->>'validos')::numeric), 0) FROM jsonb_each(x.calidad) AS c(k, v)) AS filas_validas,
+       (SELECT COALESCE(SUM((c.v->>'transformados')::numeric), 0) FROM jsonb_each(x.calidad) AS c(k, v))
+           AS filas_transformadas
 FROM etl_ejecucion x;
+
+-- Informe de calidad: una fila por corrida y entidad (posicion, recorrido, ruta, parada, entrega, venta) con lo que
+-- entro, los duplicados, lo valido segun las reglas, lo rechazado, lo transformado y lo cargado en el DWH.
+CREATE OR REPLACE VIEW v_bi_etl_calidad AS
+SELECT x.lote_id, x.modo, x.estado, x.inicio_utc,
+       c.k AS entidad,
+       COALESCE((c.v->>'entrada')::int, 0) AS entrada,
+       COALESCE((c.v->>'duplicados')::int, 0) AS duplicados,
+       COALESCE((c.v->>'validos')::int, 0) AS validos,
+       COALESCE((c.v->>'rechazados')::int, 0) AS rechazados,
+       COALESCE((c.v->>'transformados')::int, 0) AS transformados,
+       COALESCE((c.v->>'cargados')::int, 0) AS cargados
+FROM etl_ejecucion x
+CROSS JOIN LATERAL jsonb_each(x.calidad) AS c(k, v);

@@ -140,3 +140,20 @@ def test_rechaza_venta_con_importe_invalido(stg_con, dwh_con, odoo, traccar):
     assert rechazos(stg_con, entidad="venta", motivo="importe_invalido", fuente_id="501") == 1
     assert rechazos(stg_con, entidad="venta", motivo="nulos_obligatorios", fuente_id="502") == 1
     assert [r[0] for r in qall(dwh_con, "select linea_id_odoo from fact_ventas order by 1")] == [503, 504]
+
+
+def test_informe_de_calidad_por_entidad(stg_con, dwh_con, odoo, traccar):
+    """Spec 5.4.7: por entidad, registros de entrada, validos, transformados, rechazados y cargados."""
+    traccar.data["positions"][0]["latitude"] = 91                          # una invalida
+    traccar.data["positions"].append(copy.deepcopy(traccar.data["positions"][1]))   # un duplicado
+    res = correr(stg_con, dwh_con, "full", odoo, traccar)
+    pos = res["calidad"]["posicion"]
+    assert pos == {"entrada": 5, "duplicados": 1, "validos": 3, "rechazados": 1, "transformados": 3, "cargados": 3}
+    for entidad, fila in res["calidad"].items():          # cuadra en todas las entidades
+        assert fila["entrada"] == fila["duplicados"] + fila["validos"] + fila["rechazados"], entidad
+        assert fila["transformados"] <= fila["validos"], entidad
+    guardado = q1(dwh_con, "select calidad->'posicion'->>'rechazados' from etl_ejecucion")
+    assert guardado == "1"
+    vista = qall(dwh_con, "select entidad, entrada, validos, rechazados, transformados, cargados "
+                          "from v_bi_etl_calidad where entidad = 'posicion'")
+    assert vista == [("posicion", 5, 3, 1, 3, 3)]

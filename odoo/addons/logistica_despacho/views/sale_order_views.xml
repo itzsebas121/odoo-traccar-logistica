@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Pedido: vehículo y conductor de reparto (vienen de la ruta que despacha su entrega). -->
+    <record id="view_order_form_despacho" model="ir.ui.view">
+        <field name="name">sale.order.form.despacho</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="logistica_base.view_order_form_inherit_logistica"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='logistica_despacho']/group" position="before">
+                <group string="Asignación de reparto" name="logistica_asignacion">
+                    <group>
+                        <field name="logistica_entrega_id" readonly="1"/>
+                        <field name="logistica_ruta_id" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="logistica_vehicle_id" readonly="1"/>
+                        <field name="logistica_driver_id" readonly="1"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_order_tree_despacho" model="ir.ui.view">
+        <field name="name">sale.order.tree.despacho</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <field name="logistica_vehicle_id" optional="show"/>
+                <field name="logistica_driver_id" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_sales_order_filter_despacho" model="ir.ui.view">
+        <field name="name">sale.order.search.despacho</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_sales_order_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <field name="logistica_vehicle_id"/>
+                <field name="logistica_driver_id"/>
+            </xpath>
+            <xpath expr="//group" position="inside">
+                <filter name="g_logistica_vehiculo" string="Vehículo de reparto"
+                        context="{'group_by': 'logistica_vehicle_id'}"/>
+                <filter name="g_logistica_conductor" string="Conductor de reparto"
+                        context="{'group_by': 'logistica_driver_id'}"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Entrega: ruta, vehículo y conductor visibles, con filtro y agrupación. -->
+    <record id="view_logistica_entrega_tree_despacho" model="ir.ui.view">
+        <field name="name">logistica.entrega.tree.despacho</field>
+        <field name="model">logistica.entrega</field>
+        <field name="inherit_id" ref="logistica_entregas.view_logistica_entrega_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='destination_address']" position="after">
+                <field name="ruta_id" optional="show"/>
+                <field name="vehicle_id" optional="show"/>
+                <field name="driver_id" optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_logistica_entrega_form_despacho" model="ir.ui.view">
+        <field name="name">logistica.entrega.form.despacho</field>
+        <field name="model">logistica.entrega</field>
+        <field name="inherit_id" ref="logistica_entregas.view_logistica_entrega_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='intentos']" position="after">
+                <field name="ruta_id" readonly="1"/>
+                <field name="vehicle_id" readonly="1"/>
+                <field name="driver_id" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_logistica_entrega_search_despacho" model="ir.ui.view">
+        <field name="name">logistica.entrega.search.despacho</field>
+        <field name="model">logistica.entrega</field>
+        <field name="inherit_id" ref="logistica_entregas.view_logistica_entrega_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <field name="ruta_id"/>
+                <field name="vehicle_id"/>
+                <field name="driver_id"/>
+            </xpath>
+            <xpath expr="//filter[@name='g_estado_detallado']" position="after">
+                <filter name="g_ruta" string="Ruta" context="{'group_by': 'ruta_id'}"/>
+                <filter name="g_vehiculo" string="Vehículo" context="{'group_by': 'vehicle_id'}"/>
+                <filter name="g_conductor" string="Conductor" context="{'group_by': 'driver_id'}"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

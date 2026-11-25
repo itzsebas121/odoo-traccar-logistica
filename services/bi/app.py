@@ -209,12 +209,18 @@ with t_etl:
         st.info("No hay corridas del ETL en el periodo.")
     else:
         ultima = ej.iloc[0]
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
         c1.metric("Ultima corrida", "%s (%s)" % (ultima["estado"], ultima["modo"]))
         c2.metric("Corridas con error", int((ej["estado"] == "error").sum()))
-        c3.metric("Filas rechazadas", int(ej["filas_rechazadas"].sum()))
+        c3.metric("Filas validas", int(ej["filas_validas"].sum()))
+        c4.metric("Filas rechazadas", int(ej["filas_rechazadas"].sum()))
         st.caption("Ultima corrida iniciada: %s UTC. Las filas rechazadas no llegan al DWH; quedan en staging con "
                    "su motivo." % ultima["inicio_utc"])
+        st.subheader("Informe de calidad por entidad")
+        st.caption("Entrada: filas leidas de staging. Validas: pasaron las reglas de calidad. Transformadas: "
+                   "normalizadas (UTC, unidades, zona, claves del DWH). Cargadas: insertadas o actualizadas en el "
+                   "DWH. Una valida sin transformar queda para otra corrida (por ejemplo, un viaje en curso).")
+        tabla(ind["etl_calidad"])
         st.subheader("Rechazos por regla de calidad")
         tabla(ind["etl_rechazos"])
         st.subheader("Corridas")

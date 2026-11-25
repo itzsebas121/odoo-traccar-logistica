@@ -8,7 +8,7 @@ import olap
 NOMBRES = {"distancia_vehiculo", "recorridos_dia_hora", "duracion_promedio", "zonas_visitadas", "paradas",
            "entregas_cliente", "entregas_estado", "motivos_no_entrega", "cumplimiento", "plan_real_vehiculo",
            "rutas_plan_real", "tiempos_parada", "ventas_cliente", "ventas_producto", "ventas_zona",
-           "etl_ejecuciones", "etl_rechazos", "od_viajes", "conductor_resumen", "vinculo_gps",
+           "etl_ejecuciones", "etl_calidad", "etl_rechazos", "od_viajes", "conductor_resumen", "vinculo_gps",
            "demanda_producto_zona", "ventas_categoria", "ventas_dia_semana", "pronostico_vs_real",
            "comparativa_modelos"}
 
@@ -127,6 +127,13 @@ def test_calidad_del_etl(conn):
     rech = olap.consulta(conn, "etl_rechazos").set_index("motivo")
     assert float(rech.loc["coordenadas_invalidas", "filas"]) == 3.0 and rech.loc["coordenadas_invalidas", "corridas"] == 2
     assert float(rech.loc["velocidad_anomala", "filas"]) == 1.0
+    assert [float(x) for x in ej["filas_entrada"]] == [0.0, 8.0]
+    assert [float(x) for x in ej["filas_validas"]] == [0.0, 6.0]
+    calidad = olap.consulta(conn, "etl_calidad").set_index("entidad")
+    fila = calidad.loc["entrega"]
+    assert (int(fila["entrada"]), int(fila["validos"]), int(fila["rechazados"]), int(fila["transformados"]),
+            int(fila["cargados"])) == (6, 4, 2, 4, 4)
+    assert int(calidad.loc["ruta", "cargados"]) == 2
 
 
 def test_total_devuelve_numeros_de_python():

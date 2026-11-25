@@ -17,6 +17,8 @@ SOLAPE_POSICIONES = timedelta(minutes=10)
 # el fin del ultimo viaje cargado, sin solape: ese instante cae en una parada, asi que ningun viaje sale cortado.
 MARCA_POSICIONES = "traccar:posiciones"
 MARCA_RECORRIDOS = "traccar:recorridos"
+# Entidad del informe de calidad de cada endpoint de Traccar que llega a una tabla de hechos.
+ENTIDAD_TRACCAR = {"positions": "posicion", "trips": "recorrido"}
 MAX_ERROR = 2000
 # Parametros de Odoo que, si cambian, obligan a una corrida completa. logistica_demo reescribe create_date/write_date
 # al pasado (_fechar) y anota hasta que dia cargo el historial: lo sembrado queda por detras de la marca de agua.
@@ -51,8 +53,10 @@ def motivo_full(scur, parametros):
     return "; ".join(cambios) or None
 
 
-def extract_to_staging(scur, lote, modo, odoo_src, traccar_src, now, dias, extraidos, omitidos):
-    """Fase 1: fuentes -> staging. Devuelve las marcas de agua candidatas (todavia no se avanzan)."""
+def extract_to_staging(scur, lote, modo, odoo_src, traccar_src, now, dias, extraidos, omitidos, duplicados=None):
+    """Fase 1: fuentes -> staging. Devuelve las marcas de agua candidatas (todavia no se avanzan).
+    `duplicados` recibe, por entidad, los registros repetidos que llegaron de Traccar (staging guarda uno)."""
+    duplicados = {} if duplicados is None else duplicados
     incremental = modo == "incremental"
     marks = {}
     if odoo_src is None:
@@ -85,7 +89,9 @@ def extract_to_staging(scur, lote, modo, odoo_src, traccar_src, now, dias, extra
         for clave in staging.TRACCAR_ENDPOINTS:
             filas = fetched.get(clave) or []
             extraidos["traccar." + clave] = len(filas)
-            staging.stage_traccar(scur, lote, clave, filas)
+            unicas = staging.stage_traccar(scur, lote, clave, filas)
+            if clave in ENTIDAD_TRACCAR:       # repetidos en la respuesta: staging guarda uno por registro
+                duplicados[ENTIDAD_TRACCAR[clave]] = len(filas) - unicas
     return marks
 
 
@@ -116,13 +122,13 @@ def registrar_ejecucion(dcur, lote, modo, inicio, fin, estado, conteos, error=No
         return json.dumps(x, default=str, ensure_ascii=False)
     dcur.execute(
         """INSERT INTO etl_ejecucion (lote_id, modo, inicio_utc, fin_utc, estado, extraidos, cargados, rechazados,
-                                      omitidos, error)
-           VALUES (%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s::jsonb,%s::jsonb,%s)
+                                      omitidos, calidad, error)
+           VALUES (%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s::jsonb,%s::jsonb,%s::jsonb,%s)
            ON CONFLICT (lote_id) DO UPDATE SET fin_utc=EXCLUDED.fin_utc, estado=EXCLUDED.estado,
              extraidos=EXCLUDED.extraidos, cargados=EXCLUDED.cargados, rechazados=EXCLUDED.rechazados,
-             omitidos=EXCLUDED.omitidos, error=EXCLUDED.error""",
+             omitidos=EXCLUDED.omitidos, calidad=EXCLUDED.calidad, error=EXCLUDED.error""",
         (lote, modo, inicio, fin, estado, j(conteos.get("extraidos", {})), j(conteos.get("cargados", {})),
-         j(conteos.get("rechazados", {})), j(conteos.get("omitidos", [])), error))
+         j(conteos.get("rechazados", {})), j(conteos.get("omitidos", [])), j(conteos.get("calidad", {})), error))
 
 
 def run_etl(stg_conn, dwh_conn, modo, odoo_src, traccar_src, now=None, dias=None, tz=None, retencion=None):
@@ -151,17 +157,22 @@ def run_etl(stg_conn, dwh_conn, modo, odoo_src, traccar_src, now=None, dias=None
         lote, inicio = staging.new_lote(scur, modo)
         stg_conn.commit()  # el lote existe aunque la corrida falle
         try:
+            duplicados = {}
             marks = extract_to_staging(scur, lote, modo, odoo_src, traccar_src, now, dias, conteos["extraidos"],
-                                       conteos["omitidos"])
+                                       conteos["omitidos"], duplicados)
             stg_conn.commit()
 
             odoo = staging.snapshot_odoo(scur)
             traccar = staging.read_traccar(scur, lote) if traccar_src is not None else None
             ctx = dimensions.Contexto(lote, now, tz)
             ctx.cargados, ctx.rechazados, ctx.omitidos = conteos["cargados"], conteos["rechazados"], conteos["omitidos"]
+            for entidad, cantidad in duplicados.items():   # entraron a la extraccion y se descartaron en staging
+                ctx.entrada(entidad, cantidad)
+                ctx.duplicados(entidad, cantidad)
 
             dcur = dwh_conn.cursor()
             marks.update(load_dwh(dcur, scur, ctx, odoo, traccar))
+            conteos["calidad"] = ctx.calidad()
             fin = staging.close_lote(scur, lote, "ok", conteos)
             registrar_ejecucion(dcur, lote, modo, inicio, fin, "ok", conteos)
             dwh_conn.commit()

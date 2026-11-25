@@ -277,16 +277,26 @@ ORDER BY procedencia, unidad_espacial, puesto NULLS LAST, modelo;
 
 -- name: etl_ejecuciones
 -- Bitacora del ETL (no depende de la procedencia). Las mas recientes primero.
-SELECT x.lote_id, x.modo, x.estado, x.inicio_utc, ROUND(EXTRACT(EPOCH FROM (x.fin_utc - x.inicio_utc))::numeric, 1) AS segundos,
-       (SELECT COALESCE(SUM(v::numeric), 0) FROM jsonb_each_text(x.cargados) AS c(k, v)) AS filas_cargadas,
-       (SELECT COALESCE(SUM(v::numeric), 0) FROM jsonb_each_text(x.rechazados) AS c(k, v)) AS filas_rechazadas,
-       jsonb_array_length(x.omitidos) AS omitidos, x.error
-FROM etl_ejecucion x
+SELECT x.lote_id, x.modo, x.estado, x.inicio_utc, x.segundos, x.filas_entrada, x.filas_validas,
+       x.filas_transformadas, x.filas_rechazadas, x.filas_cargadas, x.omitidos, x.error
+FROM v_bi_etl_ejecuciones x
 WHERE (%(desde)s::date IS NULL OR x.inicio_utc::date >= %(desde)s::date)
   AND (%(hasta)s::date IS NULL OR x.inicio_utc::date <= %(hasta)s::date)
   AND (%(proc)s::text[] IS NULL OR TRUE)
 ORDER BY x.lote_id DESC
 LIMIT 50;
+
+-- name: etl_calidad
+-- Informe de calidad del periodo por entidad: entrada, duplicados, validos, rechazados, transformados y cargados.
+SELECT c.entidad, SUM(c.entrada) AS entrada, SUM(c.duplicados) AS duplicados, SUM(c.validos) AS validos,
+       SUM(c.rechazados) AS rechazados, SUM(c.transformados) AS transformados, SUM(c.cargados) AS cargados,
+       COUNT(*) AS corridas
+FROM v_bi_etl_calidad c
+WHERE (%(desde)s::date IS NULL OR c.inicio_utc::date >= %(desde)s::date)
+  AND (%(hasta)s::date IS NULL OR c.inicio_utc::date <= %(hasta)s::date)
+  AND (%(proc)s::text[] IS NULL OR TRUE)
+GROUP BY c.entidad
+ORDER BY c.entidad;
 
 -- name: etl_rechazos
 -- Filas rechazadas por regla de calidad en las corridas del periodo.
