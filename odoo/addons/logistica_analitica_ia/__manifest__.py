@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Logística Analítica IA - Destinos probables',
-    'version': '16.0.1.0.0',
+    'version': '16.0.1.1.0',
     'category': 'Inventory/Logistics',
     'summary': 'Consulta de destinos probables con el modelo predictivo y ruta vial sugerida',
     'description': """

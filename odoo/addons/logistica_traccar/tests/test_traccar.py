@@ -20,6 +20,9 @@ LAT, LON = -1.2417, -78.6197
 # 0,00027 grados de latitud son unos 30 m; 0,0045 son unos 500 m.
 CERCA = 0.00027
 LEJOS = 0.0045
+# Base de los IDs de posicion de Traccar en las pruebas: una base de desarrollo con GPS real ya ocupa los bajos
+# (traccar_position_id es unico) y un ID repetido haria fallar la prueba por datos ajenos a ella.
+ID = 900000000
 
 
 def _redondear(puntos):
@@ -85,9 +88,9 @@ class TestMonitoreoTraccar(_BaseMonitoreo, TransactionCase):
     # ----------------------------------------------------------- posiciones
     def test_sincronizacion_crea_posicion_por_vehiculo(self):
         with mock.patch.object(modulo.requests, 'get', side_effect=_fake_traccar(
-                posiciones={41: [_posicion(2001, lat=LAT, lon=LON)]})):
+                posiciones={41: [_posicion(ID + 2001, lat=LAT, lon=LON)]})):
             self.servidor._sincronizar_todo()
-        posicion = self.env['logistica.traccar.posicion'].search([('traccar_position_id', '=', 2001)])
+        posicion = self.env['logistica.traccar.posicion'].search([('traccar_position_id', '=', ID + 2001)])
         self.assertEqual(posicion.vehicle_id, self.vehiculo)
         self.assertEqual(posicion.device_id, self.dispositivo)
 
@@ -230,16 +233,16 @@ class TestRecorridoGps(_BaseMonitoreo, TransactionCase):
     def test_recorrido_solo_desde_la_salida_y_en_orden(self):
         ruta, _entrega = self._ruta_salida_hace_una_hora()
         salida = ruta.started_at
-        self._posicion_guardada(4001, salida - timedelta(minutes=5), LAT, LON)  # antes de salir: fuera
-        self._posicion_guardada(4003, salida + timedelta(minutes=2), LAT + 2 * CERCA, LON)
-        self._posicion_guardada(4002, salida + timedelta(minutes=1), LAT + CERCA, LON)
+        self._posicion_guardada(ID + 4001, salida - timedelta(minutes=5), LAT, LON)  # antes de salir: fuera
+        self._posicion_guardada(ID + 4003, salida + timedelta(minutes=2), LAT + 2 * CERCA, LON)
+        self._posicion_guardada(ID + 4002, salida + timedelta(minutes=1), LAT + CERCA, LON)
         self.assertEqual(_redondear(ruta._recorrido_gps()), _redondear([[LAT + CERCA, LON], [LAT + 2 * CERCA, LON]]))
 
     def test_recorrido_termina_al_cerrar(self):
         ruta, _entrega = self._ruta_salida_hace_una_hora()
-        self._posicion_guardada(4101, ruta.started_at + timedelta(minutes=1), LAT, LON)
+        self._posicion_guardada(ID + 4101, ruta.started_at + timedelta(minutes=1), LAT, LON)
         ruta.sudo().write({'finished_at': ruta.started_at + timedelta(minutes=10)})
-        self._posicion_guardada(4102, ruta.started_at + timedelta(minutes=20), LAT + LEJOS, LON)
+        self._posicion_guardada(ID + 4102, ruta.started_at + timedelta(minutes=20), LAT + LEJOS, LON)
         self.assertEqual(ruta._recorrido_gps(), [[LAT, LON]])
 
     def test_ruta_sin_salir_no_tiene_recorrido(self):
@@ -248,13 +251,13 @@ class TestRecorridoGps(_BaseMonitoreo, TransactionCase):
             'vehicle_id': self.vehiculo.id, 'driver_id': self.vehiculo.driver_id.id,
             'bodega_id': self.env['logistica.bodega'].get_bodega_activa().id,
             'stop_ids': [(0, 0, {'entrega_id': entrega.id, 'sequence': 1})]})
-        self._posicion_guardada(4201, fields.Datetime.now(), LAT, LON)
+        self._posicion_guardada(ID + 4201, fields.Datetime.now(), LAT, LON)
         self.assertEqual(ruta._recorrido_gps(), [])
 
     def test_recorrido_largo_se_reduce_y_conserva_el_ultimo_punto(self):
         ruta, _entrega = self._ruta_salida_hace_una_hora()
         for i in range(7):
-            self._posicion_guardada(4300 + i, ruta.started_at + timedelta(seconds=i + 1), LAT + i * CERCA, LON)
+            self._posicion_guardada(ID + 4300 + i, ruta.started_at + timedelta(seconds=i + 1), LAT + i * CERCA, LON)
         with mock.patch.object(modulo_ruta, 'MAX_PUNTOS_RECORRIDO', 3):
             puntos = ruta._recorrido_gps()
         self.assertLessEqual(len(puntos), 4)
@@ -266,12 +269,12 @@ class TestRecorridoGps(_BaseMonitoreo, TransactionCase):
         antes = (ruta.started_at - timedelta(minutes=1)).strftime(formato)
         despues = (ruta.started_at + timedelta(minutes=1)).strftime(formato)
         with mock.patch.object(modulo.requests, 'get', side_effect=_fake_traccar(posiciones={41: [
-                _posicion(4401, fix=antes, lat=LAT + LEJOS, lon=LON),
-                _posicion(4402, fix=despues, lat=LAT + LEJOS, lon=LON)]})):
+                _posicion(ID + 4401, fix=antes, lat=LAT + LEJOS, lon=LON),
+                _posicion(ID + 4402, fix=despues, lat=LAT + LEJOS, lon=LON)]})):
             self.servidor._sincronizar_todo()
         Posicion = self.env['logistica.traccar.posicion']
-        self.assertFalse(Posicion.search([('traccar_position_id', '=', 4401)]).route_id)
-        self.assertEqual(Posicion.search([('traccar_position_id', '=', 4402)]).route_id, ruta)
+        self.assertFalse(Posicion.search([('traccar_position_id', '=', ID + 4401)]).route_id)
+        self.assertEqual(Posicion.search([('traccar_position_id', '=', ID + 4402)]).route_id, ruta)
 
 
 @tagged('post_install', '-at_install', 'logistica_traccar')
@@ -297,7 +300,7 @@ class TestMonitoreoHttp(_BaseMonitoreo, HttpCase):
         self.dispositivo._registrar_posicion(fields.Datetime.now(), LAT + LEJOS, LON, 20.0)
         self.servidor.sudo().write({'username': 'usuario-secreto@logistica.local'})
         self.servidor.password = 'clave-secreta-mon'
-        self._posicion_guardada(3001, fields.Datetime.now(), LAT + LEJOS, LON)
+        self._posicion_guardada(ID + 3001, fields.Datetime.now(), LAT + LEJOS, LON)
         cabeceras = dict(CABECERAS, Authorization='Basic Y3JlZGVuY2lhbGVz')
         # El recorrido sale de las posiciones guardadas en Odoo: el mapa no consulta a Traccar.
         with mock.patch.object(modulo.TraccarServer, '_get_auth_headers', return_value=cabeceras), \

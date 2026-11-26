@@ -66,6 +66,8 @@
         }
 
         var pin = null;
+        var botonQuitar = document.getElementById('logistica_map_quitar');
+        var SIN_PUNTO = 'Aún no ha seleccionado el punto de entrega.';
 
         function fijar(latlng) {
             campoLat.value = latlng.lat.toFixed(7);
@@ -88,12 +90,35 @@
                 pin.setLatLng(latlng);
             }
             fijar(pin.getLatLng());
+            if (botonQuitar) {
+                botonQuitar.classList.remove('d-none');
+            }
+        }
+
+        // Quitar el punto: vacía los campos ocultos (el servidor pedirá marcar uno antes de continuar).
+        function quitar() {
+            if (pin) {
+                mapa.removeLayer(pin);
+                pin = null;
+            }
+            campoLat.value = '';
+            campoLon.value = '';
+            if (estado) {
+                estado.textContent = SIN_PUNTO;
+                estado.className = 'form-text text-muted';
+            }
+            if (botonQuitar) {
+                botonQuitar.classList.add('d-none');
+            }
+        }
+        if (botonQuitar) {
+            botonQuitar.addEventListener('click', quitar);
         }
 
         if (tienePin) {
             colocar(L.latLng(lat, lon));
         } else if (estado) {
-            estado.textContent = 'Aún no ha seleccionado el punto de entrega.';
+            estado.textContent = SIN_PUNTO;
         }
         mapa.on('click', function (ev) { colocar(ev.latlng); });
         // El contenedor cambia de tamaño al cargar el formulario, al rotar el
