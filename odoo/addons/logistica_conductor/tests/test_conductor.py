@@ -258,7 +258,7 @@ class TestConductor(HttpCase):
         ruta.sudo().write({'started_at': fields.Datetime.now() - timedelta(hours=1)})
         for i, minutos in enumerate((-90, -30, -10)):  # el primero es anterior a la salida
             self.env['logistica.traccar.posicion'].create({
-                'device_id': dispositivo.id, 'vehicle_id': ruta.vehicle_id.id, 'traccar_position_id': 7700 + i,
+                'device_id': dispositivo.id, 'vehicle_id': ruta.vehicle_id.id, 'traccar_position_id': 900007700 + i,
                 'fix_time': fields.Datetime.now() + timedelta(minutes=minutos),
                 'latitude': LAT + i * 0.001, 'longitude': LON, 'valid': True})
         datos = self._mapa(ruta)
